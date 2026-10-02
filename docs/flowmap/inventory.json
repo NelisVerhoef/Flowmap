@@ -1,0 +1,44 @@
+{
+ "endpoints": [
+  {
+   "endpoint": "CLI flowmap atlas",
+   "handler": "flowmap/atlas.py:__main__",
+   "line": 154
+  },
+  {
+   "endpoint": "CLI flowmap brief",
+   "handler": "flowmap/brief.py:__main__",
+   "line": 91
+  },
+  {
+   "endpoint": "CLI flowmap callgraph",
+   "handler": "flowmap/callgraph.py:__main__",
+   "line": 224
+  },
+  {
+   "endpoint": "CLI flowmap diagrams",
+   "handler": "flowmap/diagrams.py:__main__",
+   "line": 276
+  },
+  {
+   "endpoint": "CLI flowmap inventory",
+   "handler": "flowmap/inventory.py:__main__",
+   "line": 30
+  },
+  {
+   "endpoint": "CLI flowmap lens",
+   "handler": "flowmap/lens.py:__main__",
+   "line": 314
+  },
+  {
+   "endpoint": "CLI flowmap reconcile",
+   "handler": "flowmap/reconcile.py:__main__",
+   "line": 369
+  },
+  {
+   "endpoint": "CLI flowmap verify",
+   "handler": "flowmap/verify.py:__main__",
+   "line": 73
+  }
+ ]
+}

@@ -1,0 +1,205 @@
+{
+  "run_id": "bu-2",
+  "method": "bottom-up",
+  "flows": [
+    {
+      "id": "new:discover-entry-points",
+      "summary": "Maintainer scans the repo being mapped and gets the list of every entry point, the join key for all later passes.",
+      "steps": [
+        {
+          "id": "list-entry-points",
+          "name": "Maintainer lists every entry point of the target repo into inventory.json",
+          "actor": "user",
+          "endpoints": ["CLI flowmap inventory"],
+          "ui": [],
+          "code_path": [
+            "flowmap/inventory.py:__main__",
+            "flowmap/inventory.py:endpoints",
+            "flowmap/config.py:load",
+            "flowmap/config.py:detect_entries",
+            "flowmap/adapters/__init__.py:entries",
+            "flowmap/adapters/cli.py:entries",
+            "flowmap/adapters/cli.py:main_guard"
+          ],
+          "writes": ["docs/flowmap/inventory.json"],
+          "confidence": "high",
+          "notes": "Adapter chosen per [[entry]] in flowmap.toml (cli, fastapi, nextjs, rails); only the cli adapter is exercised in this repo."
+        }
+      ]
+    },
+    {
+      "id": "new:run-mapping-passes",
+      "summary": "Maintainer prepares independent mapping passes for agents and checks each pass's citations and coverage.",
+      "steps": [
+        {
+          "id": "write-pass-brief",
+          "name": "Maintainer generates the brief an agent follows for one mapping pass",
+          "actor": "user",
+          "endpoints": ["CLI flowmap brief"],
+          "ui": [],
+          "code_path": [
+            "flowmap/brief.py:__main__",
+            "flowmap/brief.py:main",
+            "flowmap/brief.py:vocabulary_text",
+            "flowmap/config.py:load",
+            "flowmap/config.py:out"
+          ],
+          "writes": ["docs/flowmap/runs/<run-id>.brief.md"],
+          "confidence": "high",
+          "notes": "Fills flowmap/RUN_SPEC.md with method text and stack text; reads flowmap.toml."
+        },
+        {
+          "id": "agent-produces-run-json",
+          "name": "Agent maps the codebase and writes its run JSON following the brief",
+          "actor": "external",
+          "endpoints": [],
+          "ui": [],
+          "code_path": [],
+          "writes": ["docs/flowmap/runs/<run-id>.json"],
+          "confidence": "medium",
+          "notes": "No code: the agent is the actor. Included because verify and reconcile consume its output."
+        },
+        {
+          "id": "verify-pass",
+          "name": "Maintainer verifies a pass's anchors exist and every entry point is placed",
+          "actor": "user",
+          "endpoints": ["CLI flowmap verify"],
+          "ui": [],
+          "code_path": [
+            "flowmap/verify.py:__main__",
+            "flowmap/verify.py:verify",
+            "flowmap/verify.py:anchor_ok",
+            "flowmap/verify.py:endpoints_in"
+          ],
+          "writes": [],
+          "confidence": "high",
+          "notes": "Prints BAD/MISS lines to stdout and exits 1; writes nothing."
+        }
+      ]
+    },
+    {
+      "id": "new:reconcile-passes",
+      "summary": "Maintainer merges independent passes into one consensus map and gets a list of disagreements to decide.",
+      "steps": [
+        {
+          "id": "reconcile-runs",
+          "name": "Maintainer reconciles passes into map.json, MAP.md and QUESTIONS.md by agreement",
+          "actor": "user",
+          "endpoints": ["CLI flowmap reconcile"],
+          "ui": [],
+          "code_path": [
+            "flowmap/reconcile.py:__main__",
+            "flowmap/reconcile.py:main",
+            "flowmap/reconcile.py:canonical_new_flows",
+            "flowmap/reconcile.py:jaccard",
+            "flowmap/reconcile.py:UnionFind.union",
+            "flowmap/reconcile.py:tested_endpoints",
+            "flowmap/reconcile.py:write_map_md",
+            "flowmap/reconcile.py:write_questions_md"
+          ],
+          "writes": ["docs/flowmap/map.json", "docs/flowmap/MAP.md", "docs/flowmap/QUESTIONS.md"],
+          "confidence": "high",
+          "notes": "Reads inventory.json, runs, and optional decisions.json (human-owned). Test hits come from [code].tests."
+        }
+      ]
+    },
+    {
+      "id": "new:visualize-map",
+      "summary": "Maintainer renders the consensus map as Mermaid diagrams and an interactive atlas page.",
+      "steps": [
+        {
+          "id": "generate-diagrams",
+          "name": "Maintainer generates Mermaid diagrams at system, flow and step zoom",
+          "actor": "user",
+          "endpoints": ["CLI flowmap diagrams"],
+          "ui": ["flowmap/diagrams.py:Diagrams.write"],
+          "code_path": [
+            "flowmap/diagrams.py:__main__",
+            "flowmap/diagrams.py:Diagrams.__init__",
+            "flowmap/diagrams.py:Diagrams.system",
+            "flowmap/diagrams.py:Diagrams.flow",
+            "flowmap/diagrams.py:Diagrams.step",
+            "flowmap/diagrams.py:Diagrams.write",
+            "flowmap/callgraph.py:Graph.__init__"
+          ],
+          "writes": ["docs/flowmap/diagrams/README.md", "docs/flowmap/diagrams/<flow>.md"],
+          "confidence": "high",
+          "notes": "Requires map.json from reconcile."
+        },
+        {
+          "id": "build-atlas",
+          "name": "Maintainer builds the interactive atlas HTML, optionally overlaying PR changes",
+          "actor": "user",
+          "endpoints": ["CLI flowmap atlas"],
+          "ui": ["flowmap/atlas.py:build"],
+          "code_path": [
+            "flowmap/atlas.py:__main__",
+            "flowmap/atlas.py:build",
+            "flowmap/atlas.py:step_code",
+            "flowmap/atlas.py:step_keys",
+            "flowmap/atlas.py:split_votes",
+            "flowmap/atlas.py:overlay",
+            "flowmap/diagrams.py:Diagrams.system",
+            "flowmap/lens.py:changed_lines",
+            "flowmap/callgraph.py:Graph.callers"
+          ],
+          "writes": ["docs/flowmap/atlas.html"],
+          "confidence": "high",
+          "notes": "Renders atlas.template.html with embedded JSON. Imports lens and diagrams as libraries."
+        }
+      ]
+    },
+    {
+      "id": "new:review-change-on-map",
+      "summary": "Reviewer sees where a PR lands on the flow map and which entry points a code symbol can affect.",
+      "steps": [
+        {
+          "id": "place-change-with-lens",
+          "name": "Reviewer places a git change on the map: touched steps, reach and off-map code",
+          "actor": "user",
+          "endpoints": ["CLI flowmap lens"],
+          "ui": [],
+          "code_path": [
+            "flowmap/lens.py:__main__",
+            "flowmap/lens.py:main",
+            "flowmap/lens.py:changed_lines",
+            "flowmap/lens.py:symbols_at",
+            "flowmap/lens.py:defs",
+            "flowmap/lens.py:endpoint_set",
+            "flowmap/lens.py:importers",
+            "flowmap/inventory.py:endpoints"
+          ],
+          "writes": [],
+          "confidence": "high",
+          "notes": "Reads map.json and git history; prints markdown to stdout."
+        },
+        {
+          "id": "symbol-impact",
+          "name": "Developer asks which entry points and flows can reach a given symbol",
+          "actor": "user",
+          "endpoints": ["CLI flowmap callgraph"],
+          "ui": [],
+          "code_path": [
+            "flowmap/callgraph.py:__main__",
+            "flowmap/callgraph.py:Graph.__init__",
+            "flowmap/callgraph.py:impact",
+            "flowmap/callgraph.py:endpoint_flows",
+            "flowmap/callgraph.py:Graph.callers"
+          ],
+          "writes": [],
+          "confidence": "high",
+          "notes": "Subcommand 'impact' prints reach; no args prints graph size. bin/flowmap documents it but the dispatcher lists it."
+        }
+      ]
+    }
+  ],
+  "unplaced_endpoints": [],
+  "observations": [
+    "flowmap/atlas.py:overlay re-implements PR change detection (changed_lines/symbols_at/endpoint_set from lens.py) with its own changed/new classification, parallel to flowmap/lens.py:main.",
+    "flowmap/atlas.py:build and flowmap/callgraph.py:__main__ import other command scripts as libraries (diagrams, lens), so 'commands' are also shared modules; flowmap/atlas.py:step_code duplicates flowmap/diagrams.py:Diagrams.step.",
+    "flowmap/callgraph.py:endpoint_flows and flowmap/diagrams.py:Diagrams.__init__ each independently load inventory.json and map.json to build the endpoint-to-handler lookup.",
+    "flowmap/verify.py:anchor_ok uses regex definition matching while flowmap/callgraph.py:Graph uses the AST, so what counts as a valid symbol can differ between verify and the call graph.",
+    "flowmap/reconcile.py:main is one very large function doing voting, step clustering, evidence and file writing in one body.",
+    "flowmap/inventory.py:endpoints is reused by lens.py via git revisions through a custom read callable; the 'inventory' command itself only writes the worktree view."
+  ]
+}
