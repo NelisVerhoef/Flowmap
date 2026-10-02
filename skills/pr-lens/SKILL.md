@@ -26,6 +26,10 @@ A PR number, a branch, or a commit range. Resolve to `<base> <head>`:
    model: it is the authority on blast radius. It over-reports (reachable ≠ executed:
    conditional branches, test doubles resolved by method name) and misses string/registry
    dispatch — so treat a reached step as "ask whether this path is affected", not "broken".
+   Its **Reach diff** section compares the call graph at base and head: existing code an
+   endpoint can newly reach, or no longer reaches, though that code itself may be unchanged.
+   A map anchor or a check (auth, validation, audit) under "no longer reachable" is the first
+   question to ask the author.
 2. Read the PR description / commit messages (`git log --format=%B <base>..<head>`) for
    stated intent.
 3. For each touched step and each off-map change, read *just enough* of the diff to say

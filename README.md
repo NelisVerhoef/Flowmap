@@ -43,7 +43,7 @@ flowmap atlas                     # the interactive map (docs/flowmap/atlas.html
 ## Every PR
 
 ```bash
-flowmap lens <base> <head>                       # placement, reach, off-map code
+flowmap lens <base> <head>                       # placement, reach, reach diff, off-map code
 flowmap atlas --pr '<base>..<head>=PR #123'      # paint it on the map
 ```
 
