@@ -1,0 +1,281 @@
+{
+  "run_id": "bu-1",
+  "method": "bottom-up",
+  "flows": [
+    {
+      "id": "new:build-flow-map",
+      "summary": "Turn a repo into a first flow map: list its entry points, brief independent mapping passes, check each pass, and vote them into one map.",
+      "steps": [
+        {
+          "id": "inventory-entry-points",
+          "name": "Maintainer lists every entry point the repo exposes into inventory.json",
+          "actor": "user",
+          "endpoints": ["CLI flowmap inventory"],
+          "ui": [],
+          "code_path": [
+            "flowmap/inventory.py:__main__",
+            "flowmap/inventory.py:endpoints",
+            "flowmap/config.py:load",
+            "flowmap/config.py:detect_entries",
+            "flowmap/adapters/__init__.py:entries",
+            "flowmap/adapters/cli.py:entries",
+            "flowmap/adapters/cli.py:_files",
+            "flowmap/adapters/cli.py:_entry",
+            "flowmap/adapters/cli.py:main_guard",
+            "flowmap/inventory.py:read_worktree",
+            "flowmap/config.py:out"
+          ],
+          "writes": ["docs/flowmap/inventory.json"],
+          "confidence": "high",
+          "notes": "Adapter chosen by flowmap.toml [[entry]]; detect_entries only auto-detects rails/nextjs/fastapi, never cli. Other adapters (fastapi/rails/nextjs .entries) are reachable by config but not used in this repo."
+        },
+        {
+          "id": "write-pass-briefs",
+          "name": "Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)",
+          "actor": "user",
+          "endpoints": ["CLI flowmap brief"],
+          "ui": [],
+          "code_path": [
+            "flowmap/brief.py:__main__",
+            "flowmap/brief.py:main",
+            "flowmap/config.py:load",
+            "flowmap/brief.py:vocabulary_text",
+            "flowmap/config.py:out"
+          ],
+          "writes": ["docs/flowmap/runs/<run-id>.brief.md"],
+          "confidence": "high",
+          "notes": "Fills RUN_SPEC.md template with METHODS/STACK text. The passes themselves (agents writing runs/<id>.json) have no code in this repo."
+        },
+        {
+          "id": "verify-pass-citations",
+          "name": "Maintainer checks each pass's anchors exist and every entry point is placed",
+          "actor": "user",
+          "endpoints": ["CLI flowmap verify"],
+          "ui": [],
+          "code_path": [
+            "flowmap/verify.py:__main__",
+            "flowmap/config.py:out",
+            "flowmap/verify.py:verify",
+            "flowmap/verify.py:anchor_ok",
+            "flowmap/verify.py:_text",
+            "flowmap/verify.py:endpoints_in"
+          ],
+          "writes": [],
+          "confidence": "high",
+          "notes": "Read-only; result is stdout + exit code. Also run by each mapping agent on its own output before finishing."
+        },
+        {
+          "id": "reconcile-runs-into-map",
+          "name": "Maintainer votes the passes into one map with evidence levels and a list of open questions",
+          "actor": "user",
+          "endpoints": ["CLI flowmap reconcile"],
+          "ui": [],
+          "code_path": [
+            "flowmap/reconcile.py:__main__",
+            "flowmap/reconcile.py:main",
+            "flowmap/reconcile.py:canonical_new_flows",
+            "flowmap/reconcile.py:jaccard",
+            "flowmap/reconcile.py:UnionFind.union",
+            "flowmap/reconcile.py:UnionFind.groups",
+            "flowmap/reconcile.py:tested_endpoints",
+            "flowmap/reconcile.py:path_regex",
+            "flowmap/reconcile.py:write_map_md",
+            "flowmap/reconcile.py:write_questions_md"
+          ],
+          "writes": ["docs/flowmap/map.json", "docs/flowmap/MAP.md", "docs/flowmap/QUESTIONS.md"],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "id": "new:settle-map-decisions",
+      "summary": "Name the proposed flows and settle split votes, then rebuild the map so human decisions become the fixed vocabulary and confirmed evidence.",
+      "steps": [
+        {
+          "id": "reconcile-with-decisions",
+          "name": "Maintainer re-runs reconcile after naming flows in flowmap.toml and pinning answers in decisions.json",
+          "actor": "user",
+          "endpoints": ["CLI flowmap reconcile"],
+          "ui": [],
+          "code_path": [
+            "flowmap/reconcile.py:__main__",
+            "flowmap/reconcile.py:main",
+            "flowmap/config.py:flow_order",
+            "flowmap/reconcile.py:canonical_new_flows",
+            "flowmap/reconcile.py:write_map_md",
+            "flowmap/reconcile.py:write_questions_md"
+          ],
+          "writes": ["docs/flowmap/map.json", "docs/flowmap/MAP.md", "docs/flowmap/QUESTIONS.md"],
+          "confidence": "medium",
+          "notes": "decisions.json endpoint_flow pins flow placement ('confirmed'); confirmed_steps raises evidence; canonical_new_flows drops the new: prefix once the id is in the vocabulary. decisions.json and flowmap.toml are hand-edited, no command writes them."
+        },
+        {
+          "id": "rebrief-with-vocabulary",
+          "name": "Maintainer regenerates briefs so later passes place steps under the named flows",
+          "actor": "user",
+          "endpoints": ["CLI flowmap brief"],
+          "ui": [],
+          "code_path": [
+            "flowmap/brief.py:__main__",
+            "flowmap/brief.py:main",
+            "flowmap/config.py:load",
+            "flowmap/brief.py:vocabulary_text"
+          ],
+          "writes": ["docs/flowmap/runs/<run-id>.brief.md"],
+          "confidence": "low",
+          "notes": "Inferred from vocabulary_text switching between discovery mode and a fixed flow table."
+        }
+      ]
+    },
+    {
+      "id": "new:explore-the-map",
+      "summary": "See the map: flows, their steps and the code each step runs, as Mermaid diagrams and an interactive atlas page.",
+      "steps": [
+        {
+          "id": "generate-diagrams",
+          "name": "Maintainer generates Mermaid diagrams at system, flow and step zoom",
+          "actor": "user",
+          "endpoints": ["CLI flowmap diagrams"],
+          "ui": [],
+          "code_path": [
+            "flowmap/diagrams.py:__main__",
+            "flowmap/diagrams.py:Diagrams.__init__",
+            "flowmap/callgraph.py:Graph.__init__",
+            "flowmap/callgraph.py:Graph._collect",
+            "flowmap/callgraph.py:Graph._link",
+            "flowmap/diagrams.py:Diagrams._forward",
+            "flowmap/diagrams.py:Diagrams.write",
+            "flowmap/diagrams.py:Diagrams.system",
+            "flowmap/diagrams.py:Diagrams.component",
+            "flowmap/diagrams.py:Diagrams._forward_avoiding",
+            "flowmap/diagrams.py:Diagrams.flow",
+            "flowmap/diagrams.py:Diagrams.step"
+          ],
+          "writes": ["docs/flowmap/diagrams/README.md", "docs/flowmap/diagrams/<flow>.md"],
+          "confidence": "high",
+          "notes": "Requires map.json from reconcile."
+        },
+        {
+          "id": "build-atlas",
+          "name": "Maintainer builds the interactive atlas page and browses flows, steps and components",
+          "actor": "user",
+          "endpoints": ["CLI flowmap atlas"],
+          "ui": [
+            "flowmap/atlas.py:build",
+            "flowmap/atlas.template.html:renderLines",
+            "flowmap/atlas.template.html:renderCore",
+            "flowmap/atlas.template.html:renderRail",
+            "flowmap/atlas.template.html:paint"
+          ],
+          "code_path": [
+            "flowmap/atlas.py:__main__",
+            "flowmap/atlas.py:build",
+            "flowmap/diagrams.py:Diagrams.__init__",
+            "flowmap/callgraph.py:Graph.__init__",
+            "flowmap/diagrams.py:Diagrams.system",
+            "flowmap/atlas.py:split_votes",
+            "flowmap/atlas.py:step_keys",
+            "flowmap/atlas.py:step_code",
+            "flowmap/diagrams.py:Diagrams.component",
+            "flowmap/lens.py:git"
+          ],
+          "writes": ["docs/flowmap/atlas.html"],
+          "confidence": "high",
+          "notes": "Reads map.json, inventory.json and QUESTIONS.md (split votes are scraped back out of the generated markdown)."
+        }
+      ]
+    },
+    {
+      "id": "new:review-a-change",
+      "summary": "Review a PR by where it lands on the map: which flows and steps it touches, what it can reach, and what code the map doesn't know.",
+      "steps": [
+        {
+          "id": "lens-place-change",
+          "name": "Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)",
+          "actor": "user",
+          "endpoints": ["CLI flowmap lens"],
+          "ui": [],
+          "code_path": [
+            "flowmap/lens.py:__main__",
+            "flowmap/lens.py:main",
+            "flowmap/lens.py:changed_lines",
+            "flowmap/lens.py:show",
+            "flowmap/lens.py:defs",
+            "flowmap/lens.py:py_symbols",
+            "flowmap/lens.py:symbols_at",
+            "flowmap/lens.py:endpoint_set",
+            "flowmap/inventory.py:endpoints",
+            "flowmap/adapters/__init__.py:entries",
+            "flowmap/callgraph.py:Graph.__init__",
+            "flowmap/callgraph.py:Graph.callers",
+            "flowmap/lens.py:importers"
+          ],
+          "writes": [],
+          "confidence": "high",
+          "notes": "Prints markdown to stdout only; the pr-lens skill consumes it. Re-inventories both revisions via git show."
+        },
+        {
+          "id": "atlas-pr-overlay",
+          "name": "Reviewer paints the change onto the atlas as a PR overlay",
+          "actor": "user",
+          "endpoints": ["CLI flowmap atlas"],
+          "ui": ["flowmap/atlas.py:build", "flowmap/atlas.template.html:currentOverlay", "flowmap/atlas.template.html:paint"],
+          "code_path": [
+            "flowmap/atlas.py:__main__",
+            "flowmap/atlas.py:build",
+            "flowmap/atlas.py:overlay",
+            "flowmap/lens.py:changed_lines",
+            "flowmap/lens.py:show",
+            "flowmap/lens.py:defs",
+            "flowmap/lens.py:symbols_at",
+            "flowmap/lens.py:endpoint_set",
+            "flowmap/callgraph.py:Graph.__init__",
+            "flowmap/callgraph.py:Graph.callers",
+            "flowmap/atlas.py:step_keys"
+          ],
+          "writes": ["docs/flowmap/atlas.html"],
+          "confidence": "high",
+          "notes": "Triggered by --pr base..head=label; one overlay per flag."
+        }
+      ]
+    },
+    {
+      "id": "new:trace-symbol-impact",
+      "summary": "Ask which entry points (and flows) can reach a given function before changing it.",
+      "steps": [
+        {
+          "id": "callgraph-impact",
+          "name": "Developer asks which entry points and flows can reach a file:symbol",
+          "actor": "user",
+          "endpoints": ["CLI flowmap callgraph"],
+          "ui": [],
+          "code_path": [
+            "flowmap/callgraph.py:__main__",
+            "flowmap/callgraph.py:Graph.__init__",
+            "flowmap/callgraph.py:Graph._collect",
+            "flowmap/callgraph.py:Graph._imports",
+            "flowmap/callgraph.py:Graph._link",
+            "flowmap/callgraph.py:Graph._one_interface",
+            "flowmap/callgraph.py:impact",
+            "flowmap/callgraph.py:endpoint_flows",
+            "flowmap/callgraph.py:Graph.callers"
+          ],
+          "writes": [],
+          "confidence": "high",
+          "notes": "Without the 'impact' subcommand it only prints graph size. endpoint_flows reads map.json, so it fails before reconcile has run."
+        }
+      ]
+    }
+  ],
+  "unplaced_endpoints": [],
+  "observations": [
+    "Two implementations of 'place a diff on the map': flowmap/atlas.py:overlay re-derives changed/new symbols and call-graph reach itself using lens helpers, instead of sharing logic with flowmap/lens.py:main. They already differ: overlay skips test files and '<module>' hits, lens.main counts '<module>' as a changed symbol and classifies steps by anchor match first.",
+    "flowmap/atlas.py:build calls flowmap/diagrams.py:Diagrams.system and throws away the Mermaid it returns, only to get self.matrix set as a side effect.",
+    "flowmap/atlas.py:split_votes scrapes split votes back out of the human-facing QUESTIONS.md written by flowmap/reconcile.py:write_questions_md (regex on '→ placed'): a generated report doubles as a data interface, and the vote data is never written to map.json.",
+    "The call graph is rebuilt from scratch in four places: flowmap/callgraph.py:__main__, flowmap/diagrams.py:Diagrams.__init__, flowmap/lens.py:main and once per --pr in flowmap/atlas.py:overlay (plus Diagrams again in flowmap/atlas.py:build).",
+    "flowmap/adapters/cli.py:_files lists commands with git ls-files, so a new, untracked command script is invisible to inventory while every other tool reads the worktree; flowmap/config.py:detect_entries never auto-detects the cli adapter, so CLI repos depend on flowmap.toml.",
+    "flowmap/verify.py:anchor_ok checks each dotted part of 'Class.method' independently anywhere in the file, so a method cited under the wrong class still passes.",
+    "flowmap/reconcile.py:canonical_new_flows merges proposed flows transitively at Jaccard >= 0.3 via union-find, so a chain of partially overlapping proposals can collapse into one flow.",
+    "Docstrings and messages still name another repo's layout ('tools/flowmap/...', 'backend/app' in flowmap/callgraph.py and flowmap/reconcile.py:write_map_md), though the real path is flowmap/ under config.root()."
+  ]
+}

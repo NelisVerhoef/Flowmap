@@ -1,0 +1,398 @@
+{
+ "runs": [
+  "bu-1",
+  "bu-2",
+  "td-1",
+  "td-2"
+ ],
+ "agree_threshold": 3,
+ "flows": [
+  {
+   "id": "new:discover-entry-points",
+   "summary": "Maintainer scans the repo being mapped and gets the list of every entry point, the join key for all later passes.",
+   "steps": [
+    {
+     "id": "list-entry-points",
+     "name": "Maintainer lists every entry point the repo exposes into inventory.json",
+     "alt_names": [
+      "Maintainer lists every entry point of the target repo into inventory.json",
+      "Maintainer runs `flowmap inventory` to discover every entry point via the configured or auto-detected adapters",
+      "User runs `flowmap inventory` to scan the repo's adapters and write the entry-point list"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap inventory"
+     ],
+     "ui": [],
+     "code_path": [
+      "flowmap/inventory.py:__main__",
+      "flowmap/inventory.py:endpoints",
+      "flowmap/config.py:load",
+      "flowmap/config.py:detect_entries",
+      "flowmap/adapters/__init__.py:entries",
+      "flowmap/adapters/cli.py:_files",
+      "flowmap/adapters/cli.py:entries",
+      "flowmap/adapters/cli.py:_entry",
+      "flowmap/adapters/cli.py:main_guard",
+      "flowmap/inventory.py:read_worktree",
+      "flowmap/config.py:out"
+     ],
+     "disputed_hops": [],
+     "writes": [
+      "docs/flowmap/inventory.json"
+     ],
+     "busyness": {
+      "hops": 11,
+      "files": 4
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap inventory"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "new:review-change-on-map",
+   "summary": "See the map: flows, their steps and the code each step runs, as Mermaid diagrams and an interactive atlas page.",
+   "steps": [
+    {
+     "id": "generate-diagrams",
+     "name": "Maintainer generates Mermaid diagrams at system, flow and step zoom",
+     "alt_names": [
+      "Maintainer runs `flowmap diagrams` to write Mermaid diagrams at system, flow and step zoom",
+      "User generates Mermaid diagrams at system, flow and step zoom"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap diagrams"
+     ],
+     "ui": [
+      "flowmap/diagrams.py:Diagrams.write"
+     ],
+     "code_path": [
+      "flowmap/diagrams.py:__main__",
+      "flowmap/diagrams.py:Diagrams.__init__",
+      "flowmap/callgraph.py:Graph._collect",
+      "flowmap/callgraph.py:Graph._link",
+      "flowmap/callgraph.py:Graph.__init__",
+      "flowmap/diagrams.py:Diagrams._forward",
+      "flowmap/diagrams.py:Diagrams.system",
+      "flowmap/diagrams.py:Diagrams.write",
+      "flowmap/diagrams.py:Diagrams.flow",
+      "flowmap/diagrams.py:Diagrams.component",
+      "flowmap/diagrams.py:Diagrams._forward_avoiding",
+      "flowmap/diagrams.py:Diagrams.step"
+     ],
+     "disputed_hops": [
+      "flowmap/callgraph.py:Graph"
+     ],
+     "writes": [
+      "docs/flowmap/diagrams/<flow>.md",
+      "docs/flowmap/diagrams/README.md"
+     ],
+     "busyness": {
+      "hops": 12,
+      "files": 2
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap diagrams"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    },
+    {
+     "id": "lens-place-change",
+     "name": "Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)",
+     "alt_names": [
+      "Reviewer places a git change on the map: touched steps, reach and off-map code",
+      "Reviewer runs `flowmap lens <base> <head>` to see flows/steps touched, endpoint changes, call-graph reach and off-map code",
+      "Reviewer runs the lens on a base..head diff to see touched steps, reach and off-map code"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap lens"
+     ],
+     "ui": [],
+     "code_path": [
+      "flowmap/lens.py:__main__",
+      "flowmap/lens.py:main",
+      "flowmap/lens.py:changed_lines",
+      "flowmap/lens.py:show",
+      "flowmap/lens.py:defs",
+      "flowmap/lens.py:symbols_at",
+      "flowmap/lens.py:py_symbols",
+      "flowmap/lens.py:endpoint_set",
+      "flowmap/inventory.py:endpoints",
+      "flowmap/callgraph.py:Graph.__init__",
+      "flowmap/lens.py:importers",
+      "flowmap/callgraph.py:Graph.callers"
+     ],
+     "disputed_hops": [
+      "flowmap/adapters/__init__.py:entries",
+      "flowmap/callgraph.py:Graph",
+      "flowmap/lens.py:git"
+     ],
+     "writes": [],
+     "busyness": {
+      "hops": 12,
+      "files": 3
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap lens"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    },
+    {
+     "id": "callgraph-impact",
+     "name": "Developer asks which entry points and flows can reach a file:symbol",
+     "alt_names": [
+      "Developer asks which entry points and flows can reach a given symbol",
+      "Reviewer asks which entry points and flows can reach a given symbol",
+      "Reviewer runs `flowmap callgraph impact <file:sym>` to list which entry points and flows can reach a symbol"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap callgraph"
+     ],
+     "ui": [],
+     "code_path": [
+      "flowmap/callgraph.py:__main__",
+      "flowmap/callgraph.py:Graph.__init__",
+      "flowmap/callgraph.py:Graph._collect",
+      "flowmap/callgraph.py:Graph._link",
+      "flowmap/callgraph.py:Graph._imports",
+      "flowmap/callgraph.py:impact",
+      "flowmap/callgraph.py:endpoint_flows",
+      "flowmap/callgraph.py:Graph.callers"
+     ],
+     "disputed_hops": [
+      "flowmap/callgraph.py:Graph",
+      "flowmap/callgraph.py:Graph._one_interface"
+     ],
+     "writes": [],
+     "busyness": {
+      "hops": 8,
+      "files": 1
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap callgraph"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    },
+    {
+     "id": "build-atlas",
+     "name": "Maintainer builds the interactive atlas page and browses flows, steps and components",
+     "alt_names": [
+      "Maintainer builds the interactive atlas HTML, optionally overlaying PR changes",
+      "Maintainer runs `flowmap atlas` to build the interactive HTML map and browses flows, steps and code flow in it",
+      "User builds the interactive atlas page, optionally painting a PR's reach onto it"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap atlas"
+     ],
+     "ui": [
+      "flowmap/atlas.py:build",
+      "flowmap/atlas.template.html:codeFlow",
+      "flowmap/atlas.template.html:paint",
+      "flowmap/atlas.template.html:renderCore",
+      "flowmap/atlas.template.html:renderLines",
+      "flowmap/atlas.template.html:renderRail",
+      "flowmap/atlas.template.html:select"
+     ],
+     "code_path": [
+      "flowmap/atlas.py:__main__",
+      "flowmap/atlas.py:build",
+      "flowmap/callgraph.py:Graph.__init__",
+      "flowmap/diagrams.py:Diagrams.__init__",
+      "flowmap/atlas.py:step_keys",
+      "flowmap/atlas.py:split_votes",
+      "flowmap/diagrams.py:Diagrams.system",
+      "flowmap/atlas.py:step_code",
+      "flowmap/atlas.py:overlay",
+      "flowmap/diagrams.py:Diagrams.component",
+      "flowmap/lens.py:changed_lines",
+      "flowmap/lens.py:git"
+     ],
+     "disputed_hops": [
+      "flowmap/callgraph.py:Graph",
+      "flowmap/callgraph.py:Graph.callers",
+      "flowmap/diagrams.py:Diagrams._forward_avoiding"
+     ],
+     "writes": [
+      "docs/flowmap/atlas.html"
+     ],
+     "busyness": {
+      "hops": 12,
+      "files": 4
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap atlas"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "new:run-mapping-passes",
+   "summary": "Turn a repo into a first flow map: list its entry points, brief independent mapping passes, check each pass, and vote them into one map.",
+   "steps": [
+    {
+     "id": "write-pass-brief",
+     "name": "Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)",
+     "alt_names": [
+      "Maintainer generates the brief an agent follows for one mapping pass",
+      "Maintainer runs `flowmap brief <run-id> <method>` to write a filled-in brief for one agent pass",
+      "User generates a pass brief for one run id and method"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap brief"
+     ],
+     "ui": [],
+     "code_path": [
+      "flowmap/brief.py:__main__",
+      "flowmap/brief.py:main",
+      "flowmap/config.py:load",
+      "flowmap/brief.py:vocabulary_text",
+      "flowmap/config.py:out"
+     ],
+     "disputed_hops": [
+      "flowmap/config.py:root"
+     ],
+     "writes": [
+      "docs/flowmap/runs/<run-id>.brief.md"
+     ],
+     "busyness": {
+      "hops": 5,
+      "files": 2
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap brief"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    },
+    {
+     "id": "reconcile-runs",
+     "name": "Maintainer votes the passes into one map with evidence levels and a list of open questions",
+     "alt_names": [
+      "Maintainer reconciles passes into map.json, MAP.md and QUESTIONS.md by agreement",
+      "Maintainer runs `flowmap reconcile` to merge pass outputs into map.json, MAP.md and QUESTIONS.md by endpoint agreement",
+      "User reconciles the passes by vote into map.json, MAP.md and QUESTIONS.md"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap reconcile"
+     ],
+     "ui": [],
+     "code_path": [
+      "flowmap/reconcile.py:__main__",
+      "flowmap/reconcile.py:main",
+      "flowmap/reconcile.py:canonical_new_flows",
+      "flowmap/reconcile.py:jaccard",
+      "flowmap/reconcile.py:UnionFind.union",
+      "flowmap/reconcile.py:UnionFind.groups",
+      "flowmap/reconcile.py:tested_endpoints",
+      "flowmap/reconcile.py:path_regex",
+      "flowmap/reconcile.py:write_map_md",
+      "flowmap/reconcile.py:write_questions_md"
+     ],
+     "disputed_hops": [],
+     "writes": [
+      "docs/flowmap/MAP.md",
+      "docs/flowmap/QUESTIONS.md",
+      "docs/flowmap/map.json"
+     ],
+     "busyness": {
+      "hops": 10,
+      "files": 1
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap reconcile"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    },
+    {
+     "id": "verify-pass-citations",
+     "name": "Maintainer checks each pass's anchors exist and every entry point is placed",
+     "alt_names": [
+      "Maintainer runs `flowmap verify` to reject bad citations and unplaced inventory entry points in a pass's JSON",
+      "Maintainer verifies a pass's anchors exist and every entry point is placed",
+      "User verifies a finished pass: every anchor exists and every inventory entry point is placed"
+     ],
+     "actor": "user",
+     "endpoints": [
+      "CLI flowmap verify"
+     ],
+     "ui": [],
+     "code_path": [
+      "flowmap/verify.py:__main__",
+      "flowmap/verify.py:verify",
+      "flowmap/config.py:out",
+      "flowmap/verify.py:anchor_ok",
+      "flowmap/verify.py:_text",
+      "flowmap/verify.py:endpoints_in"
+     ],
+     "disputed_hops": [],
+     "writes": [],
+     "busyness": {
+      "hops": 6,
+      "files": 2
+     },
+     "evidence": "agreed",
+     "untested_endpoints": [
+      "CLI flowmap verify"
+     ],
+     "runs": [
+      "bu-1",
+      "bu-2",
+      "td-1",
+      "td-2"
+     ]
+    }
+   ]
+  }
+ ]
+}
