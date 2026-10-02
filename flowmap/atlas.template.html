@@ -1,0 +1,382 @@
+<title>__ATLAS_NAME__ System Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a transit map. Flows are vertical lines in a fixed order, steps are stations,
+   shared components sit in a core band below; a detail rail shows one station's code flow. */
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6676;
+  --rule: #cdd4dc;
+  --line: #9aa6b4;
+  --accent: #2e5bff;
+  --accent-soft: rgba(46, 91, 255, .14);
+  --ev-confirmed: #12663a;
+  --ev-tested: #1e8a4c;
+  --ev-agreed: #6dbb8b;
+  --ev-contested: #d99a0b;
+  --ev-single: #c8423b;
+  --root-bg: #17202b;
+  --root-fg: #ffffff;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+    --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .18);
+    --ev-confirmed: #3fbf78; --ev-tested: #33a865; --ev-agreed: #7fcf9e; --ev-contested: #f0b429;
+    --ev-single: #ef6b63; --root-bg: #e6ebf1; --root-fg: #0f141a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+  --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .18);
+  --ev-confirmed: #3fbf78; --ev-tested: #33a865; --ev-agreed: #7fcf9e; --ev-contested: #f0b429;
+  --ev-single: #ef6b63; --root-bg: #e6ebf1; --root-fg: #0f141a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--body); }
+.wrap { padding-inline: 16px; padding-block: 20px 40px; max-width: 1680px; margin: 0 auto; display: grid; gap: 18px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+h1 { font: 800 30px/1 var(--display); font-stretch: 72%; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.meta { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.meta code, .mono { font-family: var(--mono); font-size: 12px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+label.ctl { display: grid; gap: 3px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+select, input[type="search"] {
+  font: 14px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 6px 10px; min-width: 0;
+}
+input[type="search"] { width: 220px; max-width: 100%; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); align-items: center; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex: none; }
+.ev-confirmed { --ev: var(--ev-confirmed); } .ev-tested { --ev: var(--ev-tested); }
+.ev-agreed { --ev: var(--ev-agreed); } .ev-contested { --ev: var(--ev-contested); }
+.ev-single-source { --ev: var(--ev-single); }
+.dot { background: var(--ev); }
+
+.overlay-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; background: var(--accent-soft);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+.overlay-bar b { font-family: var(--display); font-stretch: 80%; font-size: 15px; }
+.overlay-bar .mono { color: var(--muted); }
+
+main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; align-items: start; }
+@media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+.map { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; min-width: 0; }
+.lines { overflow-x: auto; padding: 16px 12px 8px; }
+.lines-inner { display: grid; grid-auto-flow: column; grid-auto-columns: 158px; gap: 8px; width: max-content; }
+.flow h2 { font: 700 13.5px/1.15 var(--display); font-stretch: 78%; letter-spacing: .02em; margin: 0 0 2px; padding-left: 6px; min-height: 31px; }
+.flow .fsum { font-size: 11px; color: var(--muted); padding-left: 6px; margin: 0 0 10px; }
+.stations { list-style: none; margin: 0; padding: 0; position: relative; }
+.stations::before { content: ""; position: absolute; left: 13px; top: 10px; bottom: 10px; width: 3px; background: var(--line); border-radius: 2px; }
+.station { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: start; gap: 4px;
+  width: 100%; text-align: left; background: none; border: 0; padding: 5px 4px 5px 0; color: inherit; font: inherit;
+  cursor: pointer; border-radius: 6px; transition: opacity .15s; }
+.station:hover { background: var(--accent-soft); }
+.station .pin { justify-self: center; margin-top: 3px; border-radius: 50%; background: var(--ev);
+  border: 2.5px solid var(--surface); box-shadow: 0 0 0 1.5px var(--ev); position: relative; z-index: 1; }
+.station .nm { font-size: 12px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.station .sub { display: block; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.station .flag { color: var(--ev-contested); font-weight: 600; }
+.station[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.station.dim { opacity: .22; }
+.station.ov-reach .pin { box-shadow: 0 0 0 1.5px var(--ev), 0 0 0 5px var(--accent-soft), 0 0 0 6.5px var(--accent); }
+.station.ov-direct .pin, .station.ov-new .pin { box-shadow: 0 0 0 1.5px var(--ev), 0 0 0 4px var(--accent); }
+.station.ov-new .nm::after { content: " NEW"; font: 700 9.5px var(--mono); color: var(--accent); }
+
+.core { border-top: 1px dashed var(--rule); padding: 12px 16px 16px; display: grid; gap: 8px; }
+.core h3, .rail h3 { font: 700 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 12px var(--mono); background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px;
+  padding: 3px 10px; cursor: pointer; }
+.chip small { color: var(--muted); font-family: var(--body); margin-left: 4px; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.chip[aria-pressed="true"] small { color: inherit; }
+.core p { margin: 0; font-size: 12px; color: var(--muted); max-width: 90ch; }
+
+.rail { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+@media (max-width: 1100px) { .rail { position: static; } }
+.rail > * { min-width: 0; }
+.rail .eyebrow { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.rail h2 { font: 700 21px/1.15 var(--display); font-stretch: 82%; margin: 2px 0 0; text-wrap: balance; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 13px; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; min-width: 0; }
+.badge { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
+.list li { font: 12px/1.4 var(--mono); overflow-wrap: anywhere; }
+.note { font-size: 12.5px; border-left: 3px solid var(--ev-contested); padding: 4px 10px; background: var(--paper); border-radius: 0 6px 6px 0; }
+.note.ov { border-color: var(--accent); }
+.code { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); }
+.code svg { display: block; }
+.code .n rect { fill: var(--surface); stroke: var(--rule); }
+.code .n.root rect { fill: var(--root-bg); stroke: var(--root-bg); }
+.code .n text { fill: var(--ink); font: 11.5px var(--mono); }
+.code .n .f { fill: var(--muted); font: 9.5px var(--body); }
+.code .n.root text { fill: var(--root-fg); }
+.code .n.ov rect { stroke: var(--accent); stroke-width: 2; }
+.code path { fill: none; stroke: var(--line); stroke-width: 1.2; }
+.small { font-size: 12px; color: var(--muted); margin: 0; }
+.empty { color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .station { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>__ATLAS_NAME__ System Atlas</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="controls">
+      <label class="ctl" for="overlay">Paint a change
+        <select id="overlay"><option value="">No change</option></select>
+      </label>
+      <label class="ctl" for="q">Find a step or endpoint
+        <input id="q" type="search" placeholder="release, /api/runs, skills…">
+      </label>
+    </div>
+  </header>
+
+  <div class="legend" aria-label="Evidence legend">
+    <span><i class="dot ev-confirmed"></i>confirmed by you</span>
+    <span><i class="dot ev-tested"></i>tested</span>
+    <span><i class="dot ev-agreed"></i>agreed by independent passes</span>
+    <span><i class="dot ev-contested"></i>contested</span>
+    <span><i class="dot ev-single-source"></i>one pass only</span>
+    <span>· dot size = how busy the step's code is</span>
+  </div>
+
+  <div class="overlay-bar" id="ovbar" hidden></div>
+
+  <main>
+    <section class="map" aria-label="System map">
+      <div class="lines"><div class="lines-inner" id="lines"></div></div>
+      <div class="core">
+        <h3>Core: components two or more flows run through</h3>
+        <div class="chips" id="chips"></div>
+        <p id="corenote"></p>
+      </div>
+    </section>
+    <aside class="rail" id="rail" aria-live="polite"></aside>
+  </main>
+</div>
+
+<script>
+const DATA = /*__ATLAS_DATA__*/null;
+const EV_TEXT = {
+  confirmed: "You pinned this in decisions.json.",
+  tested: "Independent passes grouped it the same way, and a backend test hits every endpoint.",
+  agreed: "Independent passes grouped these endpoints into one step.",
+  contested: "Passes overlap here but drew the step or its flow differently. Worth a look.",
+  "single-source": "Only one pass saw it this way. Treat as a hypothesis."
+};
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+};
+
+const steps = new Map();
+DATA.flows.forEach(f => f.steps.forEach((s, i) => steps.set(s.key, { ...s, flow: f.id, index: i + 1 })));
+const stationEls = new Map();
+let state = { step: store.get("atlas.step"), comp: null, overlay: store.get("atlas.overlay") || "", q: "" };
+if (!steps.has(state.step)) state.step = "review-queue/release-held-run";
+if (!steps.has(state.step)) state.step = DATA.flows.find(f => f.id === "review-queue")?.steps[1]?.key || [...steps.keys()][0];
+if (!DATA.overlays.some(o => o.id === state.overlay)) state.overlay = "";
+
+$("#meta").innerHTML = "";
+$("#meta").append(
+  `${DATA.flows.length} flows · ${steps.size} steps · built from passes ${DATA.runs.join(", ")} at `,
+  el("code", { text: DATA.commit }),
+  " · generated by tools/flowmap/atlas.py"
+);
+
+for (const o of DATA.overlays) $("#overlay").append(el("option", { value: o.id, text: o.title }));
+$("#overlay").value = state.overlay;
+
+function pinSize(busy) { return 9 + Math.min(12, Math.round(busy.hops * 1.1)); }
+
+function renderLines() {
+  const host = $("#lines");
+  for (const f of DATA.flows) {
+    const ul = el("ol", { class: "stations" });
+    for (const s of f.steps) {
+      const size = pinSize(s.busy);
+      const pin = el("span", { class: "pin", "aria-hidden": "true" });
+      pin.style.width = pin.style.height = size + "px";
+      const flag = Object.keys(s.split).length ? el("span", { class: "flag", text: " · split vote" }) : null;
+      const sub = el("span", { class: "sub" }, `${s.actor} · busy ${s.busy.hops}`, flag);
+      const btn = el("button", { class: `station ev-${s.evidence}`, type: "button", "aria-pressed": "false",
+        title: s.name }, pin, el("span", {}, el("span", { class: "nm", text: s.name }), sub));
+      btn.addEventListener("click", () => select(s.key));
+      stationEls.set(s.key, btn);
+      ul.append(el("li", {}, btn));
+    }
+    const name = f.id.replace(/^new:/, "");
+    host.append(el("section", { class: "flow", "aria-label": name },
+      el("h2", { text: name + (f.id.startsWith("new:") ? " ✦" : "") }),
+      el("p", { class: "fsum", text: `${f.steps.length} steps` }), ul));
+  }
+}
+
+function renderCore() {
+  const host = $("#chips");
+  for (const c of DATA.components) {
+    const b = el("button", { class: "chip", type: "button", "aria-pressed": "false" },
+      c.id, el("small", { text: `${c.flows} flows` }));
+    const on = () => { state.comp = c.id; paint(); };
+    b.addEventListener("mouseenter", on);
+    b.addEventListener("focus", on);
+    b.addEventListener("mouseleave", () => { if (state.comp === c.id && !b.dataset.locked) { state.comp = null; paint(); } });
+    b.addEventListener("click", () => {
+      const locked = !b.dataset.locked;
+      host.querySelectorAll(".chip").forEach(x => delete x.dataset.locked);
+      if (locked) { b.dataset.locked = "1"; state.comp = c.id; } else state.comp = null;
+      paint();
+    });
+    host.append(b);
+  }
+  $("#corenote").textContent = `Hover or tap a component to light up every step that runs through it. ` +
+    `"workflow engine" is executor.run_workflow and everything only it reaches (${DATA.engine.join(", ")}). ` +
+    `Hidden as plumbing: ${DATA.plumbing.join(", ")}.`;
+}
+
+function currentOverlay() { return DATA.overlays.find(o => o.id === state.overlay); }
+
+function paint() {
+  const ov = currentOverlay();
+  const q = state.q.trim().toLowerCase();
+  for (const [key, btn] of stationEls) {
+    const s = steps.get(key);
+    btn.setAttribute("aria-pressed", key === state.step ? "true" : "false");
+    btn.classList.remove("ov-reach", "ov-direct", "ov-new", "dim");
+    const hit = ov && ov.steps[key];
+    if (hit) btn.classList.add("ov-" + hit.kind);
+    let dim = false;
+    if (state.comp) dim = !s.components.includes(state.comp);
+    else if (q) dim = !(s.name.toLowerCase().includes(q) || s.endpoints.some(e => e.toLowerCase().includes(q)) || key.includes(q));
+    else if (ov) dim = !hit;
+    btn.classList.toggle("dim", dim);
+  }
+  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c.firstChild.textContent === state.comp ? "true" : "false"));
+  const bar = $("#ovbar");
+  bar.hidden = !ov;
+  if (ov) {
+    const kinds = { new: 0, direct: 0, reach: 0 };
+    Object.values(ov.steps).forEach(h => kinds[h.kind]++);
+    const flows = new Set(Object.keys(ov.steps).map(k => k.split("/")[0])).size;
+    bar.replaceChildren(
+      el("b", { text: ov.title }),
+      el("span", { class: "mono", text: ov.range }),
+      el("span", { text: `${kinds.new} new step${kinds.new === 1 ? "" : "s"} · ${kinds.direct} changed directly · ${kinds.reach} reached through the call graph · ${flows} flows` }),
+      ov.widest.length ? el("span", { text: "Widest: " + ov.widest.slice(0, 3).map(w => `${w.sym} (${w.endpoints} endpoints)`).join(", ") }) : null
+    );
+  }
+  renderRail();
+}
+
+function renderRail() {
+  const rail = $("#rail");
+  const s = steps.get(state.step);
+  if (!s) { rail.replaceChildren(el("p", { class: "empty", text: "Pick a station on the map." })); return; }
+  const ov = currentOverlay();
+  const hit = ov && ov.steps[s.key];
+  const kids = [
+    el("div", {}, el("div", { class: "eyebrow", text: `${s.flow.replace(/^new:/, "")} · step ${s.index}` }), el("h2", { text: s.name })),
+    el("dl", { class: "facts" },
+      el("dt", { text: "Evidence" }), el("dd", {}, el("span", { class: `badge ev-${s.evidence}` }, el("i", { class: "dot" }), s.evidence), el("div", { class: "small", text: EV_TEXT[s.evidence] })),
+      el("dt", { text: "Actor" }), el("dd", { text: s.actor }),
+      el("dt", { text: "Busy" }), el("dd", { text: `${s.busy.hops} agreed code hops over ${s.busy.files} files` }),
+      el("dt", { text: "Seen by" }), el("dd", { class: "mono", text: s.runs.join(", ") })
+    )
+  ];
+  if (hit) {
+    const what = { new: "This step is new in the change.", direct: "The change edits this step's own code.", reach: "Changed code can run under this step (call graph)." }[hit.kind];
+    kids.push(el("div", { class: "note ov" }, el("b", { text: ov.title + ": " }), what, hit.via.length ? ` Via ${hit.via.join(", ")}.` : ""));
+  }
+  for (const [ep, vote] of Object.entries(s.split)) {
+    kids.push(el("div", { class: "note" }, el("b", { text: "Split vote. " }), `Passes disagreed on the flow for ${ep}: ${vote}. Decide in decisions.json.`));
+  }
+  if (s.endpoints.length) kids.push(el("div", {}, el("h3", { text: "Endpoints" }), el("ul", { class: "list" }, ...s.endpoints.map(e => el("li", { text: e })))));
+  if (s.writes.length) kids.push(el("div", {}, el("h3", { text: "Writes" }), el("ul", { class: "list" }, ...s.writes.map(e => el("li", { text: e })))));
+  if (s.components.length) kids.push(el("div", {}, el("h3", { text: "Runs through" }), el("div", { class: "chips" }, ...s.components.map(c => el("span", { class: "chip", text: c })))));
+  kids.push(el("div", {}, el("h3", { text: "Code flow" }), s.code ? codeFlow(s.code, hit) : el("p", { class: "small", text: "No endpoint: a background or UI-only step. See its anchors in map.json." })));
+  if (s.code) kids.push(el("p", { class: "small", text: `Call graph from the handler (dark), depth ≤ 4, plumbing hidden${s.code.hidden ? `, ${s.code.hidden} more functions not drawn` : ""}. Columns are call depth.` }));
+  rail.replaceChildren(...kids);
+}
+
+function codeFlow(code, hit) {
+  const W = 168, H = 34, GX = 34, GY = 10, PAD = 10;
+  const cols = new Map();
+  code.nodes.forEach(n => { if (!cols.has(n.depth)) cols.set(n.depth, []); cols.get(n.depth).push(n); });
+  const pos = new Map();
+  let maxRows = 0;
+  for (const [d, list] of cols) {
+    list.forEach((n, i) => pos.set(n.id, { x: PAD + d * (W + GX), y: PAD + i * (H + GY) }));
+    maxRows = Math.max(maxRows, list.length);
+  }
+  const width = PAD * 2 + cols.size * (W + GX) - GX, height = PAD * 2 + maxRows * (H + GY) - GY;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("width", width); svg.setAttribute("height", height); svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Call graph for this step");
+  const via = new Set(hit ? hit.via : []);
+  for (const [a, b] of code.edges) {
+    const p = pos.get(a), q = pos.get(b);
+    if (!p || !q) continue;
+    const x1 = p.x + W, y1 = p.y + H / 2, x2 = q.x, y2 = q.y + H / 2;
+    const path = document.createElementNS(ns, "path");
+    const back = x2 <= x1;
+    path.setAttribute("d", back ? `M${p.x + W / 2},${p.y + H} C${p.x + W / 2},${p.y + H + 18} ${q.x + W / 2},${q.y + H + 18} ${q.x + W / 2},${q.y + H}`
+                                : `M${x1},${y1} C${x1 + GX / 2},${y1} ${x2 - GX / 2},${y2} ${x2},${y2}`);
+    svg.append(path);
+  }
+  for (const n of code.nodes) {
+    const p = pos.get(n.id);
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("class", "n" + (n.root ? " root" : "") + (via.has(n.sym) ? " ov" : ""));
+    const r = document.createElementNS(ns, "rect");
+    Object.entries({ x: p.x, y: p.y, width: W, height: H, rx: 5 }).forEach(([k, v]) => r.setAttribute(k, v));
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", p.x + 8); t.setAttribute("y", p.y + 14);
+    t.textContent = n.sym.length > 24 ? n.sym.slice(0, 23) + "…" : n.sym;
+    const f = document.createElementNS(ns, "text");
+    f.setAttribute("x", p.x + 8); f.setAttribute("y", p.y + 27); f.setAttribute("class", "f");
+    f.textContent = n.file.length > 30 ? "…" + n.file.slice(-29) : n.file;
+    const tip = document.createElementNS(ns, "title");
+    tip.textContent = `${n.file}:${n.sym}`;
+    g.append(tip, r, t, f);
+    svg.append(g);
+  }
+  return el("div", { class: "code" }, svg);
+}
+
+function select(key) {
+  state.step = key; store.set("atlas.step", key); paint();
+  if (window.matchMedia("(max-width: 1100px)").matches) $("#rail").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("#overlay").addEventListener("change", e => { state.overlay = e.target.value; store.set("atlas.overlay", state.overlay); paint(); });
+$("#q").addEventListener("input", e => { state.q = e.target.value; paint(); });
+
+renderLines();
+renderCore();
+paint();
+</script>

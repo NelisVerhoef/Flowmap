@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""flowmap — map a codebase as user flows -> steps -> code, and review changes on that map.
+
+Run from inside the repo you're mapping (or set FLOWMAP_ROOT).
+
+  flowmap inventory                     list every entry point -> <out>/inventory.json
+  flowmap brief <run-id> <method>       write a pass brief (method: bottom-up | top-down)
+  flowmap verify <run.json>...          check a pass's citations and coverage
+  flowmap reconcile <run.json>...       vote the passes into map.json, MAP.md, QUESTIONS.md
+  flowmap diagrams                      Mermaid at system / flow / step zoom
+  flowmap atlas [--pr base..head=label] the interactive map, optionally with PR overlays
+  flowmap lens <base> [<head>]          place a change on the map (flows, reach, off-map code)
+  flowmap callgraph impact <file:sym>   which entry points can reach a symbol (Python)
+"""
+import runpy
+import sys
+from pathlib import Path
+
+PKG = Path(__file__).resolve().parent.parent / "flowmap"
+COMMANDS = {"inventory", "brief", "verify", "reconcile", "diagrams", "atlas", "lens", "callgraph"}
+
+if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+    print(__doc__.strip())
+    sys.exit(0 if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help") else 2)
+cmd = sys.argv.pop(1)
+sys.argv[0] = f"flowmap {cmd}"
+sys.path.insert(0, str(PKG))
+runpy.run_path(str(PKG / f"{cmd}.py"), run_name="__main__")
