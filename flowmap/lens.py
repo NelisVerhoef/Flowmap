@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
 import inventory  # noqa: E402
+from adapters.cli import main_guard  # noqa: E402
 from callgraph import Graph  # noqa: E402
 
 ROOT = config.root()
@@ -54,9 +55,13 @@ def py_symbols(text):
                 out.append((child.lineno, child.end_lineno, name))
                 walk(child, f"{name}.")
     try:
-        walk(ast.parse(text), "")
+        tree = ast.parse(text)
     except SyntaxError:
-        pass
+        return out
+    walk(tree, "")
+    guard = main_guard(tree)
+    if guard:
+        out.append((guard.lineno, guard.end_lineno, "__main__"))
     return out
 
 

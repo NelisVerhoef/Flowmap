@@ -6,6 +6,7 @@ Python is dynamic, so this resolves calls by what it can see:
   name (over-approximates; capped by AMBIGUOUS so `.get()` doesn't connect everything).
 - a function referenced without being called (`Depends(f)`, `run_in_background(f)`,
   callbacks) -> edge, since it will be called by someone on our behalf.
+- a script's `if __name__ == "__main__":` block -> node `file:__main__` (CLI entry points).
 Missed on purpose: string/registry dispatch (system workflows by name, block registry).
 
     python tools/flowmap/callgraph.py impact backend/app/providers/__init__.py:Provider.complete
@@ -20,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
+from adapters.cli import main_guard  # noqa: E402
 
 ROOT = config.root()
 AMBIGUOUS = 6  # an obj.method() matching more app methods than this is too generic to follow
@@ -72,6 +74,9 @@ class Graph:
                         self.methods[child.name].add(nid)
                     walk(child, f"{qual}.", isinstance(child, ast.ClassDef))
         walk(tree, "", False)
+        guard = main_guard(tree)
+        if guard:
+            self.defs[f"{rel}:__main__"] = (guard.lineno, guard.end_lineno)
 
     def _imports(self, rel, tree):
         """local name -> ('mod', module) or ('sym', node id)."""
@@ -150,7 +155,10 @@ class Graph:
                     elif isinstance(child.ctx, ast.Load):
                         self.edges[owner] |= targets(child, called=False, owner=owner) - {owner}
                 walk(child, owner)
-        walk(tree, "")
+        guard = main_guard(tree)
+        walk(ast.Module(body=[n for n in tree.body if n is not guard], type_ignores=[]), "")
+        if guard:
+            walk(guard, f"{rel}:__main__")
 
     def _one_interface(self, cands):
         """Many same-named methods that all implement one base class are polymorphic

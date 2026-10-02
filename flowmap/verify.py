@@ -36,6 +36,9 @@ def anchor_ok(anchor):
         return False, "file missing"
     if symbol == "default" and re.search(r"export\s+default\b", text):
         return True, ""
+    if symbol == "__main__":
+        ok = re.search(r"^if\s+__name__\s*==\s*['\"]__main__['\"]", text, re.M)
+        return (True, "") if ok else (False, "no `if __name__ == \"__main__\"` block in file")
     for part in symbol.split("."):
         if not re.search(rf"\b{DEF}\s+(?:self\.)?{re.escape(part)}\b|\bas\s+{re.escape(part)}\b|^\s*{re.escape(part)}\s*[:=(]", text, re.M):
             return False, f"symbol {part!r} not defined in file"

@@ -1,0 +1,10 @@
+name = "flowmap"
+
+[[entry]]
+adapter = "cli"
+prog = "flowmap"
+commands = "flowmap"
+
+[code]
+python = ["flowmap"]
+other = ["bin"]

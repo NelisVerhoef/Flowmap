@@ -96,7 +96,11 @@ def tested_endpoints(inventory):
     hits = set()
     for e in inventory:
         kind, _, target = e["endpoint"].partition(" ")
-        if kind == "ACTION":
+        if kind == "CLI":
+            module = e["handler"].rsplit(":", 1)[0].rsplit("/", 1)[-1].removesuffix(".py")
+            target_hit = re.search(rf"\b{re.escape(module)}\.py\b|\bimport\s+{re.escape(module)}\b|"
+                                   rf"['\"]{re.escape(target.split(' ', 1)[-1])}['\"]", text) if " " in target else None
+        elif kind == "ACTION":
             target_hit = re.search(rf"\b{re.escape(target.rsplit('#', 1)[1])}\b", text)
         else:
             target_hit = path_regex(re.sub(r"\{(\w+):\w+\}", r"{\1}", target)).search(text)

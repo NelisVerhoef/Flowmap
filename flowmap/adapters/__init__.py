@@ -9,9 +9,9 @@ and derived from code, never from a model. `aliases` are other spellings tests m
 hit it (Rails path helpers, for instance).
 """
 
-from . import fastapi, nextjs, rails
+from . import cli, fastapi, nextjs, rails
 
-ADAPTERS = {"fastapi": fastapi.entries, "rails": rails.entries, "nextjs": nextjs.entries}
+ADAPTERS = {"fastapi": fastapi.entries, "rails": rails.entries, "nextjs": nextjs.entries, "cli": cli.entries}
 
 
 def entries(cfg, read):

@@ -8,7 +8,7 @@ Every key is optional; a repo with no config gets discovery mode and auto-detect
     out = "docs/flowmap"                       # where the map lives in the target repo
 
     [[entry]]                                  # one per app; see adapters/ for options
-    adapter = "fastapi"                        # fastapi | rails | nextjs
+    adapter = "fastapi"                        # fastapi | rails | nextjs | cli
     main = "backend/app/main.py"
 
     [code]
@@ -105,6 +105,9 @@ def app_dirs():
             dirs.append("." if base in (".", "") else base)
         elif e["adapter"] == "fastapi":
             dirs.append(str(Path(e["main"]).parent))
+        elif e["adapter"] == "cli":
+            dirs += [e["commands"].strip("/")] if e.get("commands") else []
+            dirs += [str(Path(e["main"]).parent)] if e.get("main") else []
     return sorted(set(dirs))
 
 

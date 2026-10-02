@@ -15,6 +15,7 @@ Python 3.11+, no dependencies.
 | Rails | `bin/rails routes` (or a saved dump), actions resolved through concerns and parent controllers | not yet: the map and anchor matching work, reach doesn't |
 | Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `"use server"` actions | not yet |
 | React SPA | its backend's entry points; top-down passes start from its router | via the backend |
+| Python CLI | `if __name__ == "__main__"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |
 
 ## First time in a repo
 

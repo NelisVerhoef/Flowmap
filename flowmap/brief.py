@@ -44,6 +44,13 @@ partials); Stimulus controllers and Turbo frames are UI. Cite Ruby methods, not 
 from forms or client components. Server components fetch data directly — a page's own data
 loading belongs in its step's `code_path`. Middleware (`middleware.ts`) runs before
 everything; note it, don't make it a step.""",
+    "cli": """**Python CLI** (commands in `{commands}`{main_note}): each `CLI <prog> <command>` entry is a
+command a person types; its handler `file:__main__` is the script's `if __name__ == "__main__":`
+block (cite it as `file:__main__`). There are no screens: top-down passes start from the CLI's
+help text, README and usage docstrings, which say what a user is trying to get done and in what
+order commands are run. Argument parsing is the "UI" — leave `ui` empty unless the tool renders
+something a person interacts with (an HTML page it writes counts: cite its generator). `writes`
+are the files the command produces (`<path>` for a file it creates or overwrites).""",
 }
 
 
@@ -61,7 +68,9 @@ def vocabulary_text(vocab):
 def main(run_id, method):
     cfg, root = config.load(), config.root()
     out_rel = cfg["out"]
-    stack = "\n\n".join(STACK[e["adapter"]].format(main=e.get("main", ""), root=e.get("root", "."))
+    stack = "\n\n".join(STACK[e["adapter"]].format(main=e.get("main", ""), root=e.get("root", "."),
+                                                    commands=e.get("commands", ""),
+                                                    main_note=f", script `{e['main']}`" if e.get("main") else "")
                         for e in cfg["entry"]) or "No adapter configured — see flowmap.toml."
     output = f"{out_rel}/runs/{run_id}.json"
     fill = {
