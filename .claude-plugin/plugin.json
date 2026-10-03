@@ -1,5 +1,8 @@
 {
   "name": "flowmap",
   "version": "0.1.0",
-  "description": "Map a codebase as user flows -> steps -> code by agreement between independent passes, and review PRs by where they land on that map."
+  "description": "Map a codebase as user flows -> steps -> code by agreement between independent passes, and review PRs by where they land on that map.",
+  "author": {
+    "name": "Nelis Verhoef"
+  }
 }

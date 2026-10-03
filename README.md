@@ -57,7 +57,31 @@ This repo is also a Claude Code plugin with two skills:
 - **pr-lens** — turns `flowmap lens` output into before→after per step and the questions to
   ask the author, without you reading the diff first.
 
-Install the plugin from this repo, or copy `skills/*` into `.claude/skills/`.
+### Install
+
+```
+/plugin marketplace add NelisVerhoef/flowmap
+/plugin install flowmap@flowmap
+```
+
+While the plugin is enabled, `bin/flowmap` is on the Bash tool's PATH, so the skills (and you,
+inside Claude Code) just run `flowmap ...`. The skills show up as `/flowmap:flowmap-build` and
+`/flowmap:pr-lens`.
+
+To have teammates prompted to install it when they open your repo, commit this to the repo's
+`.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "flowmap": { "source": { "source": "github", "repo": "NelisVerhoef/flowmap" } }
+  },
+  "enabledPlugins": { "flowmap@flowmap": true }
+}
+```
+
+Without the plugin system: clone this repo, put its `bin/` on PATH, and copy `skills/*` into
+the target repo's `.claude/skills/`.
 
 ## flowmap.toml
 
