@@ -39,7 +39,7 @@ class Graph:
         self.methods = defaultdict(set)         # method name -> {node ids}
         self.bases = {}                         # class node id -> {base class names}
         self.edges = defaultdict(set)
-        files = files or [p.relative_to(ROOT).as_posix() for d in config.python_roots()
+        files = files if files is not None else [p.relative_to(ROOT).as_posix() for d in config.python_roots()
                           for p in (ROOT / d).rglob("*.py")]
         self.packages = {module_of(rel).split(".")[0] for rel in files}
         trees = {}
@@ -174,13 +174,24 @@ class Graph:
 
     def callers(self, nid):
         """Everything that can transitively reach nid (reverse BFS)."""
+        return self._closure(self.reverse, nid)
+
+    def callees(self, nid):
+        """Everything nid can transitively reach (forward BFS)."""
+        return self._closure(self.edges, nid)
+
+    @staticmethod
+    def _closure(adj, nid):
         seen, queue = {nid}, deque([nid])
         while queue:
-            for prev in self.reverse.get(queue.popleft(), ()):
-                if prev not in seen:
-                    seen.add(prev)
-                    queue.append(prev)
+            for nxt in adj.get(queue.popleft(), ()):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append(nxt)
         return seen - {nid}
+
+    def edge_set(self):
+        return {(a, b) for a, bs in self.edges.items() for b in bs}
 
     def reaches(self, src, dst, limit=12):
         """Shortest call chain src -> dst, or None."""

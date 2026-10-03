@@ -26,6 +26,10 @@ A PR number, a branch, or a commit range. Resolve to `<base> <head>`:
    model: it is the authority on blast radius. It over-reports (reachable ≠ executed:
    conditional branches, test doubles resolved by method name) and misses string/registry
    dispatch — so treat a reached step as "ask whether this path is affected", not "broken".
+   Its **Reach diff** section compares the call graph at base and head: existing code an
+   endpoint can newly reach, or no longer reaches, though that code itself may be unchanged.
+   A map anchor or a check (auth, validation, audit) under "no longer reachable" is the first
+   question to ask the author.
 2. Read the PR description / commit messages (`git log --format=%B <base>..<head>`) for
    stated intent.
 3. For each touched step and each off-map change, read *just enough* of the diff to say
@@ -66,6 +70,40 @@ Draw questions from these patterns, picking only the ones the change actually ra
 A question that's wrong because you misread the code is cheap (the author corrects it).
 A question so vague the author can't be wrong ("is this tested?") is useless. Prefer
 specific and occasionally wrong over safe and vague.
+
+## The change page
+
+Also write the change as a page people can read without the diff:
+
+1. `python3 <flowmap>/bin/flowmap change <base> <head> --facts` prints the deterministic facts:
+   changed symbols with the map steps that run them (and a call path proving it), callers left
+   unedited, call edges and module dependencies added or removed, reach that moved, flow spread.
+2. Write `docs/flowmap/changes/<name>.story.json` (e.g. `pr-12`). It is the prose layer only;
+   every claim in it must be backed by a fact from step 1 or a line of the diff:
+
+   ```json
+   {"title": "what the system now does, as a name (not the PR title if that says how)",
+    "pr": "PR #12", "url": "<pr url>",
+    "intent": "the author's stated intent, one sentence",
+    "delta": "how the system moves, in 2-3 sentences of flow terms; say what did NOT change too",
+    "chapters": [{
+      "title": "one behaviour change, stated as what the system now does",
+      "role": "core | supporting | refactor | outside", "kind": "free text, e.g. new capability",
+      "symbols": ["path.py:Qual.name", "..."], "files": ["non-code files, e.g. a skill"],
+      "before": "system behaviour before", "after": "system behaviour after",
+      "claim": "one line", "why": "who/what runs through this and what it costs or risks them",
+      "questions": [{"q": "concrete, cites a function or flow", "why": "what the answer decides",
+                     "kind": "ask | check"}]}]}
+   ```
+
+   Order chapters core first (the change the others exist to support), then by how much an
+   answer could change the verdict. Group by behaviour, not by file. A behaviour-preserving
+   refactor gets its own `refactor` chapter so it can be read quickly. Prose that steers an
+   agent (skills, prompts) is behaviour: give it a chapter. Two to five questions per chapter.
+   "Ask" means only the author can answer; "check" means the reviewer can settle it themselves.
+3. `python3 <flowmap>/bin/flowmap change <base> <head> --name <name>` writes
+   `docs/flowmap/changes/<name>.html`. Symbols the story leaves out land in a "not in the story"
+   chapter, so nothing changed is hidden.
 
 ## After
 

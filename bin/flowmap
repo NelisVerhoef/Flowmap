@@ -10,6 +10,7 @@ Run from inside the repo you're mapping (or set FLOWMAP_ROOT).
   flowmap diagrams                      Mermaid at system / flow / step zoom
   flowmap atlas [--pr base..head=label] the interactive map, optionally with PR overlays
   flowmap lens <base> [<head>]          place a change on the map (flows, reach, off-map code)
+  flowmap change <base> [<head>]        the change as chapters on the map: where, what, why, questions
   flowmap callgraph impact <file:sym>   which entry points can reach a symbol (Python)
 """
 import runpy
@@ -17,7 +18,7 @@ import sys
 from pathlib import Path
 
 PKG = Path(__file__).resolve().parent.parent / "flowmap"
-COMMANDS = {"inventory", "brief", "verify", "reconcile", "diagrams", "atlas", "lens", "callgraph"}
+COMMANDS = {"inventory", "brief", "verify", "reconcile", "diagrams", "atlas", "lens", "change", "callgraph"}
 
 if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
     print(__doc__.strip())

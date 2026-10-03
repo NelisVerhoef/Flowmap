@@ -162,6 +162,43 @@ def endpoint_set(ref):
         return {}
 
 
+def graph_at(ref):
+    """The static call graph of the Python roots as they are at `ref`."""
+    roots = config.python_roots()
+    files = [f for f in git("ls-tree", "-r", "--name-only", ref, "--", *roots).splitlines()
+             if f.endswith(".py")] if roots else []
+    return Graph(read=lambda rel: show(ref, rel) or "", files=files)
+
+
+def reach_diff(old, new, old_eps, new_eps):
+    """How the call graph moved between two revisions.
+
+    old_eps/new_eps: endpoint -> handler node. Returns (edges added, edges removed,
+    {symbol: (endpoints that newly reach it, endpoints that no longer do)}), counting only
+    symbols and endpoints that exist on both sides: new code inherits its caller's reach and
+    deleted code loses all of it, neither of which is news.
+    """
+    old_edges, new_edges = old.edge_set(), new.edge_set()
+    added, removed = new_edges - old_edges, old_edges - new_edges
+    # only endpoints that sit above a changed edge can have changed reach
+    affected = set()
+    for g, eps, edges in ((old, old_eps, removed), (new, new_eps, added)):
+        above = set()
+        for src in {a for a, _ in edges}:
+            above |= g.callers(src) | {src}
+        affected |= {e for e, h in eps.items() if h in above}
+    both = old.defs.keys() & new.defs.keys()
+    moved = defaultdict(lambda: (set(), set()))
+    for e in affected & old_eps.keys() & new_eps.keys():
+        before = old.callees(old_eps[e]) | {old_eps[e]}
+        after = new.callees(new_eps[e]) | {new_eps[e]}
+        for sym in (after - before) & both:
+            moved[sym][0].add(e)
+        for sym in (before - after) & both:
+            moved[sym][1].add(e)
+    return added, removed, dict(moved)
+
+
 def main(base, head="HEAD"):
     the_map = json.loads(MAP.read_text())
     changes = changed_lines(base, head)
@@ -233,10 +270,7 @@ def main(base, head="HEAD"):
 
     # Deterministic reach: walk the call graph backwards from every changed backend
     # symbol to the endpoints that can execute it, then up to map steps and flows.
-    py_files = [f for f in (git("ls-tree", "-r", "--name-only", head, "--", *config.python_roots()).splitlines()
-                            if config.python_roots() else [])
-                if f.endswith(".py")]
-    graph = Graph(read=lambda rel: show(head, rel) or "", files=py_files)
+    graph = graph_at(head)
     step_of = defaultdict(list)  # endpoint -> [(flow, step)]
     for f in the_map["flows"]:
         for s in f["steps"]:
@@ -281,6 +315,42 @@ def main(base, head="HEAD"):
                     via = ", ".join(sorted(f"`{x.rsplit(':', 1)[1]}`" for x in syms)[:3])
                     out.append(f"  - {name} — via {via}")
         out.append("")
+
+    # Reach diff: the call graph at base vs head. Catches a change that makes existing code
+    # run under new endpoints (or stop running under old ones) without that code changing.
+    if config.python_roots():
+        added_edges, removed_edges, moved = reach_diff(graph_at(base), graph, base_eps, head_eps)
+        short = lambda nid: f"{Path(nid.rsplit(':', 1)[0]).stem}.{nid.rsplit(':', 1)[1]}"  # noqa: E731
+        flows_of = lambda eps: sorted({fid for e in eps for fid, _ in step_of.get(e, [])})  # noqa: E731
+        anchors = set(anchor_uses)
+        gained = {sym: g for sym, (g, _) in moved.items() if g}
+        lost = {sym: lo for sym, (_, lo) in moved.items() if lo}
+        if added_edges or removed_edges:
+            out += ["## Reach diff (call graph, base → head)", "",
+                    f"{len(added_edges)} call edges added, {len(removed_edges)} removed. "
+                    f"Existing code newly reachable from some endpoint: **{len(gained)}**; "
+                    f"no longer reachable from some endpoint: **{len(lost)}**.", ""]
+
+            def listing(title, syms):
+                if not syms:
+                    return
+                out.extend([title, ""])
+                # widest first; map anchors break ties since they name a step
+                for sym, eps in sorted(syms.items(), key=lambda kv: (-len(kv[1]), kv[0] not in anchors, kv[0]))[:10]:
+                    names = ", ".join(f"`{e}`" for e in sorted(eps)[:3]) + (f" +{len(eps) - 3}" if len(eps) > 3 else "")
+                    fl = flows_of(eps)
+                    out.append(f"- `{sym}`{' (map anchor)' if sym in anchors else ''} — {names}"
+                               + (f" · flows: {', '.join(fl)}" if fl else ""))
+                if len(syms) > 10:
+                    out.append(f"- … {len(syms) - 10} more")
+                out.append("")
+            listing("**Newly reachable** existing code (now runs under endpoints it didn't before):", gained)
+            listing("**No longer reachable** (endpoints that stopped reaching it — a dropped check?):", lost)
+            for title, edges in (("Edges added", sorted(added_edges)), ("Edges removed", sorted(removed_edges))):
+                if edges:
+                    out.append(f"{title}: " + ", ".join(f"`{short(a)}` → `{short(b)}`" for a, b in edges[:8])
+                               + (f", … {len(edges) - 8} more" if len(edges) > 8 else ""))
+            out.append("")
 
     if off_map:
         out += ["## Off-map changes (code the map doesn't know)", "",
