@@ -7,7 +7,7 @@ name: flowmap pages
 
 on:
   push:
-    paths: ["docs/flowmap/**"]
+    paths: ["docs/flowmap/**", ".github/workflows/flowmap-pages.yml"]
   workflow_dispatch:
 
 permissions:
