@@ -1,0 +1,449 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lens compares two versions of the system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a change told as chapters on a fixed system map. The map keeps the atlas's positions
+   so the same place always looks the same; each chapter says where, before -> after, why, and
+   what to ask. Code is folded at the end of each chapter. */
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6676;
+  --rule: #cdd4dc;
+  --line: #9aa6b4;
+  --accent: #2e5bff;
+  --accent-soft: rgba(46, 91, 255, .12);
+  --core: #2e5bff;
+  --support: #0f7c86;
+  --refactor: #6b7686;
+  --outside: #b7791f;
+  --gain: #1e8a4c;
+  --loss: #c8423b;
+  --code-bg: #f6f8fa;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+    --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+    --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+    --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+  --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+  --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+  --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { padding-inline: 16px; padding-block: 28px 64px; max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+p code, li code, dd code { background: var(--accent-soft); padding: 0 .3em; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+
+/* header */
+header { display: grid; gap: 12px; }
+header h1 { font: 800 clamp(28px, 4.4vw, 44px)/1.02 var(--display); font-stretch: 74%; margin: 0; max-width: 24ch; }
+.range { color: var(--muted); font-size: 13px; }
+.range a { color: inherit; }
+.delta { font-size: 18px; line-height: 1.5; max-width: 68ch; margin: 0; }
+.intent { color: var(--muted); max-width: 68ch; margin: 0; font-size: 14px; }
+
+/* system numbers: each with what drives it */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.tile { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile b { font: 700 22px/1.1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; }
+.tile small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.tile.zero b { color: var(--muted); }
+
+/* the map */
+.map { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
+.map-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; }
+.map-head h2 { font: 700 15px var(--display); font-stretch: 80%; margin: 0; letter-spacing: .02em; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lines { overflow-x: auto; }
+.lines-inner { display: grid; grid-template-columns: repeat(var(--flows, 3), minmax(190px, 1fr)); gap: 14px; }
+.flow h3 { font: 700 13px/1.2 var(--display); font-stretch: 78%; margin: 0 0 8px; padding-left: 4px; letter-spacing: .02em; }
+.flow.quiet h3 { color: var(--muted); }
+.stations { list-style: none; margin: 0; padding: 0; position: relative; display: grid; gap: 2px; }
+.stations::before { content: ""; position: absolute; left: 11px; top: 12px; bottom: 12px; width: 3px; background: var(--line); border-radius: 2px; }
+.st { position: relative; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 6px; align-items: start;
+  padding: 5px 6px 5px 0; border-radius: 6px; font-size: 12.5px; line-height: 1.3; }
+.st .pin { width: 13px; height: 13px; border-radius: 50%; background: var(--surface); border: 3px solid var(--line);
+  justify-self: center; margin-top: 2px; position: relative; z-index: 1; }
+.st.hit .pin { border-color: var(--accent); background: var(--accent); }
+.st.quiet { color: var(--muted); }
+.st .refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ref { font: 600 11px/1 var(--mono); border-radius: 999px; padding: 3px 7px; border: 1px solid currentColor; color: var(--role, var(--accent));
+  background: none; cursor: pointer; text-decoration: none; }
+.ref:hover { background: var(--accent-soft); }
+.offmap { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* chapters */
+.chapters { display: grid; gap: 22px; counter-reset: ch; }
+.chapter { --role: var(--accent); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+  padding: 20px; display: grid; gap: 16px; scroll-margin-top: 16px; border-top: 4px solid var(--role); }
+.chapter.core { --role: var(--core); } .chapter.supporting { --role: var(--support); }
+.chapter.refactor { --role: var(--refactor); } .chapter.outside, .chapter.unassigned, .chapter.off-map { --role: var(--outside); }
+.chapter:target { box-shadow: 0 0 0 3px var(--accent-soft); }
+.ch-head { display: grid; gap: 6px; }
+.ch-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.num { font: 800 13px var(--mono); color: var(--surface); background: var(--role); border-radius: 6px; padding: 2px 8px; }
+.tag { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--role); }
+.kind { font-size: 12px; color: var(--muted); }
+.chapter h2 { font: 750 clamp(20px, 2.6vw, 26px)/1.15 var(--display); font-stretch: 80%; margin: 0; }
+.claim { margin: 0; color: var(--muted); max-width: 70ch; }
+
+.where { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 720px) { .where { grid-template-columns: minmax(0, 1fr); } }
+.here { display: grid; gap: 8px; }
+.minimap { background: var(--paper); border-radius: 8px; padding: 10px; }
+.minimap svg { display: block; width: 100%; height: auto; }
+.minimap .dot { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+.minimap .dot.on { fill: var(--role); stroke: var(--role); }
+.minimap .rail { stroke: var(--line); stroke-width: 2; }
+.minimap text { fill: var(--muted); font: 9px var(--body); }
+.crumbs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.crumbs li { display: grid; gap: 1px; }
+.crumbs .flow-name { color: var(--muted); font-size: 11.5px; }
+
+.morph { display: grid; gap: 10px; margin: 0; }
+.morph > div { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; }
+.morph dt { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: 3px; }
+.morph dd { margin: 0; }
+.morph .after dd { font-weight: 500; }
+.why { border-left: 3px solid var(--role); padding: 6px 12px; background: var(--paper); border-radius: 0 8px 8px 0; display: grid; gap: 2px; }
+.why p { margin: 0; max-width: 72ch; }
+
+.evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px 24px; }
+.evidence > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.paths, .callers, .edges { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.path span { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
+.path span.end { border-color: var(--role); color: var(--role); }
+.path i { color: var(--muted); font-style: normal; }
+.callers li, .edges li { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.mark { font-family: var(--body); font-size: 11px; font-weight: 600; flex: none; width: 72px; }
+.mark.yes { color: var(--gain); } .mark.no { color: var(--outside); }
+.edges .add { color: var(--gain); } .edges .rem { color: var(--loss); }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+.qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: q; }
+.q { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.q input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+.q label { display: grid; gap: 3px; cursor: pointer; }
+.q .qtext { font-weight: 500; }
+.q .qwhy { color: var(--muted); font-size: 13px; }
+.qkind { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+.qkind.ask { background: var(--accent-soft); color: var(--accent); }
+.qkind.check { background: var(--paper); color: var(--muted); border: 1px solid var(--rule); }
+.qkind.graph { background: var(--paper); color: var(--support); border: 1px solid var(--rule); }
+
+details.code { border-top: 1px dashed var(--rule); padding-top: 10px; }
+details.code summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.hunk { margin-top: 10px; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.hunk .hh { font: 11.5px var(--mono); color: var(--muted); padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.hunk pre { margin: 0; overflow-x: auto; background: var(--code-bg); font: 12px/1.5 var(--mono); padding: 6px 0; }
+.hunk pre span { display: block; padding: 0 10px; white-space: pre; min-width: max-content; }
+.hunk .a { background: rgba(30, 138, 76, .13); } .hunk .r { background: rgba(200, 66, 59, .13); }
+
+/* the review note */
+.ask-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: grid; gap: 12px; }
+.ask-box h2 { font: 750 22px var(--display); font-stretch: 80%; margin: 0; }
+.ask-box textarea { width: 100%; min-height: 160px; font: 13px/1.5 var(--mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 8px; padding: 10px; resize: vertical; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button.primary { font: 600 14px var(--body); background: var(--accent); color: var(--surface); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.status { font-size: 13px; color: var(--muted); }
+.folded { font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+  <header id="top"></header>
+  <section class="tiles" id="tiles" aria-label="How the system moved"></section>
+  <section class="map" aria-label="System map">
+    <div class="map-head">
+      <h2>Where this lands on the system</h2>
+      <div class="legend"><span><i class="ref" style="cursor:default">1</i> chapter that runs here</span><span>grey: untouched</span></div>
+    </div>
+    <div class="lines"><div class="lines-inner" id="lines"></div></div>
+    <div class="offmap" id="offmap" hidden></div>
+  </section>
+  <section class="chapters" id="chapters" aria-label="Chapters"></section>
+  <section class="ask-box" aria-labelledby="ask-h">
+    <h2 id="ask-h">Questions for the author</h2>
+    <p class="note">Ticked questions collect here. Copy them into the PR as your review.</p>
+    <textarea id="note" aria-label="Review note" readonly></textarea>
+    <div class="row"><button class="primary" id="copy" type="button">Copy questions</button><span class="status" id="status" aria-live="polite"></span></div>
+    <p class="folded" id="folded"></p>
+  </section>
+</div>
+
+<script>
+const DATA = {"facts":{"base":"58b30d7","head":"lens-reach-diff","base_sha":"58b30d7","head_sha":"8a3ba2e","name":"flowmap","map":[{"id":"new:discover-entry-points","steps":[{"key":"new:discover-entry-points/list-entry-points","name":"Maintainer lists every entry point the repo exposes into inventory.json","endpoints":["CLI flowmap inventory"],"evidence":"agreed"}]},{"id":"new:review-change-on-map","steps":[{"key":"new:review-change-on-map/generate-diagrams","name":"Maintainer generates Mermaid diagrams at system, flow and step zoom","endpoints":["CLI flowmap diagrams"],"evidence":"agreed"},{"key":"new:review-change-on-map/lens-place-change","name":"Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)","endpoints":["CLI flowmap lens"],"evidence":"agreed"},{"key":"new:review-change-on-map/callgraph-impact","name":"Developer asks which entry points and flows can reach a file:symbol","endpoints":["CLI flowmap callgraph"],"evidence":"agreed"},{"key":"new:review-change-on-map/build-atlas","name":"Maintainer builds the interactive atlas page and browses flows, steps and components","endpoints":["CLI flowmap atlas"],"evidence":"agreed"}]},{"id":"new:run-mapping-passes","steps":[{"key":"new:run-mapping-passes/write-pass-brief","name":"Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)","endpoints":["CLI flowmap brief"],"evidence":"agreed"},{"key":"new:run-mapping-passes/reconcile-runs","name":"Maintainer votes the passes into one map with evidence levels and a list of open questions","endpoints":["CLI flowmap reconcile"],"evidence":"agreed"},{"key":"new:run-mapping-passes/verify-pass-citations","name":"Maintainer checks each pass's anchors exist and every entry point is placed","endpoints":["CLI flowmap verify"],"evidence":"agreed"}]}],"files":[{"path":"README.md","kind":"doc","added":1,"removed":1},{"path":"flowmap/callgraph.py","kind":"code","added":16,"removed":5},{"path":"flowmap/lens.py","kind":"code","added":74,"removed":4},{"path":"skills/pr-lens/SKILL.md","kind":"doc","added":4,"removed":0}],"symbols":[{"id":"flowmap/callgraph.py:Graph.edge_set","file":"flowmap/callgraph.py","sym":"Graph.edge_set","status":"new","contract":false,"signature":[null,"self"],"steps":["new:review-change-on-map/lens-place-change"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.edge_set"]},"callers":[{"id":"flowmap/lens.py:reach_diff","edited":true}]},{"id":"flowmap/callgraph.py:Graph.callers","file":"flowmap/callgraph.py","sym":"Graph.callers","status":"modified","contract":false,"signature":null,"steps":["new:review-change-on-map/lens-place-change","new:review-change-on-map/callgraph-impact","new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/callgraph.py:Graph.callers"],"new:review-change-on-map/callgraph-impact":["flowmap/callgraph.py:__main__","flowmap/callgraph.py:impact","flowmap/callgraph.py:Graph.callers"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay","flowmap/callgraph.py:Graph.callers"]},"callers":[{"id":"flowmap/atlas.py:overlay","edited":false},{"id":"flowmap/callgraph.py:impact","edited":false},{"id":"flowmap/lens.py:main","edited":true},{"id":"flowmap/lens.py:reach_diff","edited":true}]},{"id":"flowmap/callgraph.py:Graph._closure","file":"flowmap/callgraph.py","sym":"Graph._closure","status":"new","contract":false,"signature":[null,"adj, nid"],"steps":["new:review-change-on-map/lens-place-change","new:review-change-on-map/callgraph-impact","new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/callgraph.py:Graph.callers","flowmap/callgraph.py:Graph._closure"],"new:review-change-on-map/callgraph-impact":["flowmap/callgraph.py:__main__","flowmap/callgraph.py:impact","flowmap/callgraph.py:Graph.callers","flowmap/callgraph.py:Graph._closure"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay","flowmap/callgraph.py:Graph.callers","flowmap/callgraph.py:Graph._closure"]},"callers":[{"id":"flowmap/callgraph.py:Graph.callees","edited":true},{"id":"flowmap/callgraph.py:Graph.callers","edited":true}]},{"id":"flowmap/callgraph.py:Graph.callees","file":"flowmap/callgraph.py","sym":"Graph.callees","status":"new","contract":false,"signature":[null,"self, nid"],"steps":["new:review-change-on-map/lens-place-change"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.callees"]},"callers":[{"id":"flowmap/lens.py:reach_diff","edited":true}]},{"id":"flowmap/callgraph.py:Graph.__init__","file":"flowmap/callgraph.py","sym":"Graph.__init__","status":"modified","contract":false,"signature":null,"steps":["new:review-change-on-map/generate-diagrams","new:review-change-on-map/lens-place-change","new:review-change-on-map/callgraph-impact","new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:graph_at","flowmap/callgraph.py:Graph"],"new:review-change-on-map/callgraph-impact":["flowmap/callgraph.py:__main__","flowmap/callgraph.py:Graph"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay","flowmap/callgraph.py:Graph"]},"callers":[{"id":"flowmap/atlas.py:overlay","edited":false},{"id":"flowmap/callgraph.py:__main__","edited":false},{"id":"flowmap/diagrams.py:Diagrams.__init__","edited":false},{"id":"flowmap/lens.py:graph_at","edited":true}]},{"id":"flowmap/lens.py:main","file":"flowmap/lens.py","sym":"main","status":"modified","contract":false,"signature":null,"steps":["new:review-change-on-map/lens-place-change"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main"]},"callers":[{"id":"flowmap/lens.py:__main__","edited":false}]},{"id":"flowmap/lens.py:graph_at","file":"flowmap/lens.py","sym":"graph_at","status":"new","contract":false,"signature":[null,"ref"],"steps":["new:review-change-on-map/lens-place-change"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:graph_at"]},"callers":[{"id":"flowmap/lens.py:main","edited":true}]},{"id":"flowmap/lens.py:reach_diff","file":"flowmap/lens.py","sym":"reach_diff","status":"new","contract":false,"signature":[null,"old, new, old_eps, new_eps"],"steps":["new:review-change-on-map/lens-place-change"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:reach_diff"]},"callers":[{"id":"flowmap/lens.py:main","edited":true}]}],"endpoints":{"added":[],"removed":[]},"reach":{"gained":{},"lost":{}},"edges":{"added":[["flowmap/callgraph.py:Graph.callees","flowmap/callgraph.py:Graph._closure"],["flowmap/callgraph.py:Graph.callers","flowmap/callgraph.py:Graph._closure"],["flowmap/lens.py:graph_at","flowmap/callgraph.py:Graph"],["flowmap/lens.py:graph_at","flowmap/config.py:python_roots"],["flowmap/lens.py:graph_at","flowmap/lens.py:git"],["flowmap/lens.py:graph_at","flowmap/lens.py:show"],["flowmap/lens.py:main","flowmap/lens.py:graph_at"],["flowmap/lens.py:main","flowmap/lens.py:reach_diff"],["flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.callees"],["flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.callers"],["flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.edge_set"]],"removed":[["flowmap/lens.py:main","flowmap/callgraph.py:Graph"],["flowmap/lens.py:main","flowmap/lens.py:git"]]},"modules":{"added":[],"removed":[]},"flow_share":{"new:review-change-on-map":8},"flow_entropy":0.0,"tests":{"configured":false,"changed":[]},"hunks":[{"file":"README.md","old":44,"new":44,"ctx":"flowmap atlas                     # the interactive map (docs/flowmap/atlas.html","lines":[" "," ```bash","-flowmap lens <base> <head>                       # placement, reach, off-map code","+flowmap lens <base> <head>                       # placement, reach, reach diff, off-map code"," flowmap atlas --pr '<base>..<head>=PR #123'      # paint it on the map"," ```"],"symbols":[]},{"file":"flowmap/callgraph.py","old":40,"new":40,"ctx":"class Graph:","lines":["         self.bases = {}                         # class node id -> {base class names}","         self.edges = defaultdict(set)","-        files = files or [p.relative_to(ROOT).as_posix() for d in config.python_roots()","+        files = files if files is not None else [p.relative_to(ROOT).as_posix() for d in config.python_roots()","                           for p in (ROOT / d).rglob(\"*.py\")]","         self.packages = {module_of(rel).split(\".\")[0] for rel in files}"],"symbols":["flowmap/callgraph.py:Graph.__init__"]},{"file":"flowmap/callgraph.py","old":175,"new":175,"ctx":"class Graph:","lines":["     def callers(self, nid):","         \"\"\"Everything that can transitively reach nid (reverse BFS).\"\"\"","+        return self._closure(self.reverse, nid)","+","+    def callees(self, nid):","+        \"\"\"Everything nid can transitively reach (forward BFS).\"\"\"","+        return self._closure(self.edges, nid)","+","+    @staticmethod","+    def _closure(adj, nid):","         seen, queue = {nid}, deque([nid])","         while queue:","-            for prev in self.reverse.get(queue.popleft(), ()):","-                if prev not in seen:","-                    seen.add(prev)","-                    queue.append(prev)","+            for nxt in adj.get(queue.popleft(), ()):","+                if nxt not in seen:","+                    seen.add(nxt)","+                    queue.append(nxt)","         return seen - {nid}"," ","+    def edge_set(self):","+        return {(a, b) for a, bs in self.edges.items() for b in bs}","+","     def reaches(self, src, dst, limit=12):","         \"\"\"Shortest call chain src -> dst, or None.\"\"\""],"symbols":["flowmap/callgraph.py:Graph.__init__","flowmap/callgraph.py:Graph._closure","flowmap/callgraph.py:Graph.callees","flowmap/callgraph.py:Graph.callers","flowmap/callgraph.py:Graph.edge_set"]},{"file":"flowmap/lens.py","old":163,"new":163,"ctx":"def endpoint_set(ref):","lines":[" "," ","+def graph_at(ref):","+    \"\"\"The static call graph of the Python roots as they are at `ref`.\"\"\"","+    roots = config.python_roots()","+    files = [f for f in git(\"ls-tree\", \"-r\", \"--name-only\", ref, \"--\", *roots).splitlines()","+             if f.endswith(\".py\")] if roots else []","+    return Graph(read=lambda rel: show(ref, rel) or \"\", files=files)","+","+","+def reach_diff(old, new, old_eps, new_eps):","+    \"\"\"How the call graph moved between two revisions.","+","+    old_eps/new_eps: endpoint -> handler node. Returns (edges added, edges removed,","+    {symbol: (endpoints that newly reach it, endpoints that no longer do)}), counting only","+    symbols and endpoints that exist on both sides: new code inherits its caller's reach and","+    deleted code loses all of it, neither of which is news.","+    \"\"\"","+    old_edges, new_edges = old.edge_set(), new.edge_set()","+    added, removed = new_edges - old_edges, old_edges - new_edges","+    # only endpoints that sit above a changed edge can have changed reach","+    affected = set()","+    for g, eps, edges in ((old, old_eps, removed), (new, new_eps, added)):","+        above = set()","+        for src in {a for a, _ in edges}:","+            above |= g.callers(src) | {src}","+        affected |= {e for e, h in eps.items() if h in above}","+    both = old.defs.keys() & new.defs.keys()","+    moved = defaultdict(lambda: (set(), set()))","+    for e in affected & old_eps.keys() & new_eps.keys():","+        before = old.callees(old_eps[e]) | {old_eps[e]}","+        after = new.callees(new_eps[e]) | {new_eps[e]}","+        for sym in (after - before) & both:","+            moved[sym][0].add(e)","+        for sym in (before - after) & both:","+            moved[sym][1].add(e)","+    return added, removed, dict(moved)","+","+"," def main(base, head=\"HEAD\"):","     the_map = json.loads(MAP.read_text())"],"symbols":["flowmap/lens.py:graph_at","flowmap/lens.py:main","flowmap/lens.py:reach_diff"]},{"file":"flowmap/lens.py","old":234,"new":271,"ctx":"def main(base, head=\"HEAD\"):","lines":["     # Deterministic reach: walk the call graph backwards from every changed backend","     # symbol to the endpoints that can execute it, then up to map steps and flows.","-    py_files = [f for f in (git(\"ls-tree\", \"-r\", \"--name-only\", head, \"--\", *config.python_roots()).splitlines()","-                            if config.python_roots() else [])","-                if f.endswith(\".py\")]","-    graph = Graph(read=lambda rel: show(head, rel) or \"\", files=py_files)","+    graph = graph_at(head)","     step_of = defaultdict(list)  # endpoint -> [(flow, step)]","     for f in the_map[\"flows\"]:"],"symbols":["flowmap/lens.py:main"]},{"file":"flowmap/lens.py","old":283,"new":317,"ctx":"def main(base, head=\"HEAD\"):","lines":["         out.append(\"\")"," ","+    # Reach diff: the call graph at base vs head. Catches a change that makes existing code","+    # run under new endpoints (or stop running under old ones) without that code changing.","+    if config.python_roots():","+        added_edges, removed_edges, moved = reach_diff(graph_at(base), graph, base_eps, head_eps)","+        short = lambda nid: f\"{Path(nid.rsplit(':', 1)[0]).stem}.{nid.rsplit(':', 1)[1]}\"  # noqa: E731","+        flows_of = lambda eps: sorted({fid for e in eps for fid, _ in step_of.get(e, [])})  # noqa: E731","+        anchors = set(anchor_uses)","+        gained = {sym: g for sym, (g, _) in moved.items() if g}","+        lost = {sym: lo for sym, (_, lo) in moved.items() if lo}","+        if added_edges or removed_edges:","+            out += [\"## Reach diff (call graph, base \u2192 head)\", \"\",","+                    f\"{len(added_edges)} call edges added, {len(removed_edges)} removed. \"","+                    f\"Existing code newly reachable from some endpoint: **{len(gained)}**; \"","+                    f\"no longer reachable from some endpoint: **{len(lost)}**.\", \"\"]","+","+            def listing(title, syms):","+                if not syms:","+                    return","+                out.extend([title, \"\"])","+                # widest first; map anchors break ties since they name a step","+                for sym, eps in sorted(syms.items(), key=lambda kv: (-len(kv[1]), kv[0] not in anchors, kv[0]))[:10]:","+                    names = \", \".join(f\"`{e}`\" for e in sorted(eps)[:3]) + (f\" +{len(eps) - 3}\" if len(eps) > 3 else \"\")","+                    fl = flows_of(eps)","+                    out.append(f\"- `{sym}`{' (map anchor)' if sym in anchors else ''} \u2014 {names}\"","+                               + (f\" \u00b7 flows: {', '.join(fl)}\" if fl else \"\"))","+                if len(syms) > 10:","+                    out.append(f\"- \u2026 {len(syms) - 10} more\")","+                out.append(\"\")","+            listing(\"**Newly reachable** existing code (now runs under endpoints it didn't before):\", gained)","+            listing(\"**No longer reachable** (endpoints that stopped reaching it \u2014 a dropped check?):\", lost)","+            for title, edges in ((\"Edges added\", sorted(added_edges)), (\"Edges removed\", sorted(removed_edges))):","+                if edges:","+                    out.append(f\"{title}: \" + \", \".join(f\"`{short(a)}` \u2192 `{short(b)}`\" for a, b in edges[:8])","+                               + (f\", \u2026 {len(edges) - 8} more\" if len(edges) > 8 else \"\"))","+            out.append(\"\")","+","     if off_map:","         out += [\"## Off-map changes (code the map doesn't know)\", \"\","],"symbols":["flowmap/lens.py:main"]},{"file":"skills/pr-lens/SKILL.md","old":27,"new":27,"ctx":"A PR number, a branch, or a commit range. Resolve to `<base> <head>`:","lines":["    conditional branches, test doubles resolved by method name) and misses string/registry","    dispatch \u2014 so treat a reached step as \"ask whether this path is affected\", not \"broken\".","+   Its **Reach diff** section compares the call graph at base and head: existing code an","+   endpoint can newly reach, or no longer reaches, though that code itself may be unchanged.","+   A map anchor or a check (auth, validation, audit) under \"no longer reachable\" is the first","+   question to ask the author."," 2. Read the PR description / commit messages (`git log --format=%B <base>..<head>`) for","    stated intent."],"symbols":[]}]},"story":{"title":"Lens compares two versions of the system","pr":"PR #1","url":"https://github.com/NelisVerhoef/Flowmap/pull/1","intent":"Make the PR lens catch reach that changes in code nobody edited: a new call into an existing destructive helper, a dropped call to a check.","delta":"The review flow now builds the call graph twice, at base and at head, and reports what each entry point gained or lost. The rest of the system behaves as before, apart from one edge case in how a graph is built from a git revision. No new dependencies between modules."},"chapters":[{"title":"The lens now sees the system before and after","kind":"new capability","role":"core","symbols":["flowmap/lens.py:reach_diff","flowmap/lens.py:graph_at","flowmap/lens.py:main"],"before":"Lens built one call graph, at head. It could say what edited code reaches, nothing about unedited code whose reach moved.","after":"Lens builds the graph at base and at head, diffs the call edges, and lists existing code each entry point newly reaches or no longer reaches, flagging map anchors.","claim":"Placing a change on the map now includes a second picture of the system: how it looked before the change.","why":"Every review through `flowmap lens` or the pr-lens skill starts from this output. It is now the only place a reviewer learns that an untouched function, like an auth check, stopped running under an entry point. The price is a second graph build on every lens run (about 0.4 s on this repo).","questions":[{"q":"The base graph is parsed using today's `[code] python` roots from flowmap.toml, not the roots as they were at base. If a PR moves or adds a Python root, base and head are read from different trees and the diff reports phantom edges. Should base read its own config?","why":"A false 'no longer reachable' is the most expensive kind of noise this section can produce.","kind":"ask"},{"q":"Lost reach is inferred through method-name matching (`obj.method()` links to every method of that name). Is that precise enough to lead the section, or should it only list map anchors?","why":"Decides whether reviewers learn to trust or skip the section.","kind":"ask"},{"q":"Only entry points that exist on both sides are compared. Confirm a brand-new entry point's reach shows up under 'Endpoint changes' instead.","why":"New capabilities should not fall between two sections.","kind":"check"}]},{"title":"Building a graph from a git revision no longer falls back to today's code","kind":"behaviour change","role":"supporting","symbols":["flowmap/callgraph.py:Graph.__init__"],"before":"Passing an empty file list to Graph meant 'use the working tree'. A revision with no Python files was silently described with today's code.","after":"Only an omitted file list means the working tree. An empty list gives an empty graph.","claim":"The shared call-graph builder tells 'no files at this revision' apart from 'read the working tree'.","why":"Two of the four map steps that build a graph do it from a git revision: lens and the atlas PR overlay. Both could previously describe the wrong version of the system without any sign of it. Diagrams and `callgraph impact` call `Graph()` with no file list and are unaffected.","questions":[{"q":"The atlas PR overlay still has its own copy of the 'graph at a revision' code that lens now keeps in `graph_at`. Should atlas call `lens.graph_at` so the two can't drift?","why":"Two copies of the same rule is how the fallback bug got in.","kind":"ask"},{"q":"Three callers of Graph were not edited: the atlas overlay, Diagrams and `callgraph impact`. Check that none of them passes an empty list expecting the old fallback.","why":"The graph lists them; only reading each call settles it.","kind":"check"}]},{"title":"The call graph can answer 'what does this reach' as well as 'what reaches this'","kind":"refactor","role":"supporting","symbols":["flowmap/callgraph.py:Graph.callers","flowmap/callgraph.py:Graph.callees","flowmap/callgraph.py:Graph._closure","flowmap/callgraph.py:Graph.edge_set"],"before":"The graph offered reverse reach (callers) and shortest paths.","after":"It also offers forward reach (callees) and its edge set. Callers now shares one traversal with callees and is meant to behave exactly as before.","claim":"A behaviour-preserving refactor of reverse reach, plus two small additions used only by the lens.","why":"Reverse reach is on the path of three map steps: lens, atlas and `callgraph impact`. If the refactor changed it, all three would report a different blast radius.","questions":[{"q":"`callers` runs under lens, atlas and `callgraph impact`, and the repo has no tests. Was its output compared before and after on a real graph?","why":"A silent change here shifts every reach number flowmap reports.","kind":"ask"}]},{"title":"The review agent is told to lead with dropped checks","kind":"outside the map","role":"outside","files":["skills/pr-lens/SKILL.md","README.md"],"before":"The pr-lens skill read lens output for placement and reach.","after":"It also reads the reach diff, and puts a map anchor or a check under 'no longer reachable' first among the questions for the author.","claim":"The instructions that steer the review agent changed. That is behaviour, even though it is prose.","why":"The skills drive `lens` and the mapping flow, but no flow on the map covers them, so the map cannot show that this changed how reviews are written.","questions":[{"q":"Should the Claude Code skills be a flow on the map? They are how most people run flowmap.","why":"Today the map is blind to changes in agent behaviour.","kind":"ask"}]}],"folded":[]};
+const F = DATA.facts, S = DATA.story;
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k === "html") n.innerHTML = v; else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+};
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const md = (s) => esc(s || "").replace(/`([^`]+)`/g, "<code>$1</code>");
+const sym = (id) => id.split(":").pop();
+const file = (id) => id.split(":")[0].split("/").pop();
+const flowName = (id) => id.replace(/^new:/, "").replace(/-/g, " ");
+const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Outside the map",
+  unassigned: "Not in the story", "off-map": "Off the map" };
+
+const steps = new Map();
+F.map.forEach((f, fi) => f.steps.forEach((s, si) => steps.set(s.key, { ...s, flow: f.id, fi, si })));
+const symById = new Map(F.symbols.map(s => [s.id, s]));
+
+// chapter facts
+const chapters = DATA.chapters.map((c, i) => {
+  const syms = (c.symbols || []).map(id => symById.get(id)).filter(Boolean);
+  const keys = new Set(syms.flatMap(s => s.steps));
+  const ids = new Set(c.symbols || []);
+  const mine = (n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
+  const edgesIn = (list) => list.filter(([a, b]) => mine(a) || mine(b));
+  const callers = new Map();
+  syms.filter(s => s.status === "modified").forEach(s => s.callers.forEach(c => { if (!ids.has(c.id)) callers.set(c.id, c.edited); }));
+  const hunks = F.hunks.filter(h => h.symbols.some(x => ids.has(x)) || (c.files || []).includes(h.file));
+  const role = c.role || (c.kind === "outside" ? "outside" : c.kind === "unassigned" ? "unassigned" : c.kind === "off-map" ? "off-map" : i === 0 ? "core" : "supporting");
+  return { ...c, n: i + 1, id: "ch" + (i + 1), syms, keys, role, callers,
+    added: edgesIn(F.edges.added), removed: edgesIn(F.edges.removed), hunks };
+});
+
+// header
+const range = el("div", { class: "range" });
+range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", S.pr ? " · " : "",
+  el("span", { class: "mono", text: `${F.base_sha} → ${F.head_sha}` }), ` · ${F.name}`);
+$("#top").append(range, el("h1", { text: S.title || `${F.base}..${F.head}` }));
+if (S.delta) $("#top").append(el("p", { class: "delta", html: md(S.delta) }));
+if (S.intent) $("#top").append(el("p", { class: "intent", html: "<b>Author's intent:</b> " + md(S.intent) }));
+
+// system numbers, each with its drivers
+const touchedFlows = new Set(F.symbols.flatMap(s => s.steps.map(k => k.split("/")[0])));
+const gained = Object.keys(F.reach.gained), lost = Object.keys(F.reach.lost);
+const outside = F.files.filter(f => f.kind === "outside" || f.kind === "doc");
+const tiles = [
+  [`${touchedFlows.size} of ${F.map.length}`, "flows run changed code",
+    touchedFlows.size ? [...touchedFlows].map(flowName).join(", ") + (F.flow_entropy === 0 ? " · one flow, no spread" : ` · spread ${F.flow_entropy} bits`) : "none"],
+  [`+${F.endpoints.added.length} −${F.endpoints.removed.length}`, "entry points",
+    [...F.endpoints.added.map(e => "+ " + e), ...F.endpoints.removed.map(e => "− " + e)].join(", ") || "no capability added or removed"],
+  [`+${gained.length} −${lost.length}`, "existing code reached",
+    [...gained.slice(0, 2).map(s => "+ " + sym(s)), ...lost.slice(0, 2).map(s => "− " + sym(s))].join(", ") || "no entry point gains or loses existing code"],
+  [`+${F.modules.added.length} −${F.modules.removed.length}`, "module dependencies",
+    [...F.modules.added.map(([a, b]) => `${a.split("/").pop()} → ${b.split("/").pop()}`)].join(", ") || "no new links between modules"],
+  [`+${F.edges.added.length} −${F.edges.removed.length}`, "calls", `${F.symbols.filter(s => s.status === "new").length} new functions, ${F.symbols.filter(s => s.status === "modified").length} changed`],
+  [`${outside.length}`, "files outside the map", outside.map(f => f.path).join(", ") || "none"],
+  [F.tests.changed.length ? `${F.tests.changed.length}` : "0", "tests changed", F.tests.configured ? (F.tests.changed.join(", ") || "none changed") : "no test suite configured"],
+];
+for (const [v, k, d] of tiles) {
+  const zero = /^(\+0 −0|0|0 of \d+)$/.test(v);
+  $("#tiles").append(el("div", { class: "tile" + (zero ? " zero" : "") }, el("span", { class: "label", text: k }), el("b", { text: v }), el("small", { text: d })));
+}
+
+// the map: positions fixed by map.json, refs say which chapters run where
+$("#lines").style.setProperty("--flows", F.map.length);
+for (const f of F.map) {
+  const ol = el("ol", { class: "stations" });
+  let any = false;
+  for (const s of f.steps) {
+    const hits = chapters.filter(c => c.keys.has(s.key));
+    any = any || hits.length > 0;
+    const refs = el("span", { class: "refs" }, ...hits.map(c => el("a", { class: "ref", href: "#" + c.id, text: String(c.n),
+      style: `--role: var(--${c.role === "core" ? "core" : c.role === "supporting" ? "support" : c.role === "refactor" ? "refactor" : "outside"})`,
+      title: c.title })));
+    ol.append(el("li", { class: "st" + (hits.length ? " hit" : " quiet") }, el("span", { class: "pin", "aria-hidden": "true" }),
+      el("span", {}, s.name, hits.length ? refs : null)));
+  }
+  $("#lines").append(el("section", { class: "flow" + (any ? "" : " quiet") }, el("h3", { text: flowName(f.id) }), ol));
+}
+const offChapters = chapters.filter(c => !c.keys.size);
+if (offChapters.length) {
+  const box = $("#offmap");
+  box.hidden = false;
+  box.append("Not on any flow:", ...offChapters.map(c => el("a", { class: "ref", href: "#" + c.id, text: `${c.n} · ${c.title}`, style: "--role: var(--outside)" })));
+}
+
+// minimap: same positions as the big map, dots only
+function minimap(c) {
+  const cols = F.map.length, rows = Math.max(...F.map.map(f => f.steps.length));
+  const W = 240, colW = W / cols, rowH = 16, top = 22, H = top + rows * rowH + 4;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `System map, ${c.keys.size} of ${steps.size} steps highlighted`);
+  F.map.forEach((f, fi) => {
+    const x = colW * fi + colW / 2;
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", x); t.setAttribute("y", 11); t.setAttribute("text-anchor", "middle");
+    const nm = flowName(f.id);
+    t.textContent = nm.length > 18 ? nm.slice(0, 17) + "…" : nm;
+    svg.append(t);
+    if (f.steps.length > 1) {
+      const l = document.createElementNS(ns, "line");
+      Object.entries({ x1: x, x2: x, y1: top, y2: top + (f.steps.length - 1) * rowH, class: "rail" }).forEach(([k, v]) => l.setAttribute(k, v));
+      svg.append(l);
+    }
+    f.steps.forEach((s, si) => {
+      const d = document.createElementNS(ns, "circle");
+      Object.entries({ cx: x, cy: top + si * rowH, r: 5, class: "dot" + (c.keys.has(s.key) ? " on" : "") }).forEach(([k, v]) => d.setAttribute(k, v));
+      const tip = document.createElementNS(ns, "title"); tip.textContent = s.name; d.append(tip);
+      svg.append(d);
+    });
+  });
+  return el("div", { class: "minimap" }, svg);
+}
+
+function pathEl(p) {
+  const box = el("div", { class: "path" });
+  p.forEach((n, i) => {
+    if (i) box.append(el("i", { text: "›" }));
+    box.append(el("span", { class: i === p.length - 1 ? "end" : "", title: n, text: i === 0 ? file(n) : sym(n) }));
+  });
+  return box;
+}
+
+const picked = new Set();
+function renderNote() {
+  const lines = [];
+  for (const c of chapters) {
+    const qs = (c._qs || []).filter(q => picked.has(q.id));
+    if (!qs.length) continue;
+    lines.push(`${c.n}. ${c.title}`);
+    qs.forEach(q => lines.push(`   - ${q.q}`));
+  }
+  $("#note").value = lines.join("\n") || "";
+}
+
+for (const c of chapters) {
+  const card = el("article", { class: `chapter ${c.role}`, id: c.id });
+  card.append(el("div", { class: "ch-head" },
+    el("div", { class: "ch-tags" }, el("span", { class: "num", text: String(c.n) }), el("span", { class: "tag", text: ROLE[c.role] || c.role }),
+      c.kind && c.kind !== c.role ? el("span", { class: "kind", text: c.kind }) : null),
+    el("h2", { text: c.title }),
+    c.claim ? el("p", { class: "claim", html: md(c.claim) }) : null));
+
+  // where + before/after
+  const crumbs = el("ul", { class: "crumbs" });
+  const keys = [...c.keys].sort((a, b) => (steps.get(a).fi - steps.get(b).fi) || (steps.get(a).si - steps.get(b).si));
+  for (const k of keys) {
+    const s = steps.get(k);
+    crumbs.append(el("li", {}, el("span", { class: "flow-name", text: flowName(s.flow) }), el("span", { text: s.name })));
+  }
+  if (!keys.length) crumbs.append(el("li", {}, el("span", { class: "flow-name", text: "No flow runs this" }),
+    el("span", { text: (c.files || []).join(", ") || c.syms.map(s => s.id).join(", ") })));
+  const here = el("div", { class: "here" }, el("span", { class: "label", text: "You are here" }), minimap(c), crumbs);
+  const morph = el("dl", { class: "morph" });
+  if (c.before) morph.append(el("div", {}, el("dt", { text: "Before" }), el("dd", { html: md(c.before) })));
+  if (c.after) morph.append(el("div", { class: "after" }, el("dt", { text: "After" }), el("dd", { html: md(c.after) })));
+  const right = el("div", { class: "here" }, el("span", { class: "label", text: "How the system changes" }), morph);
+  if (c.why) right.append(el("div", { class: "why" }, el("span", { class: "label", text: "Why it matters" }), el("p", { html: md(c.why) })));
+  if (!c.before && !c.after && !c.why) right.append(el("p", { class: "note", text: "No story for this chapter: the graph facts below are all flowmap knows. Add it to the story file to say what changes and why." }));
+  card.append(el("div", { class: "where" }, here, right));
+
+  // evidence from the graph
+  const ev = el("div", { class: "evidence" });
+  const graphQs = [];
+  const witnesses = new Map();
+  c.syms.forEach(s => Object.entries(s.witness).forEach(([k, p]) => { if (!witnesses.has(k) || witnesses.get(k).length > p.length) witnesses.set(k, p); }));
+  if (witnesses.size) {
+    const ul = el("ul", { class: "paths" });
+    for (const [k, p] of witnesses) ul.append(el("li", {}, el("div", { class: "note", text: steps.get(k).endpoints.join(", ") }), pathEl(p)));
+    const unproved = keys.filter(k => !witnesses.has(k));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Runs under (call path as proof)" }), ul,
+      unproved.length ? el("p", { class: "note", text: `Also on the map's own anchors for: ${unproved.map(k => steps.get(k).name).join("; ")} (no call path found).` }) : null));
+  }
+  if (c.callers.size) {
+    const ul = el("ul", { class: "callers" });
+    [...c.callers].sort((a, b) => a[1] - b[1]).forEach(([id, edited]) =>
+      ul.append(el("li", {}, el("span", { class: "mark " + (edited ? "yes" : "no"), text: edited ? "edited" : "not edited" }), el("span", { title: id, text: `${file(id)} · ${sym(id)}` }))));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Callers of what changed" }), ul));
+  }
+  if (c.added.length || c.removed.length) {
+    const ul = el("ul", { class: "edges" });
+    c.added.slice(0, 8).forEach(([a, b]) => ul.append(el("li", {}, el("span", { class: "mark add", text: "+ call" }), el("span", { text: `${sym(a)} → ${sym(b)}` }))));
+    c.removed.slice(0, 8).forEach(([a, b]) => ul.append(el("li", {}, el("span", { class: "mark rem", text: "− call" }), el("span", { text: `${sym(a)} → ${sym(b)}` }))));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Calls added and removed" }), ul));
+  }
+  // reach that moved under this chapter's steps, though the code reached may be untouched
+  const myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
+  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
+  const gainedHere = moved(F.reach.gained), lostHere = moved(F.reach.lost);
+  if (gainedHere.length || lostHere.length) {
+    const ul = el("ul", { class: "edges" });
+    lostHere.forEach(([s, eps]) => ul.append(el("li", {}, el("span", { class: "mark rem", text: "no longer" }), el("span", { title: s, text: `${file(s)} · ${sym(s)} from ${eps.join(", ")}` }))));
+    gainedHere.forEach(([s, eps]) => ul.append(el("li", {}, el("span", { class: "mark add", text: "now reaches" }), el("span", { title: s, text: `${file(s)} · ${sym(s)} from ${eps.join(", ")}` }))));
+    ev.prepend(el("div", {}, el("span", { class: "label", text: "Reach that moved (unedited code)" }), ul));
+    lostHere.forEach(([s, eps], i) => graphQs.push({ id: `${c.id}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
+    gainedHere.forEach(([s, eps], i) => graphQs.push({ id: `${c.id}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
+  }
+  if (ev.children.length) card.append(ev);
+
+  // questions: the story's, then what the graph raises on its own
+  const qs = [...graphQs, ...(c.questions || []).map((q, i) => ({ ...q, id: `${c.id}q${i}` }))];
+  c.syms.filter(s => s.contract).forEach((s, i) => {
+    const still = s.callers.filter(x => !x.edited).map(x => sym(x.id));
+    if (still.length) qs.push({ id: `${c.id}g${i}`, kind: "graph", q: `${sym(s.id)} changed its arguments (${s.signature[0]} → ${s.signature[1]}) but ${still.length} caller(s) were not edited: ${still.join(", ")}. Are they still correct?`, why: "Signature changed, callers did not." });
+  });
+  c.syms.filter(s => s.status === "new" && !s.steps.length).forEach((s, i) =>
+    qs.push({ id: `${c.id}o${i}`, kind: "graph", q: `New ${sym(s.id)} is not run by any flow on the map. Which step is it for?`, why: "New code no flow reaches is either a map gap or dead." }));
+  c._qs = qs;
+  if (qs.length) {
+    const ol = el("ol", { class: "qs" });
+    for (const q of qs) {
+      const box = el("input", { type: "checkbox", id: q.id });
+      if (q.kind === "ask" || q.kind === "graph") { box.checked = true; picked.add(q.id); }
+      box.addEventListener("change", () => { box.checked ? picked.add(q.id) : picked.delete(q.id); renderNote(); });
+      const kind = { ask: "Ask the author", check: "Check yourself", graph: "From the graph" }[q.kind] || q.kind;
+      ol.append(el("li", { class: "q" }, box, el("label", { for: q.id },
+        el("span", { class: "qtext", html: `<span class="qkind ${esc(q.kind)}">${esc(kind)}</span>` + md(q.q) }),
+        q.why ? el("span", { class: "qwhy", html: md(q.why) }) : null)));
+    }
+    card.append(el("div", { class: "here" }, el("span", { class: "label", text: "Questions, most decisive first" }), ol));
+  }
+
+  // code last
+  if (c.hunks.length) {
+    const d = el("details", { class: "code" }, el("summary", { text: `Code: ${c.hunks.length} hunk${c.hunks.length === 1 ? "" : "s"} in ${[...new Set(c.hunks.map(h => h.file))].join(", ")}` }));
+    for (const h of c.hunks) {
+      const pre = el("pre");
+      h.lines.forEach(l => pre.append(el("span", { class: l[0] === "+" ? "a" : l[0] === "-" ? "r" : "", text: l })));
+      d.append(el("div", { class: "hunk" }, el("div", { class: "hh", text: `${h.file} @ ${h.new}${h.ctx ? " · " + h.ctx : ""}` }), pre));
+    }
+    card.append(d);
+  }
+  $("#chapters").append(card);
+}
+renderNote();
+if (DATA.folded.length) $("#folded").textContent = "Folded, not shown: " + DATA.folded.join(", ");
+
+$("#copy").addEventListener("click", async () => {
+  const t = $("#note");
+  try { await navigator.clipboard.writeText(t.value); $("#status").textContent = "Copied"; }
+  catch (e) { t.focus(); t.select(); $("#status").textContent = "Selected: press Ctrl+C or Cmd+C to copy"; }
+});
+</script>

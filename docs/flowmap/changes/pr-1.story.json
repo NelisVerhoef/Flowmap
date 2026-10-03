@@ -1,0 +1,64 @@
+{
+  "title": "Lens compares two versions of the system",
+  "pr": "PR #1",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/1",
+  "intent": "Make the PR lens catch reach that changes in code nobody edited: a new call into an existing destructive helper, a dropped call to a check.",
+  "delta": "The review flow now builds the call graph twice, at base and at head, and reports what each entry point gained or lost. The rest of the system behaves as before, apart from one edge case in how a graph is built from a git revision. No new dependencies between modules.",
+  "chapters": [
+    {
+      "title": "The lens now sees the system before and after",
+      "kind": "new capability",
+      "role": "core",
+      "symbols": ["flowmap/lens.py:reach_diff", "flowmap/lens.py:graph_at", "flowmap/lens.py:main"],
+      "before": "Lens built one call graph, at head. It could say what edited code reaches, nothing about unedited code whose reach moved.",
+      "after": "Lens builds the graph at base and at head, diffs the call edges, and lists existing code each entry point newly reaches or no longer reaches, flagging map anchors.",
+      "claim": "Placing a change on the map now includes a second picture of the system: how it looked before the change.",
+      "why": "Every review through `flowmap lens` or the pr-lens skill starts from this output. It is now the only place a reviewer learns that an untouched function, like an auth check, stopped running under an entry point. The price is a second graph build on every lens run (about 0.4 s on this repo).",
+      "questions": [
+        {"q": "The base graph is parsed using today's `[code] python` roots from flowmap.toml, not the roots as they were at base. If a PR moves or adds a Python root, base and head are read from different trees and the diff reports phantom edges. Should base read its own config?", "why": "A false 'no longer reachable' is the most expensive kind of noise this section can produce.", "kind": "ask"},
+        {"q": "Lost reach is inferred through method-name matching (`obj.method()` links to every method of that name). Is that precise enough to lead the section, or should it only list map anchors?", "why": "Decides whether reviewers learn to trust or skip the section.", "kind": "ask"},
+        {"q": "Only entry points that exist on both sides are compared. Confirm a brand-new entry point's reach shows up under 'Endpoint changes' instead.", "why": "New capabilities should not fall between two sections.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "Building a graph from a git revision no longer falls back to today's code",
+      "kind": "behaviour change",
+      "role": "supporting",
+      "symbols": ["flowmap/callgraph.py:Graph.__init__"],
+      "before": "Passing an empty file list to Graph meant 'use the working tree'. A revision with no Python files was silently described with today's code.",
+      "after": "Only an omitted file list means the working tree. An empty list gives an empty graph.",
+      "claim": "The shared call-graph builder tells 'no files at this revision' apart from 'read the working tree'.",
+      "why": "Two of the four map steps that build a graph do it from a git revision: lens and the atlas PR overlay. Both could previously describe the wrong version of the system without any sign of it. Diagrams and `callgraph impact` call `Graph()` with no file list and are unaffected.",
+      "questions": [
+        {"q": "The atlas PR overlay still has its own copy of the 'graph at a revision' code that lens now keeps in `graph_at`. Should atlas call `lens.graph_at` so the two can't drift?", "why": "Two copies of the same rule is how the fallback bug got in.", "kind": "ask"},
+        {"q": "Three callers of Graph were not edited: the atlas overlay, Diagrams and `callgraph impact`. Check that none of them passes an empty list expecting the old fallback.", "why": "The graph lists them; only reading each call settles it.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "The call graph can answer 'what does this reach' as well as 'what reaches this'",
+      "kind": "refactor",
+      "role": "supporting",
+      "symbols": ["flowmap/callgraph.py:Graph.callers", "flowmap/callgraph.py:Graph.callees", "flowmap/callgraph.py:Graph._closure", "flowmap/callgraph.py:Graph.edge_set"],
+      "before": "The graph offered reverse reach (callers) and shortest paths.",
+      "after": "It also offers forward reach (callees) and its edge set. Callers now shares one traversal with callees and is meant to behave exactly as before.",
+      "claim": "A behaviour-preserving refactor of reverse reach, plus two small additions used only by the lens.",
+      "why": "Reverse reach is on the path of three map steps: lens, atlas and `callgraph impact`. If the refactor changed it, all three would report a different blast radius.",
+      "questions": [
+        {"q": "`callers` runs under lens, atlas and `callgraph impact`, and the repo has no tests. Was its output compared before and after on a real graph?", "why": "A silent change here shifts every reach number flowmap reports.", "kind": "ask"}
+      ]
+    },
+    {
+      "title": "The review agent is told to lead with dropped checks",
+      "kind": "outside the map",
+      "role": "outside",
+      "files": ["skills/pr-lens/SKILL.md", "README.md"],
+      "before": "The pr-lens skill read lens output for placement and reach.",
+      "after": "It also reads the reach diff, and puts a map anchor or a check under 'no longer reachable' first among the questions for the author.",
+      "claim": "The instructions that steer the review agent changed. That is behaviour, even though it is prose.",
+      "why": "The skills drive `lens` and the mapping flow, but no flow on the map covers them, so the map cannot show that this changed how reviews are written.",
+      "questions": [
+        {"q": "Should the Claude Code skills be a flow on the map? They are how most people run flowmap.", "why": "Today the map is blind to changes in agent behaviour.", "kind": "ask"}
+      ]
+    }
+  ]
+}
