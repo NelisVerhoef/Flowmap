@@ -8,6 +8,7 @@ purpose, is in its own docstring.
     flowmap callgraph                       definitions and edges in the working tree
     flowmap callgraph impact <file:sym>...  which entry points (and flows) can reach a symbol
     flowmap callgraph dump [<ref>]          the graph as JSON, at a git revision or the working tree
+    flowmap callgraph check                 is every entry point's handler a node the graph can walk from?
 """
 
 import json
@@ -109,6 +110,18 @@ def impact(graph, nid):
     return sorted(set(hits))
 
 
+def classify(eps, defs, parsed):
+    """Can the graph walk from each entry point's handler? 'node': yes. 'not graphed': its file
+    is outside the graph roots or no builder parses that language yet (expected, not a fault).
+    'broken': the file is parsed but has no such node, so the adapter and the builder spell the
+    handler differently, and every reach number for that entry point is silently zero."""
+    out = {"node": [], "not graphed": [], "broken": []}
+    for e in eps:
+        h = e["handler"]
+        out["node" if h in defs else "broken" if h.rsplit(":", 1)[0] in parsed else "not graphed"].append(e)
+    return out
+
+
 if __name__ == "__main__":
     if sys.argv[1:2] == ["dump"]:
         import lens  # late: lens imports this module
@@ -116,6 +129,20 @@ if __name__ == "__main__":
         print(json.dumps({"defs": {k: list(v) for k, v in sorted(g.defs.items())},
                           "edges": sorted([a, b] for a, b in g.edge_set())}, indent=1))
         sys.exit(0)
+    if sys.argv[1:2] == ["check"]:
+        import inventory
+        files = config.graph_files()
+        eps = inventory.endpoints()
+        got = classify(eps, Graph(files=files).defs, set(files))
+        print(f"{len(eps)} entry points: {len(got['node'])} handlers are graph nodes, "
+              f"{len(got['not graphed'])} not graphed, {len(got['broken'])} broken")
+        for e in got["not graphed"]:
+            rel = e["handler"].rsplit(":", 1)[0]
+            why = f"no builder for {Path(rel).suffix or rel}" if graphs.builder_for(rel) is None else "outside [code].graph"
+            print(f"  NOT GRAPHED {e['endpoint']} -> {e['handler']} ({why})")
+        for e in got["broken"]:
+            print(f"  BROKEN {e['endpoint']} -> {e['handler']} (file is parsed, no such node)")
+        sys.exit(1 if got["broken"] else 0)
     g = Graph()
     if sys.argv[1:2] == ["impact"]:
         for nid in sys.argv[2:]:

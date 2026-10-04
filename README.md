@@ -71,3 +71,9 @@ Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{"endpoint", "h
 "aliases"?}]`, register it in `adapters/__init__.py`, and add its guidance to `STACK` in
 `flowmap/brief.py`. The `endpoint` string is the join key between passes, so derive it from code,
 never from a model.
+
+For deterministic reach, the language also needs a call-graph builder: `flowmap/graphs/<lang>.py`
+with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (see
+`graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then
+`flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node
+the builder emits.
