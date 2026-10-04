@@ -19,7 +19,7 @@ A PR number, a branch, or a commit range. Resolve to `<base> <head>`:
 
 ## Steps
 
-1. From the repo root, run `python3 <flowmap>/bin/flowmap lens <base> <head>` (the repo you are reviewing must already have a map;
+1. From the repo root (if `flowmap` isn't on PATH, use `"${CLAUDE_PLUGIN_ROOT}/bin/flowmap"`), run `flowmap lens <base> <head>` (the repo you are reviewing must already have a map;
    build one with the flowmap-build skill). This is the ground truth for
    placement — do not contradict it; if you think the map is wrong, say so separately.
    Its **Reach** section comes from the static call graph (`callgraph.py`), not from any
@@ -75,7 +75,7 @@ specific and occasionally wrong over safe and vague.
 
 Also write the change as a page people can read without the diff:
 
-1. `python3 <flowmap>/bin/flowmap change <base> <head> --facts` prints the deterministic facts:
+1. `flowmap change <base> <head> --facts` prints the deterministic facts:
    changed symbols with the map steps that run them (and a call path proving it), callers left
    unedited, call edges and module dependencies added or removed, reach that moved, flow spread.
 2. Write `docs/flowmap/changes/<name>.story.json` (e.g. `pr-12`). It is the prose layer only;
@@ -101,7 +101,7 @@ Also write the change as a page people can read without the diff:
    refactor gets its own `refactor` chapter so it can be read quickly. Prose that steers an
    agent (skills, prompts) is behaviour: give it a chapter. Two to five questions per chapter.
    "Ask" means only the author can answer; "check" means the reviewer can settle it themselves.
-3. `python3 <flowmap>/bin/flowmap change <base> <head> --name <name>` writes
+3. `flowmap change <base> <head> --name <name>` writes
    `docs/flowmap/changes/<name>.html`. Symbols the story leaves out land in a "not in the story"
    chapter, so nothing changed is hidden.
 

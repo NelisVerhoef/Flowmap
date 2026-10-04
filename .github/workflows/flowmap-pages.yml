@@ -1,0 +1,61 @@
+# Publishes the flowmap HTML pages to the gh-pages branch so they render in a browser.
+# GitHub shows committed .html as source; Pages serves it.
+#   change pages (any branch): https://<owner>.github.io/<repo>/changes/<name>.html
+#   atlas (default branch):    https://<owner>.github.io/<repo>/atlas.html
+# One-time setup: Settings -> Pages -> Deploy from a branch -> gh-pages / (root).
+name: flowmap pages
+
+on:
+  push:
+    paths: ["docs/flowmap/**", ".github/workflows/flowmap-pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flowmap-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Check out gh-pages (or start it)
+        run: |
+          if git ls-remote --exit-code --heads "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" gh-pages >/dev/null; then
+            git clone --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" site
+          else
+            git init -b gh-pages site
+            git -C site remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}"
+            touch site/.nojekyll
+          fi
+
+      - name: Copy pages
+        run: |
+          OUT=src/docs/flowmap
+          mkdir -p site/changes
+          cp "$OUT"/changes/*.html site/changes/ 2>/dev/null || true
+          if [ "${{ github.ref_name }}" = "${{ github.event.repository.default_branch }}" ] && [ -f "$OUT/atlas.html" ]; then
+            cp "$OUT/atlas.html" site/atlas.html
+          fi
+          {
+            echo '<!doctype html><meta charset="utf-8"><title>flowmap pages</title><ul>'
+            [ -f site/atlas.html ] && echo '<li><a href="atlas.html">atlas</a></li>'
+            for f in site/changes/*.html; do [ -e "$f" ] && n=$(basename "$f") && echo "<li><a href=\"changes/$n\">${n%.html}</a></li>"; done
+            echo '</ul>'
+          } > site/index.html
+
+      - name: Push
+        working-directory: site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "flowmap pages from ${{ github.ref_name }}@${GITHUB_SHA::7}"
+          git push origin gh-pages

@@ -1,0 +1,102 @@
+{
+  "title": "flowmap installs into any repo as a Claude Code plugin",
+  "pr": "PR #3",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/3",
+  "intent": "Make flowmap easy to use on other repos: installable with two /plugin commands instead of a clone and hand-copied skills.",
+  "delta": "No flow, step or call edge moves: the CLI is untouched. What changes is how the tools reach another repo. The repo now serves as its own plugin marketplace, and the two skills call `flowmap` from PATH, where the plugin's bin/ lives, instead of from a placeholder path. Change pages and the atlas also get a rendered URL on GitHub Pages, since GitHub shows committed HTML as source.",
+  "chapters": [
+    {
+      "title": "The repo is its own plugin marketplace",
+      "role": "core",
+      "kind": "distribution",
+      "symbols": [],
+      "files": [
+        ".claude-plugin/marketplace.json",
+        ".claude-plugin/plugin.json"
+      ],
+      "before": "plugin.json existed, but with no marketplace there was no install command; the README said to copy skills/* by hand.",
+      "after": "`/plugin marketplace add NelisVerhoef/flowmap` then `/plugin install flowmap@flowmap` installs both skills and puts bin/flowmap on the Bash PATH while enabled. `claude plugin validate .` passes.",
+      "claim": "Any repo can get flowmap in two commands.",
+      "why": "Every other repo reaches the build and review flows through this. Installs track the default branch, so it does nothing until merged.",
+      "questions": [
+        {
+          "q": "Should the marketplace entry pin a version or tag, so a push to main doesn't change every installed copy at once?",
+          "why": "Decides whether users get updates continuously or by release.",
+          "kind": "ask"
+        },
+        {
+          "q": "The marketplace and plugin are both named `flowmap`, so installs read `flowmap@flowmap`. Keep that, or name the marketplace after the owner?",
+          "why": "The name is hard to change once people have it in their settings.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "Flowmap pages render on GitHub Pages",
+      "role": "supporting",
+      "kind": "publishing",
+      "symbols": [],
+      "files": [
+        ".github/workflows/flowmap-pages.yml",
+        "CLAUDE.md"
+      ],
+      "before": "Change pages and the atlas were committed as .html, which GitHub shows as source; a reviewer had to download one to read it.",
+      "after": "On every push that touches docs/flowmap, a workflow copies changes/*.html (any branch) and atlas.html (default branch) to gh-pages, at https://nelisverhoef.github.io/Flowmap/changes/<name>.html. CLAUDE.md asks every PR to link its page there.",
+      "claim": "Every PR's flowmap has a URL a reviewer can open.",
+      "why": "The change page is the review entry point; if it doesn't open, reviewers fall back to reading the diff. Needs Pages turned on once (Settings → Pages → gh-pages).",
+      "questions": [
+        {
+          "q": "Change pages from every branch land in one flat changes/ folder, so a stale branch can overwrite pr-N.html. Fine given pages are named per PR, or key them by branch?",
+          "why": "Decides whether two branches can collide.",
+          "kind": "ask"
+        },
+        {
+          "q": "Pages are public even if the repo later goes private on a plan without private Pages. OK for maps of private repos that copy this workflow?",
+          "why": "The map names every endpoint and handler.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "The skills run flowmap from PATH",
+      "role": "supporting",
+      "kind": "agent instructions",
+      "symbols": [],
+      "files": [
+        "skills/flowmap-build/SKILL.md",
+        "skills/pr-lens/SKILL.md"
+      ],
+      "before": "The skills told the agent to run `<plugin root>/bin/flowmap` or `python3 <flowmap>/bin/flowmap`, placeholders it had to resolve by guessing.",
+      "after": "They run bare `flowmap`, falling back to `${CLAUDE_PLUGIN_ROOT}/bin/flowmap` when the command isn't found.",
+      "claim": "An agent following either skill no longer has to find the tool.",
+      "why": "Every map build and PR lens run through an agent starts with this line; a wrong path fails the first command.",
+      "questions": [
+        {
+          "q": "When the skills are copied into .claude/skills instead of installed, neither PATH nor CLAUDE_PLUGIN_ROOT is set. Is the README's manual route (put bin/ on PATH) enough of a fallback?",
+          "why": "Decides whether the skills need a third fallback.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "The README documents three install routes",
+      "role": "supporting",
+      "kind": "docs",
+      "symbols": [],
+      "files": [
+        "README.md"
+      ],
+      "before": "One line: install the plugin from this repo, or copy skills/*.",
+      "after": "Plugin install commands; a .claude/settings.json snippet (extraKnownMarketplaces + enabledPlugins) so teammates are offered the plugin when they open a repo; and a manual route.",
+      "claim": "A team can adopt flowmap by committing one settings file.",
+      "why": "This is what makes it spread across repos without each person installing it by hand.",
+      "questions": [
+        {
+          "q": "The settings snippet hasn't been tried end to end. Try it in one repo once this is merged, before recommending it to a team.",
+          "why": "Decides whether the team route is documented as working.",
+          "kind": "check"
+        }
+      ]
+    }
+  ]
+}

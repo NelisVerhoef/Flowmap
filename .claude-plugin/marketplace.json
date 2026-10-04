@@ -1,0 +1,14 @@
+{
+  "name": "flowmap",
+  "description": "flowmap: map a codebase as user flows and review PRs on that map.",
+  "owner": {
+    "name": "Nelis Verhoef"
+  },
+  "plugins": [
+    {
+      "name": "flowmap",
+      "source": "./",
+      "description": "Map a codebase as user flows -> steps -> code, and review PRs by where they land on that map."
+    }
+  ]
+}

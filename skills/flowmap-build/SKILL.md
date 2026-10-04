@@ -8,7 +8,8 @@ description: Build or rebuild the flow map of the current repo (docs/flowmap/) â
 The map is built by **agreement between independent passes**, not by any single pass being
 right. Agreement only means something between *different methods*, so never skip the mix.
 
-`flowmap` below is `<plugin root>/bin/flowmap` (or `python3 <plugin root>/flowmap/<cmd>.py`).
+`flowmap` is on PATH when this plugin is installed. If the bare command isn't found, use
+`"${CLAUDE_PLUGIN_ROOT}/bin/flowmap"` (or wherever the flowmap repo is checked out).
 Run everything from the root of the repo being mapped.
 
 1. **Config.** If there is no `flowmap.toml`, run `flowmap inventory` and see what was
