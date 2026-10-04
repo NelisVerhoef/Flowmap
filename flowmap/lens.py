@@ -8,7 +8,6 @@ and writes the before/after and the questions.
     python tools/flowmap/lens.py <base> [<head>]      # e.g. main HEAD, or abc123^ abc123
 """
 
-import ast
 import json
 import re
 import subprocess
@@ -18,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
+import graphs  # noqa: E402
 import inventory  # noqa: E402
-from adapters.cli import main_guard  # noqa: E402
 from callgraph import Graph  # noqa: E402
 
 ROOT = config.root()
@@ -42,27 +41,6 @@ def show(ref, rel):
         return git("show", f"{ref}:{rel}")
     except subprocess.CalledProcessError:
         return None
-
-
-def py_symbols(text):
-    """[(start, end, 'Class.method' or 'fn')] innermost-last."""
-    out = []
-
-    def walk(node, prefix):
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                name = f"{prefix}{child.name}"
-                out.append((child.lineno, child.end_lineno, name))
-                walk(child, f"{name}.")
-    try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        return out
-    walk(tree, "")
-    guard = main_guard(tree)
-    if guard:
-        out.append((guard.lineno, guard.end_lineno, "__main__"))
-    return out
 
 
 def ts_symbols(text):
@@ -95,10 +73,14 @@ def rb_symbols(text):
 
 
 def defs(rel, text):
-    """[(start, end, name)] for any supported language."""
+    """[(start, end, name)] for any supported language: its graph builder's parser if it has
+    one, else a regex outline."""
     if not text:
         return []
-    return py_symbols(text) if rel.endswith(".py") else rb_symbols(text) if rel.endswith(".rb") else ts_symbols(text)
+    builder = graphs.builder_for(rel)
+    if builder:
+        return builder.symbols(text)
+    return rb_symbols(text) if rel.endswith(".rb") else ts_symbols(text)
 
 
 def symbols_at(rel, text, lines):
