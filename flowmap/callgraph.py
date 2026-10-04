@@ -233,6 +233,12 @@ def impact(graph, nid):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["dump"]:
+        import lens  # late: lens imports this module
+        g = lens.graph_at(sys.argv[2]) if len(sys.argv) > 2 else Graph()
+        print(json.dumps({"defs": {k: list(v) for k, v in sorted(g.defs.items())},
+                          "edges": sorted([a, b] for a, b in g.edge_set())}, indent=1))
+        sys.exit(0)
     g = Graph()
     if sys.argv[1:2] == ["impact"]:
         for nid in sys.argv[2:]:
