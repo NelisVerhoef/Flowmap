@@ -88,7 +88,7 @@ def flow_order():
     return [f["id"] for f in load()["flows"]["vocabulary"]]
 
 
-VENDORED = {"node_modules", ".venv", "venv", "__pycache__", ".next", "vendor"}
+VENDORED = {"node_modules", ".venv", "venv", "__pycache__", ".next", ".git"}
 
 
 def graph_roots():
@@ -99,18 +99,27 @@ def graph_roots():
 
 def graph_files(ref=None):
     """Files under graph_roots() that some call-graph builder parses: at a git revision, or in
-    the working tree (untracked files included) when ref is None. Vendored dirs never count."""
+    the working tree (untracked and ignored files included) when ref is None. Vendored dirs
+    below a root never count; a root you name is yours even if it sits under one."""
     import graphs  # late: graphs imports config
-    roots, ext = graph_roots(), graphs.suffixes()
+    roots, ext = [r.strip("/") for r in graph_roots()], graphs.suffixes()
     if not roots:
         return []
     if ref:
         listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", ref, "--", *roots], cwd=root(),
                                 capture_output=True, text=True, check=True).stdout.splitlines()
     else:
-        listed = [p.relative_to(root()).as_posix() for d in roots for p in sorted((root() / d).rglob("*"))
-                  if p.is_file()]
-    return [f for f in dict.fromkeys(listed) if f.endswith(ext) and not VENDORED.intersection(f.split("/"))]
+        listed = []
+        for d in roots:
+            for here, dirs, files in os.walk(root() / d):  # prune vendored dirs instead of walking them
+                dirs[:] = sorted(x for x in dirs if x not in VENDORED)
+                listed += [(Path(here) / f).relative_to(root()).as_posix() for f in sorted(files) if f.endswith(ext)]
+
+    def vendored(rel):
+        r = next((r for r in roots if r in ("", ".") or rel.startswith(r + "/")), "")
+        below = rel if r in ("", ".") else rel[len(r) + 1:]
+        return VENDORED.intersection(below.split("/")[:-1])
+    return [f for f in dict.fromkeys(listed) if f.endswith(ext) and not vendored(f)]
 
 
 def app_dirs():

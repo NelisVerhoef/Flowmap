@@ -33,3 +33,14 @@ class GraphRootsTest(unittest.TestCase):
                 defs = json.loads(flowmap(*args, root=root))["defs"]
                 self.assertIn("tool/helpers.py:shout", defs)
                 self.assertEqual([d for d in defs if "node_modules" in d or ".venv" in d], [])
+
+    def test_first_party_dirs_named_like_vendored_ones_still_count(self):
+        files = cli_app('graph = ["tool", "node_modules/@acme/lib"]')
+        files["tool/vendor/billing.py"] = "def charge():\n    pass\n"
+        files["node_modules/@acme/lib/core.py"] = "def linked():\n    pass\n"
+        root, base = fixture_repo(self, files)
+        for args in (("callgraph", "dump", base), ("callgraph", "dump")):
+            with self.subTest(args=args):
+                defs = json.loads(flowmap(*args, root=root))["defs"]
+                self.assertIn("tool/vendor/billing.py:charge", defs)
+                self.assertIn("node_modules/@acme/lib/core.py:linked", defs)
