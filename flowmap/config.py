@@ -12,7 +12,7 @@ Every key is optional; a repo with no config gets discovery mode and auto-detect
     main = "backend/app/main.py"
 
     [code]
-    python = ["backend/app"]                   # call-graph sources (deterministic reach)
+    graph = ["backend/app", "web/src"]         # call-graph sources (deterministic reach); `python` is the old name
     tests = ["backend/tests"]                  # a step is "tested" when tests hit its endpoints
     other = ["frontend/src"]                   # other app code the PR lens should recognise
 
@@ -52,7 +52,7 @@ def load() -> dict:
     cfg.setdefault("out", "docs/flowmap")
     cfg.setdefault("entry", [])
     code = cfg.setdefault("code", {})
-    for k in ("python", "tests", "other"):
+    for k in ("graph", "python", "tests", "other"):
         code.setdefault(k, [])
     flows = cfg.setdefault("flows", {})
     flows.setdefault("vocabulary", [])
@@ -88,14 +88,35 @@ def flow_order():
     return [f["id"] for f in load()["flows"]["vocabulary"]]
 
 
-def python_roots():
-    return load()["code"]["python"]
+VENDORED = {"node_modules", ".venv", "venv", "__pycache__", ".next", "vendor"}
+
+
+def graph_roots():
+    """Directories the call graph is built from: [code].graph, plus its old name `python`."""
+    code = load()["code"]
+    return list(dict.fromkeys(code["graph"] + code["python"]))
+
+
+def graph_files(ref=None):
+    """Files under graph_roots() that some call-graph builder parses: at a git revision, or in
+    the working tree (untracked files included) when ref is None. Vendored dirs never count."""
+    import graphs  # late: graphs imports config
+    roots, ext = graph_roots(), graphs.suffixes()
+    if not roots:
+        return []
+    if ref:
+        listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", ref, "--", *roots], cwd=root(),
+                                capture_output=True, text=True, check=True).stdout.splitlines()
+    else:
+        listed = [p.relative_to(root()).as_posix() for d in roots for p in sorted((root() / d).rglob("*"))
+                  if p.is_file()]
+    return [f for f in dict.fromkeys(listed) if f.endswith(ext) and not VENDORED.intersection(f.split("/"))]
 
 
 def app_dirs():
     """Every directory holding app code: call-graph sources, adapter roots, and `other`."""
     cfg = load()
-    dirs = list(cfg["code"]["python"]) + list(cfg["code"]["other"])
+    dirs = graph_roots() + list(cfg["code"]["other"])
     for e in cfg["entry"]:
         if e["adapter"] == "rails":
             base = e.get("root", ".").rstrip("/")

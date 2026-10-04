@@ -14,7 +14,7 @@ Run everything from the root of the repo being mapped.
 1. **Config.** If there is no `flowmap.toml`, run `flowmap inventory` and see what was
    auto-detected. Rails needs its routes dumped once where the app boots
    (`bin/rails routes > tmp/routes.txt`, then `routes_file` in `flowmap.toml`). Write a
-   minimal `flowmap.toml` with `[code] tests = [...]` and, for Python, `python = [...]`.
+   minimal `flowmap.toml` with `[code] tests = [...]` and `graph = [...]` (the app's source dirs the call graph is built from; Python today).
 2. **Inventory.** `flowmap inventory`. Sanity-check the count and a few handlers against
    the code before spending anything on passes.
 3. **Briefs.** `flowmap brief bu-1 bottom-up`, `bu-2 bottom-up`, `td-1 top-down`,

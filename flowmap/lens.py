@@ -121,7 +121,7 @@ def importers(ref, rel):
         if "." not in mod:
             return 0
         pat = rf"(from|import) {re.escape(mod)}\b|from {re.escape(mod.rsplit('.', 1)[0])} import {re.escape(mod.rsplit('.', 1)[1])}\b"
-        where = config.python_roots() or ["."]
+        where = config.graph_roots() or ["."]
     elif rel.endswith(".rb"):
         return 0  # Ruby autoloads by constant name; import counting doesn't apply
     else:
@@ -145,11 +145,8 @@ def endpoint_set(ref):
 
 
 def graph_at(ref):
-    """The static call graph of the Python roots as they are at `ref`."""
-    roots = config.python_roots()
-    files = [f for f in git("ls-tree", "-r", "--name-only", ref, "--", *roots).splitlines()
-             if f.endswith(".py")] if roots else []
-    return Graph(read=lambda rel: show(ref, rel) or "", files=files)
+    """The static call graph of the graph roots as they are at `ref`."""
+    return Graph(read=lambda rel: show(ref, rel) or "", files=config.graph_files(ref))
 
 
 def reach_diff(old, new, old_eps, new_eps):
@@ -265,7 +262,7 @@ def main(base, head="HEAD"):
     reach = defaultdict(set)      # (flow, step id) -> changed symbols that reach it
     step_by_key, widest = {}, []
     for c in sorted(changed):
-        if c not in graph.defs or not c.endswith(".py") and ".py:" not in c:
+        if c not in graph.defs:
             continue
         eps = {e for n in graph.callers(c) | {c} for e in handler_eps.get(n, [])}
         flows = {fid for e in eps for fid, _ in step_of.get(e, [])}
@@ -300,7 +297,7 @@ def main(base, head="HEAD"):
 
     # Reach diff: the call graph at base vs head. Catches a change that makes existing code
     # run under new endpoints (or stop running under old ones) without that code changing.
-    if config.python_roots():
+    if config.graph_roots():
         added_edges, removed_edges, moved = reach_diff(graph_at(base), graph, base_eps, head_eps)
         short = lambda nid: f"{Path(nid.rsplit(':', 1)[0]).stem}.{nid.rsplit(':', 1)[1]}"  # noqa: E731
         flows_of = lambda eps: sorted({fid for e in eps for fid, _ in step_of.get(e, [])})  # noqa: E731

@@ -33,8 +33,7 @@ class Graph:
         """`read`/`files` let callers build the graph at any git revision; by default it is the
         working tree's graph sources."""
         read = read or _read_worktree
-        if files is None:
-            files = [p.relative_to(ROOT).as_posix() for d in config.python_roots() for p in (ROOT / d).rglob("*.py")]
+        files = config.graph_files() if files is None else files
         self.defs, self.edges, self.bases = {}, defaultdict(set), {}
         for builder in graphs.BUILDERS:
             mine = [f for f in files if f.endswith(builder.EXT)]
