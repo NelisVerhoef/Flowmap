@@ -9,10 +9,14 @@
 - `Class()` -> edge to `Class.__init__`, so what a constructor calls is reachable.
 - `x.f()` where x may be an app module passed around as a value (`PLUGINS = [loud]`) -> also
   an edge to each such module's `f`; modules only ever used as `mod.f` don't count.
+- a module-level alias that injects a dependency (FastAPI's `X = Annotated[T, Depends(f)]`) ->
+  node `file:X` with an edge to f, so an endpoint annotated `user: X` reaches f.
+- a def starts at its first decorator: dropping an auth dependency there changes the handler.
 Missed on purpose: string/registry dispatch (system workflows by name, block registry).
 """
 
 import ast
+import copy
 from collections import defaultdict
 
 import config
@@ -26,7 +30,11 @@ AMBIGUOUS = 6  # an obj.method() matching more app methods than this is too gene
 
 def build(files, read):
     b = _Builder(files, read)
-    return Part(defs=b.defs, edges=b.edges, bases=b.bases)
+    return Part(defs=b.defs, edges=b.edges, bases=b.bases, unparsed=b.unparsed)
+
+
+def _start(node):
+    return min([d.lineno for d in node.decorator_list] + [node.lineno])
 
 
 def symbols(text):
@@ -37,7 +45,7 @@ def symbols(text):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 name = f"{prefix}{child.name}"
-                out.append((child.lineno, child.end_lineno, name))
+                out.append((_start(child), child.end_lineno, name))
                 walk(child, f"{name}.")
     try:
         tree = ast.parse(text)
@@ -69,6 +77,54 @@ def signature(text, sym):
     return None
 
 
+def live(text):
+    """Module-level lines that run: not blanks, comments, imports, docstrings or defs. None if
+    the text doesn't parse, so every line counts."""
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return None
+    out = set()
+    for node in tree.body:
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            continue
+        out |= set(range(node.lineno, node.end_lineno + 1))
+    return out
+
+
+def same(base_text, head_text, sym):
+    """True when `sym` changed only in docstrings, comments or formatting."""
+    try:
+        a, b = _find(ast.parse(base_text), sym), _find(ast.parse(head_text), sym)
+    except (SyntaxError, ValueError):
+        return False
+    return a is not None and b is not None and _shape(a) == _shape(b)
+
+
+def _find(tree, sym):
+    node = tree
+    for part in sym.split("."):
+        node = next((c for c in ast.iter_child_nodes(node)
+                     if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and c.name == part), None)
+        if node is None:
+            return None
+    return node
+
+
+def _shape(node):
+    """The node's AST without docstrings or positions: equal shapes can't behave differently."""
+    node = copy.deepcopy(node)
+    for n in ast.walk(node):
+        body = getattr(n, "body", None)
+        if (isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and body
+                and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)):
+            n.body = body[1:] or [ast.Pass()]
+    return ast.dump(node, include_attributes=False)
+
+
 class _Builder:
     def __init__(self, files, read):
         self.defs = {}                          # "rel:Qual.name" -> (lineno, end)
@@ -77,6 +133,8 @@ class _Builder:
         self.bases = {}                         # class node id -> {base class names}
         self.edges = defaultdict(set)
         self.module_values = set()              # app modules used as values, not just `mod.f`
+        self.aliases = {}                       # alias node id -> its value, e.g. Annotated[..., Depends(f)]
+        self.unparsed = []                      # files this Python can't parse
         self.packages = {config.module_name(rel).split(".")[0] for rel in files}
         trees = {}
         for rel in files:
@@ -86,6 +144,7 @@ class _Builder:
             try:
                 trees[rel] = ast.parse(text)
             except (SyntaxError, ValueError):
+                self.unparsed.append(rel)
                 continue
             self._collect(rel, trees[rel])
         for rel, tree in trees.items():
@@ -113,7 +172,7 @@ class _Builder:
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     qual = f"{prefix}{child.name}"
                     nid = f"{rel}:{qual}"
-                    self.defs[nid] = (child.lineno, child.end_lineno)
+                    self.defs[nid] = (_start(child), child.end_lineno)
                     if not prefix:
                         self.by_module[mod][child.name] = nid
                     if isinstance(child, ast.ClassDef):
@@ -126,6 +185,15 @@ class _Builder:
         guard = main_guard(tree)
         if guard:
             self.defs[f"{rel}:__main__"] = (guard.lineno, guard.end_lineno)
+        for node in tree.body:
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                    and any(isinstance(s, ast.Call) and "Depends" in (getattr(s.func, "id", None),
+                                                                      getattr(s.func, "attr", None))
+                            for s in ast.walk(node.value))):
+                nid = f"{rel}:{node.targets[0].id}"
+                self.defs[nid] = (node.lineno, node.end_lineno)
+                self.by_module[mod][node.targets[0].id] = nid
+                self.aliases[nid] = node.value
 
     def _imports(self, rel, tree):
         """local name -> ('mod', module) or ('sym', node id)."""
@@ -205,6 +273,13 @@ class _Builder:
                     elif isinstance(child.ctx, ast.Load):
                         self.edges[owner] |= targets(child, called=False, owner=owner) - {owner}
                 walk(child, owner)
+        for nid, value in self.aliases.items():
+            if nid.startswith(f"{rel}:"):
+                for sub in ast.walk(value):
+                    if isinstance(sub, ast.Call):
+                        self.edges[nid] |= targets(sub.func)
+                    elif isinstance(sub, (ast.Name, ast.Attribute)):
+                        self.edges[nid] |= targets(sub, called=False)
         guard = main_guard(tree)
         walk(ast.Module(body=[n for n in tree.body if n is not guard], type_ignores=[]), "")
         if guard:

@@ -36,6 +36,7 @@ class Graph:
         read = read or _read_worktree
         files = config.graph_files() if files is None else files
         self.defs, self.edges, self.bases = {}, defaultdict(set), {}
+        self.unparsed = []  # files a builder couldn't parse: nothing in them is reached
         for builder in graphs.BUILDERS:
             mine = [f for f in files if f.endswith(builder.EXT)]
             if not mine:
@@ -43,6 +44,7 @@ class Graph:
             part = builder.build(mine, read)
             self.defs.update(part.defs)
             self.bases.update(part.bases)
+            self.unparsed += part.unparsed
             for a, bs in part.edges.items():
                 self.edges[a] |= bs
         self.reverse = defaultdict(set)

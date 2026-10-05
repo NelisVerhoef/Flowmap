@@ -39,7 +39,10 @@ def _mounts(main, read):
         if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                 and node.func.attr == "include_router" and node.args):
             target = node.args[0]
-            alias = target.value.id if isinstance(target, ast.Attribute) else getattr(target, "id", None)
+            # include_router(import_module(...).router) and friends can't be resolved statically;
+            # their endpoints drop out of the inventory, which lens reports as a blind spot
+            alias = (getattr(target.value, "id", None) if isinstance(target, ast.Attribute)
+                     else getattr(target, "id", None))
             if alias in alias_to_module:
                 prefixes[alias_to_module[alias]] = _kw(node, "prefix") or ""
     return prefixes

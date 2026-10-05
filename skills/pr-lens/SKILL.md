@@ -30,6 +30,11 @@ A PR number, a branch, or a commit range. Resolve to `<base> <head>`:
    endpoint can newly reach, or no longer reaches, though that code itself may be unchanged.
    A map anchor or a check (auth, validation, audit) under "no longer reachable" is the first
    question to ask the author.
+   It opens with a **verdict**: *contained* (no existing entry point runs changed code), *spreads*
+   (names the entry points and flows it reaches) or *blind* (the change includes something it
+   can't see: module-level code, model or settings classes, migrations, code with no call graph,
+   files it couldn't parse, entry points it lost track of). Carry the verdict into your first lines. Never
+   upgrade *blind* to *contained*: a blind spot is exactly where you read the diff yourself.
 2. Read the PR description / commit messages (`git log --format=%B <base>..<head>`) for
    stated intent.
 3. For each touched step and each off-map change, read *just enough* of the diff to say
@@ -41,6 +46,7 @@ A PR number, a branch, or a commit range. Resolve to `<base> <head>`:
 ```
 ## <one line: what this change does, in user terms>
 
+**Verdict:** <contained | spreads to N entry points in <flows> | blind: what lens can't see>
 **Lands on:** <flow> → <step>, <step> · <flow> → <step>
 **New on the map:** <endpoints added / off-map code that is really a new step — name the step you'd add>
 

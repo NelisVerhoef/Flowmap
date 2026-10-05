@@ -169,7 +169,7 @@
    233
   ],
   "flowmap/callgraph.py:endpoint_flows": [
-   206,
+   205,
    214
   ],
   "flowmap/callgraph.py:impact": [
@@ -193,7 +193,7 @@
    88
   ],
   "flowmap/config.py:load": [
-   49,
+   48,
    63
   ],
   "flowmap/config.py:module_name": [
@@ -209,7 +209,7 @@
    92
   ],
   "flowmap/config.py:root": [
-   37,
+   36,
    45
   ],
   "flowmap/diagrams.py:Diagrams": [
@@ -389,7 +389,7 @@
    89
   ],
   "flowmap/verify.py:_text": [
-   24,
+   23,
    26
   ],
   "flowmap/verify.py:anchor_ok": [
