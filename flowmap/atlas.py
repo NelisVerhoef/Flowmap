@@ -15,7 +15,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
 import lens  # noqa: E402
-from callgraph import Graph  # noqa: E402
 from diagrams import ENGINE_ROOT, MAX_DEPTH, MAX_NODES, Diagrams, short  # noqa: E402
 
 ROOT = config.root()
@@ -79,10 +78,7 @@ def overlay(d, spec):
             if s == "<module>":
                 continue
             (new if s not in before else changed).add(f"{rel}:{s}")
-    roots = config.python_roots()
-    files = [f for f in (lens.git("ls-tree", "-r", "--name-only", head, "--", *roots).splitlines() if roots else [])
-             if f.endswith(".py")]
-    g = Graph(read=lambda rel: lens.show(head, rel) or "", files=files)
+    g = lens.graph_at(head)
     added_eps = set(lens.endpoint_set(head)) - set(lens.endpoint_set(base))
     handlers = {}
     for e, h in lens.endpoint_set(head).items():

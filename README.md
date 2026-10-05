@@ -89,6 +89,15 @@ To have teammates prompted to install it when they open your repo, commit this t
 Without the plugin system: clone this repo, put its `bin/` on PATH, and copy `skills/*` into
 the target repo's `.claude/skills/`.
 
+### PR hook
+
+`.claude/settings.json` runs `bin/flowmap-pr-hook` after every `git push` and `gh pr create` in a
+Claude Code session. When the branch has an open PR and the repo has a map, it runs `flowmap lens`
+on the PR and hands the output to Claude, which writes the pr-lens summary and posts it as one PR
+comment (`flowmap-pr-hook post <pr> <file>` edits that comment on later pushes instead of adding
+another). It stays silent otherwise, and runs once per head commit. Copy the hook block into
+another repo's `.claude/settings.json`, pointing at this repo's `bin/flowmap-pr-hook`, to use it there.
+
 ## flowmap.toml
 
 See the docstring in `flowmap/config.py`. The parts you own: `[[flows.vocabulary]]` (the flow names,
@@ -101,3 +110,9 @@ Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{"endpoint", "h
 "aliases"?}]`, register it in `adapters/__init__.py`, and add its guidance to `STACK` in
 `flowmap/brief.py`. The `endpoint` string is the join key between passes, so derive it from code,
 never from a model.
+
+For deterministic reach, the language also needs a call-graph builder: `flowmap/graphs/<lang>.py`
+with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (see
+`graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then
+`flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node
+the builder emits.
