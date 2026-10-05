@@ -1,0 +1,61 @@
+{
+ "base": "main",
+ "head": "pr-11",
+ "files": [
+  "backend/app/crud.py"
+ ],
+ "code": [
+  "backend/app/crud.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/crud.py:update_user"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-edits-user",
+   "matched": [
+    "backend/app/crud.py:update_user"
+   ]
+  },
+  {
+   "flow": "recover-forgotten-password",
+   "step": "user-sets-new-password",
+   "matched": [
+    "backend/app/crud.py:update_user"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/crud.py:update_user": [
+   "PATCH /users/{user_id}",
+   "POST /reset-password/"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-edits-user",
+  "recover-forgotten-password/user-sets-new-password"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [
+  "1 other file(s) could not be parsed, so reach through them is missing: `backend/app/api/deps.py`"
+ ],
+ "verdict": "blind",
+ "spreads_to": [
+  "PATCH /users/{user_id}",
+  "POST /reset-password/"
+ ]
+}

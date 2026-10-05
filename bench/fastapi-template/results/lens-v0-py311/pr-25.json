@@ -1,0 +1,33 @@
+{
+ "base": "main",
+ "head": "pr-25",
+ "files": [
+  "backend/app/core/config.py"
+ ],
+ "code": [
+  "backend/app/core/config.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/core/config.py:Settings"
+ ],
+ "new_symbols": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [],
+ "reach": {
+  "backend/app/core/config.py:Settings": []
+ },
+ "reach_steps": [],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/core/config.py:Settings"
+ ]
+}

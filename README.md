@@ -124,6 +124,17 @@ comment (`flowmap-pr-hook post <pr> <file>` edits that comment on later pushes i
 another). It stays silent otherwise, and runs once per head commit. Copy the hook block into
 another repo's `.claude/settings.json`, pointing at this repo's `bin/flowmap-pr-hook`, to use it there.
 
+## Does it tell the truth?
+
+`bench/` plants 26 changes with known effects in the FastAPI full-stack template and checks what
+lens says against the app's own tests, a seeded production database and runtime reach. 16 of the
+20 changes that break production pass the template's CI. lens as first shipped said nothing
+about existing code on 4 of those and crashed on 1. After the fixes it found (they are in lens
+now), it says *contained* on none of them and flags 50 of 55 affected endpoints. An LLM review
+with flowmap was right on 13 of 13 subtle cases, but one without flowmap was right on all 8 it
+ran: the claim is a lens a reviewer can trust when it is quiet, not one that finds more bugs. Method and numbers:
+[`bench/README.md`](bench/README.md), [`bench/fastapi-template/RESULTS.md`](bench/fastapi-template/RESULTS.md).
+
 ## flowmap.toml
 
 See the docstring in `flowmap/config.py`. The parts you own: `[[flows.vocabulary]]` (the flow names,

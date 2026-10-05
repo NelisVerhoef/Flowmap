@@ -1,0 +1,85 @@
+{
+ "base": "main",
+ "head": "pr-24",
+ "files": [
+  "backend/app/api/main.py"
+ ],
+ "code": [
+  "backend/app/api/main.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/main.py:<module>"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [
+  "DELETE /items/{id}",
+  "DELETE /users/me",
+  "DELETE /users/{user_id}",
+  "GET /items/",
+  "GET /items/{id}",
+  "GET /users/",
+  "GET /users/me",
+  "GET /users/{user_id}",
+  "GET /utils/health-check/",
+  "PATCH /users/me",
+  "PATCH /users/me/password",
+  "PATCH /users/{user_id}",
+  "POST /items/",
+  "POST /login/access-token",
+  "POST /login/test-token",
+  "POST /password-recovery-html-content/{email}",
+  "POST /password-recovery/{email}",
+  "POST /reset-password/",
+  "POST /users/",
+  "POST /users/signup",
+  "POST /utils/test-email/",
+  "PUT /items/{id}"
+ ],
+ "touched": [],
+ "reach": {},
+ "reach_steps": [],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/api/main.py:<module>"
+ ],
+ "blind": [
+  "1 other file(s) could not be parsed, so reach through them is missing: `backend/app/api/deps.py`",
+  "module-level code changed (constants, config, router registration): `backend/app/api/main.py`",
+  "22 entry point(s) left the inventory although their handlers still exist (registration the adapter can't read?): `DELETE /items/{id}`, `DELETE /users/me`, `DELETE /users/{user_id}`, `GET /items/`"
+ ],
+ "verdict": "blind",
+ "spreads_to": [
+  "DELETE /items/{id}",
+  "DELETE /users/me",
+  "DELETE /users/{user_id}",
+  "GET /items/",
+  "GET /items/{id}",
+  "GET /users/",
+  "GET /users/me",
+  "GET /users/{user_id}",
+  "GET /utils/health-check/",
+  "PATCH /users/me",
+  "PATCH /users/me/password",
+  "PATCH /users/{user_id}",
+  "POST /items/",
+  "POST /login/access-token",
+  "POST /login/test-token",
+  "POST /password-recovery-html-content/{email}",
+  "POST /password-recovery/{email}",
+  "POST /reset-password/",
+  "POST /users/",
+  "POST /users/signup",
+  "POST /utils/test-email/",
+  "PUT /items/{id}"
+ ]
+}

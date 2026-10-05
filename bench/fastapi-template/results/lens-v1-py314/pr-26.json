@@ -1,0 +1,49 @@
+{
+ "base": "main",
+ "head": "pr-26",
+ "files": [
+  "backend/app/crud.py"
+ ],
+ "code": [
+  "backend/app/crud.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/crud.py:authenticate"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "sign-in",
+   "step": "user-logs-in",
+   "matched": [
+    "backend/app/crud.py:authenticate"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/crud.py:authenticate": [
+   "POST /login/access-token"
+  ]
+ },
+ "reach_steps": [
+  "sign-in/user-logs-in"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "POST /login/access-token"
+ ]
+}

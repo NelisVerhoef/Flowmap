@@ -1,0 +1,51 @@
+{
+ "base": "main",
+ "head": "pr-12",
+ "files": [
+  "backend/app/api/routes/items.py"
+ ],
+ "code": [
+  "backend/app/api/routes/items.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/items.py:read_items"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "manage-items",
+   "step": "user-views-items",
+   "matched": [
+    "backend/app/api/routes/items.py:read_items"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/items.py:read_items": [
+   "GET /items/"
+  ]
+ },
+ "reach_steps": [
+  "manage-items/user-views-items"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [
+  "1 other file(s) could not be parsed, so reach through them is missing: `backend/app/api/deps.py`"
+ ],
+ "verdict": "blind",
+ "spreads_to": [
+  "GET /items/"
+ ]
+}

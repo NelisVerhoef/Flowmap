@@ -1,0 +1,49 @@
+{
+ "base": "main",
+ "head": "pr-06",
+ "files": [
+  "backend/app/utils.py"
+ ],
+ "code": [
+  "backend/app/utils.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/utils.py:verify_password_reset_token"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "recover-forgotten-password",
+   "step": "user-sets-new-password",
+   "matched": [
+    "backend/app/utils.py:verify_password_reset_token"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/utils.py:verify_password_reset_token": [
+   "POST /reset-password/"
+  ]
+ },
+ "reach_steps": [
+  "recover-forgotten-password/user-sets-new-password"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "POST /reset-password/"
+ ]
+}

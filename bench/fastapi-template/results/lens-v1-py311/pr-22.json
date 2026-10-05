@@ -1,0 +1,80 @@
+{
+ "base": "main",
+ "head": "pr-22",
+ "files": [
+  "backend/app/api/routes/users.py"
+ ],
+ "code": [
+  "backend/app/api/routes/users.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/users.py:read_user_me"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-lists-users",
+   "matched": [
+    "backend/app/api/routes/users.py:read_user_me"
+   ]
+  },
+  {
+   "flow": "sign-in",
+   "step": "app-loads-current-user",
+   "matched": [
+    "backend/app/api/routes/users.py:read_user_me"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/users.py:read_user_me": [
+   "GET /users/me"
+  ]
+ },
+ "reach_steps": [
+  "sign-in/app-loads-current-user"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 2,
+  "edges_removed": 0,
+  "gained": {
+   "backend/app/models.py:Item": [
+    "GET /users/me"
+   ],
+   "backend/app/models.py:User": [
+    "GET /users/me"
+   ],
+   "backend/app/models.py:get_datetime_utc": [
+    "GET /users/me"
+   ],
+   "backend/app/core/security.py:get_password_hash": [
+    "GET /users/me"
+   ],
+   "backend/app/models.py:UserUpdate": [
+    "GET /users/me"
+   ],
+   "backend/app/models.py:ItemBase": [
+    "GET /users/me"
+   ],
+   "backend/app/crud.py:update_user": [
+    "GET /users/me"
+   ]
+  },
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [
+  "1 other file(s) could not be parsed, so reach through them is missing: `backend/app/api/deps.py`"
+ ],
+ "verdict": "blind",
+ "spreads_to": [
+  "GET /users/me"
+ ]
+}

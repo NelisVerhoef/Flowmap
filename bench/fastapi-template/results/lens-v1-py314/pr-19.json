@@ -1,0 +1,37 @@
+{
+ "base": "main",
+ "head": "pr-19",
+ "files": [
+  "frontend/src/routes/signup.tsx"
+ ],
+ "code": [
+  "frontend/src/routes/signup.tsx"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "frontend/src/routes/signup.tsx:formSchema"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [],
+ "reach": {},
+ "reach_steps": [],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "frontend/src/routes/signup.tsx:formSchema"
+ ],
+ "blind": [
+  "code with no call graph (only Python has deterministic reach): `frontend/src/routes/signup.tsx`"
+ ],
+ "verdict": "blind",
+ "spreads_to": []
+}

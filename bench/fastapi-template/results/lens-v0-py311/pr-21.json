@@ -1,0 +1,67 @@
+{
+ "base": "main",
+ "head": "pr-21",
+ "files": [
+  "backend/app/api/routes/users.py"
+ ],
+ "code": [
+  "backend/app/api/routes/users.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/users.py:delete_user",
+  "backend/app/api/routes/users.py:read_users",
+  "backend/app/api/routes/users.py:update_user_me"
+ ],
+ "new_symbols": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-lists-users",
+   "matched": [
+    "backend/app/api/routes/users.py:read_users"
+   ]
+  },
+  {
+   "flow": "administer-users",
+   "step": "admin-deletes-user",
+   "matched": [
+    "backend/app/api/routes/users.py:delete_user"
+   ]
+  },
+  {
+   "flow": "manage-own-account",
+   "step": "user-updates-profile",
+   "matched": [
+    "backend/app/api/routes/users.py:update_user_me"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/users.py:delete_user": [
+   "DELETE /users/{user_id}"
+  ],
+  "backend/app/api/routes/users.py:read_users": [
+   "GET /users/"
+  ],
+  "backend/app/api/routes/users.py:update_user_me": [
+   "PATCH /users/me"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-deletes-user",
+  "administer-users/admin-lists-users",
+  "manage-own-account/user-updates-profile"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": []
+}
