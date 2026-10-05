@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Claude Code PostToolUse hook: after `gh pr create` or `git push`, place the branch's open PR on
+the flow map with `flowmap lens` and hand the result to Claude, which writes the pr-lens summary
+and posts it as the PR's single flow-lens comment.
+
+  (hook)                            stdin: PostToolUse JSON -> stdout: additionalContext for Claude
+  flowmap-pr-hook post <pr> <file>  create the PR's flow-lens comment, or edit it if it exists
+
+Silent (no output) unless the command pushed to a PR in a repo that has a map, and only once per
+head commit. Wire it in .claude/settings.json; see README.
+"""
+
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+FLOWMAP = HERE / "flowmap"
+SKILL = HERE.parent / "skills" / "pr-lens" / "SKILL.md"
+MARKER = "<!-- flowmap-lens -->"
+SEPARATORS = {";", "&&", "||", "|", "&", "(", ")", "{", "}", "then", "do", "else"}
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n.*?\n\2[ \t]*(?=\n|$)", re.S)
+
+CONTEXT = """flowmap placed PR #{n} ({url}, `{base}..{head}`) on the flow map, because that command \
+pushed to it. Now, without being asked:
+1. Write the pr-lens summary, following {skill} (its "Output" section). The lens output below is \
+the ground truth for placement and reach; read just enough of the diff to describe behaviour.
+2. Save it to a file and publish it with `{hook} post {n} <file>`, which creates the PR's single \
+flow-lens comment or edits it if it already exists.
+3. Show the user the summary and the comment link.
+
+{lens}"""
+
+
+def pushes(command):
+    """Does this shell command run `git push` or `gh pr create`, rather than just mention it (in a
+    heredoc, a quoted string, a commit message)?"""
+    try:
+        lex = shlex.shlex(HEREDOC.sub(r"\3", command).replace("\n", " ; "), posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return False
+    for i, w in enumerate(words):
+        if i and words[i - 1] not in SEPARATORS:
+            continue
+        k = i
+        while k < len(words) and re.match(r"^\w+=", words[k]):  # VAR=1 git push
+            k += 1
+        rest = words[k:k + 6]
+        if rest[:3] == ["gh", "pr", "create"]:
+            return True
+        if rest[:1] == ["git"]:
+            j = 1
+            while j < len(rest) and rest[j].startswith("-"):
+                j += 2 if rest[j] in ("-C", "-c") else 1
+            if rest[j:j + 1] == ["push"]:
+                return True
+    return False
+
+
+def run(cmd, cwd, env=None):
+    return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
+
+
+def out_dir(root):
+    toml = root / "flowmap.toml"
+    return root / (tomllib.loads(toml.read_text()).get("out", "docs/flowmap") if toml.exists() else "docs/flowmap")
+
+
+def hook(event):
+    if not pushes(event.get("tool_input", {}).get("command", "")):
+        return None
+    top = run(["git", "rev-parse", "--show-toplevel"], event.get("cwd") or ".")
+    if top.returncode:
+        return None
+    root = Path(top.stdout.strip())
+    if not (out_dir(root) / "map.json").exists():
+        return None
+    view = run(["gh", "pr", "view", "--json", "number,url,baseRefName"], root)
+    if view.returncode:
+        return None
+    pr = json.loads(view.stdout)
+    n = pr["number"]
+    head = run(["git", "rev-parse", "HEAD"], root).stdout.strip()
+    seen = Path(run(["git", "rev-parse", "--git-common-dir"], root).stdout.strip())
+    seen = (seen if seen.is_absolute() else root / seen) / "flowmap-lens" / f"{n}-{head}"
+    seen.parent.mkdir(parents=True, exist_ok=True)
+    try:  # claim this head atomically: two hooks matching one push must not both post
+        os.close(os.open(seen, os.O_CREAT | os.O_EXCL))
+    except FileExistsError:
+        return None
+    base = run(["git", "merge-base", f"origin/{pr['baseRefName']}", head], root)
+    if base.returncode:
+        seen.unlink()
+        return {"systemMessage": f"flowmap: no merge-base with origin/{pr['baseRefName']}; lens skipped for PR #{n}"}
+    base = base.stdout.strip()
+    lens = run([sys.executable, str(FLOWMAP), "lens", base, head], root, env={**os.environ, "FLOWMAP_ROOT": str(root)})
+    if lens.returncode:
+        seen.unlink()  # let the next push retry
+        tail = (lens.stderr.strip().splitlines() or ["?"])[-1]
+        return {"systemMessage": f"flowmap: lens failed for PR #{n}: {tail}"}
+    reach = re.search(r"execute under \*\*(\d+) steps in (\d+) flows", lens.stdout)
+    touched = re.search(r"(\d+) map steps touched across (\d+) flows", lens.stdout)
+    summary = (f"{touched[1]} steps touched" if touched else "lens ran") + (f", {reach[1]} reached" if reach else "")
+    return {"systemMessage": f"flowmap: PR #{n} placed on the map ({summary}); Claude is writing the lens comment",
+            "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": CONTEXT.format(
+                n=n, url=pr["url"], base=base[:7], head=head[:7], skill=SKILL, hook=Path(__file__).resolve(),
+                lens=lens.stdout.strip())}}
+
+
+def post(n, path):
+    """One comment per PR, found by MARKER: edit it if present so the PR shows the current lens."""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+        f.write(f"{MARKER}\n{Path(path).read_text()}")
+    try:
+        ids = run(["gh", "api", f"repos/{{owner}}/{{repo}}/issues/{n}/comments", "--paginate",
+                   "--jq", f'.[] | select(.body | startswith("{MARKER}")) | .id'], ".")
+        if ids.returncode:
+            sys.exit(f"flowmap-pr-hook: could not list comments on PR #{n}: {ids.stderr.strip()}")
+        if ids.stdout.split():
+            r = run(["gh", "api", "-X", "PATCH", f"repos/{{owner}}/{{repo}}/issues/comments/{ids.stdout.split()[0]}",
+                     "-F", f"body=@{f.name}", "--jq", ".html_url"], ".")
+        else:
+            r = run(["gh", "pr", "comment", str(n), "--body-file", f.name], ".")
+        if r.returncode:
+            sys.exit(f"flowmap-pr-hook: posting to PR #{n} failed: {r.stderr.strip()}")
+        print(r.stdout.strip())
+    finally:
+        os.unlink(f.name)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:2] == ["post"] and len(sys.argv) == 4:
+        post(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 1:
+        result = hook(json.load(sys.stdin))
+        if result:
+            print(json.dumps(result))
+    else:
+        sys.exit(__doc__.strip())

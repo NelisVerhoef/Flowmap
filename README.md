@@ -59,6 +59,15 @@ This repo is also a Claude Code plugin with two skills:
 
 Install the plugin from this repo, or copy `skills/*` into `.claude/skills/`.
 
+### PR hook
+
+`.claude/settings.json` runs `bin/flowmap-pr-hook` after every `git push` and `gh pr create` in a
+Claude Code session. When the branch has an open PR and the repo has a map, it runs `flowmap lens`
+on the PR and hands the output to Claude, which writes the pr-lens summary and posts it as one PR
+comment (`flowmap-pr-hook post <pr> <file>` edits that comment on later pushes instead of adding
+another). It stays silent otherwise, and runs once per head commit. Copy the hook block into
+another repo's `.claude/settings.json`, pointing at this repo's `bin/flowmap-pr-hook`, to use it there.
+
 ## flowmap.toml
 
 See the docstring in `flowmap/config.py`. The parts you own: `[[flows.vocabulary]]` (the flow names,
