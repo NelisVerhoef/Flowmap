@@ -8,7 +8,6 @@ and writes the before/after and the questions.
     python tools/flowmap/lens.py <base> [<head>]      # e.g. main HEAD, or abc123^ abc123
 """
 
-import ast
 import json
 import re
 import subprocess
@@ -18,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
+import graphs  # noqa: E402
 import inventory  # noqa: E402
-from adapters.cli import main_guard  # noqa: E402
 from callgraph import Graph  # noqa: E402
 
 ROOT = config.root()
@@ -42,27 +41,6 @@ def show(ref, rel):
         return git("show", f"{ref}:{rel}")
     except subprocess.CalledProcessError:
         return None
-
-
-def py_symbols(text):
-    """[(start, end, 'Class.method' or 'fn')] innermost-last."""
-    out = []
-
-    def walk(node, prefix):
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                name = f"{prefix}{child.name}"
-                out.append((child.lineno, child.end_lineno, name))
-                walk(child, f"{name}.")
-    try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        return out
-    walk(tree, "")
-    guard = main_guard(tree)
-    if guard:
-        out.append((guard.lineno, guard.end_lineno, "__main__"))
-    return out
 
 
 def ts_symbols(text):
@@ -95,10 +73,14 @@ def rb_symbols(text):
 
 
 def defs(rel, text):
-    """[(start, end, name)] for any supported language."""
+    """[(start, end, name)] for any supported language: its graph builder's parser if it has
+    one, else a regex outline."""
     if not text:
         return []
-    return py_symbols(text) if rel.endswith(".py") else rb_symbols(text) if rel.endswith(".rb") else ts_symbols(text)
+    builder = graphs.builder_for(rel)
+    if builder:
+        return builder.symbols(text)
+    return rb_symbols(text) if rel.endswith(".rb") else ts_symbols(text)
 
 
 def symbols_at(rel, text, lines):
@@ -139,7 +121,7 @@ def importers(ref, rel):
         if "." not in mod:
             return 0
         pat = rf"(from|import) {re.escape(mod)}\b|from {re.escape(mod.rsplit('.', 1)[0])} import {re.escape(mod.rsplit('.', 1)[1])}\b"
-        where = config.python_roots() or ["."]
+        where = config.graph_roots() or ["."]
     elif rel.endswith(".rb"):
         return 0  # Ruby autoloads by constant name; import counting doesn't apply
     else:
@@ -163,11 +145,8 @@ def endpoint_set(ref):
 
 
 def graph_at(ref):
-    """The static call graph of the Python roots as they are at `ref`."""
-    roots = config.python_roots()
-    files = [f for f in git("ls-tree", "-r", "--name-only", ref, "--", *roots).splitlines()
-             if f.endswith(".py")] if roots else []
-    return Graph(read=lambda rel: show(ref, rel) or "", files=files)
+    """The static call graph of the graph roots as they are at `ref`."""
+    return Graph(read=lambda rel: show(ref, rel) or "", files=config.graph_files(ref))
 
 
 def reach_diff(old, new, old_eps, new_eps):
@@ -283,7 +262,7 @@ def main(base, head="HEAD"):
     reach = defaultdict(set)      # (flow, step id) -> changed symbols that reach it
     step_by_key, widest = {}, []
     for c in sorted(changed):
-        if c not in graph.defs or not c.endswith(".py") and ".py:" not in c:
+        if c not in graph.defs:
             continue
         eps = {e for n in graph.callers(c) | {c} for e in handler_eps.get(n, [])}
         flows = {fid for e in eps for fid, _ in step_of.get(e, [])}
@@ -318,7 +297,7 @@ def main(base, head="HEAD"):
 
     # Reach diff: the call graph at base vs head. Catches a change that makes existing code
     # run under new endpoints (or stop running under old ones) without that code changing.
-    if config.python_roots():
+    if config.graph_roots():
         added_edges, removed_edges, moved = reach_diff(graph_at(base), graph, base_eps, head_eps)
         short = lambda nid: f"{Path(nid.rsplit(':', 1)[0]).stem}.{nid.rsplit(':', 1)[1]}"  # noqa: E731
         flows_of = lambda eps: sorted({fid for e in eps for fid, _ in step_of.get(e, [])})  # noqa: E731

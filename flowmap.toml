@@ -7,5 +7,5 @@ prog = "flowmap"
 commands = "flowmap"
 
 [code]
-python = ["flowmap"]
+graph = ["flowmap"]
 other = ["bin"]

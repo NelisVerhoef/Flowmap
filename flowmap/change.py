@@ -14,19 +14,19 @@ Story format: see STORY in the /pr-lens skill.
 """
 
 import argparse
-import ast
 import base64
 import json
-import os
-import zlib
 import math
+import os
 import re
 import sys
+import zlib
 from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
+import graphs  # noqa: E402
 import lens  # noqa: E402
 from atlas import step_keys  # noqa: E402
 
@@ -59,23 +59,10 @@ def hunks(base, head):
     return out
 
 
-def signature(text, sym):
-    """Argument list of a Python def, for spotting contract changes."""
-    try:
-        tree = ast.parse(text or "")
-    except SyntaxError:
-        return None
-    parts = sym.split(".")
-    nodes = tree.body
-    for i, p in enumerate(parts):
-        hit = next((n for n in nodes if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                    and n.name == p), None)
-        if hit is None:
-            return None
-        if i == len(parts) - 1:
-            return ast.unparse(hit.args) if not isinstance(hit, ast.ClassDef) else None
-        nodes = hit.body
-    return None
+def signature(rel, text, sym):
+    """A def's parameter list, for spotting contract changes (None where no builder parses rel)."""
+    builder = graphs.builder_for(rel)
+    return builder.signature(text, sym) if builder else None
 
 
 def facts(base, head):
@@ -103,7 +90,7 @@ def facts(base, head):
             if s == "<module>":
                 continue
             status = "new" if s not in base_syms else "deleted" if s not in head_syms else "modified"
-            sig_b, sig_h = signature(base_text, s), signature(head_text, s)
+            sig_b, sig_h = signature(rel, base_text, s), signature(rel, head_text, s)
             symbols[f"{rel}:{s}"] = {"id": f"{rel}:{s}", "file": rel, "sym": s, "status": status,
                                      "contract": status == "modified" and sig_b != sig_h,
                                      "signature": [sig_b, sig_h] if sig_b != sig_h else None}

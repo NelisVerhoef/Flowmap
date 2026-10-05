@@ -12,7 +12,8 @@ Run from inside the repo you're mapping (or set FLOWMAP_ROOT).
   flowmap lens <base> [<head>]          place a change on the map (flows, reach, off-map code)
   flowmap change <base> [<head>]        the change as chapters on the map: where, what, why, questions
   flowmap viewer <dir>                  the hosted change viewer, rendering --link links in the browser
-  flowmap callgraph impact <file:sym>   which entry points can reach a symbol (Python)
+  flowmap callgraph impact <file:sym>   which entry points can reach a symbol
+  flowmap callgraph check               is every entry point's handler a call-graph node?
 """
 import runpy
 import sys
