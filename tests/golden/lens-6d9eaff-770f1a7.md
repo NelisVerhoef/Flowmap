@@ -16,12 +16,13 @@
 
 ## Reach (call graph, deterministic)
 
-Changed backend code can execute under **3 steps in 1 flows**; 0 of those steps the map's own anchors did not show (hidden blast radius).
+Changed backend code can execute under **4 steps in 1 flows**; 0 of those steps the map's own anchors did not show (hidden blast radius).
 
 Widest-reaching **modified** code (new code only inherits its caller's reach):
 
+- `flowmap/callgraph.py:Graph.__init__` — reachable from 5 endpoints in 1 flows
+- `flowmap/callgraph.py:Graph` — reachable from 5 endpoints in 1 flows
 - `flowmap/callgraph.py:Graph.callers` — reachable from 4 endpoints in 1 flows
-- `flowmap/callgraph.py:Graph` — reachable from 4 endpoints in 1 flows
 - `flowmap/lens.py:main` — reachable from 1 endpoints in 1 flows
 
 ## Reach diff (call graph, base → head)

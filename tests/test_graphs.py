@@ -32,3 +32,46 @@ class PythonBuilderTest(unittest.TestCase):
                 self.assertIn(["tool/run.py:main", "tool/helpers.py:shout"], g["edges"])
                 self.assertIn(["tool/run.py:__main__", "tool/run.py:main"], g["edges"])
                 self.assertFalse([d for d in g["defs"] if d.startswith("tool/broken.py")])
+
+
+class PythonResolutionTest(unittest.TestCase):
+    def edges(self, files):
+        root, base = fixture_repo(self, {**cli_app(), **files})
+        return json.loads(flowmap("callgraph", "dump", base, root=root))["edges"]
+
+    def test_constructing_a_class_runs_its_init(self):
+        edges = self.edges({"tool/loud.py": '''
+            from helpers import shout
+
+
+            class Loud:
+                def __init__(self, s):
+                    self.s = shout(s)
+        '''})
+        self.assertIn(["tool/loud.py:Loud", "tool/loud.py:Loud.__init__"], edges)
+
+    def test_calls_through_a_registry_of_modules_reach_its_functions(self):
+        edges = self.edges({
+            "tool/plugins/__init__.py": "from . import loud\n\nPLUGINS = [loud]\n",
+            "tool/plugins/loud.py": "def render(s):\n    return s.upper()\n",
+            "tool/each.py": '''
+                import plugins
+
+
+                def render_all(s):
+                    return [p.render(s) for p in plugins.PLUGINS]
+
+
+                def unrelated(x):
+                    return x.shout(1)
+            ''',
+        })
+        self.assertIn(["tool/each.py:render_all", "tool/plugins/loud.py:render"], edges)
+        # helpers is imported by name, never passed around as a module: x.shout() is not its shout
+        self.assertNotIn(["tool/each.py:unrelated", "tool/helpers.py:shout"], edges)
+
+    def test_flowmap_sees_its_own_builders(self):
+        edges = json.loads(flowmap("callgraph", "dump"))["edges"]
+        self.assertIn(["flowmap/callgraph.py:Graph.__init__", "flowmap/graphs/python.py:build"], edges)
+        self.assertIn(["flowmap/lens.py:defs", "flowmap/graphs/python.py:symbols"], edges)
+        self.assertIn(["flowmap/callgraph.py:Graph", "flowmap/callgraph.py:Graph.__init__"], edges)

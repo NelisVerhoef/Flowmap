@@ -6,6 +6,9 @@
 - a function referenced without being called (`Depends(f)`, `run_in_background(f)`,
   callbacks) -> edge, since it will be called by someone on our behalf.
 - a script's `if __name__ == "__main__":` block -> node `file:__main__` (CLI entry points).
+- `Class()` -> edge to `Class.__init__`, so what a constructor calls is reachable.
+- `x.f()` where x may be an app module passed around as a value (`PLUGINS = [loud]`) -> also
+  an edge to each such module's `f`; modules only ever used as `mod.f` don't count.
 Missed on purpose: string/registry dispatch (system workflows by name, block registry).
 """
 
@@ -73,6 +76,7 @@ class _Builder:
         self.methods = defaultdict(set)         # method name -> {node ids}
         self.bases = {}                         # class node id -> {base class names}
         self.edges = defaultdict(set)
+        self.module_values = set()              # app modules used as values, not just `mod.f`
         self.packages = {config.module_name(rel).split(".")[0] for rel in files}
         trees = {}
         for rel in files:
@@ -85,7 +89,21 @@ class _Builder:
                 continue
             self._collect(rel, trees[rel])
         for rel, tree in trees.items():
+            self._find_module_values(rel, tree)
+        for rel, tree in trees.items():
             self._link(rel, tree)
+        for cls in self.bases:
+            if f"{cls}.__init__" in self.defs:
+                self.edges[cls].add(f"{cls}.__init__")
+
+    def _find_module_values(self, rel, tree):
+        imports = self._imports(rel, tree)
+        bases = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and id(n) not in bases:
+                kind, target = imports.get(n.id, (None, None))
+                if kind == "mod":
+                    self.module_values.add(target)
 
     def _collect(self, rel, tree):
         mod = config.module_name(rel)
@@ -162,7 +180,8 @@ class _Builder:
                         return {f"{local[node.value.id]}.{node.attr}"}  # Class.method
                 if not called:
                     return set()  # `x.score` read as a field is not a call to any .score()
-                cands = self.methods.get(node.attr, set())
+                cands = self.methods.get(node.attr, set()) | {
+                    self.by_module[m][node.attr] for m in self.module_values if node.attr in self.by_module.get(m, {})}
                 return cands if len(cands) <= AMBIGUOUS or self._one_interface(cands) else set()
             return set()
 

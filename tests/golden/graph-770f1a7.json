@@ -671,6 +671,10 @@
    "flowmap/config.py:root"
   ],
   [
+   "flowmap/callgraph.py:Graph",
+   "flowmap/callgraph.py:Graph.__init__"
+  ],
+  [
    "flowmap/callgraph.py:Graph.__init__",
    "flowmap/callgraph.py:Graph._collect"
   ],
@@ -897,6 +901,10 @@
   [
    "flowmap/config.py:python_roots",
    "flowmap/config.py:load"
+  ],
+  [
+   "flowmap/diagrams.py:Diagrams",
+   "flowmap/diagrams.py:Diagrams.__init__"
   ],
   [
    "flowmap/diagrams.py:Diagrams.__init__",
@@ -1137,6 +1145,10 @@
   [
    "flowmap/lens.py:ts_symbols",
    "flowmap/reconcile.py:UnionFind.groups"
+  ],
+  [
+   "flowmap/reconcile.py:UnionFind",
+   "flowmap/reconcile.py:UnionFind.__init__"
   ],
   [
    "flowmap/reconcile.py:UnionFind.groups",
