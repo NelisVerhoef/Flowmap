@@ -1,0 +1,78 @@
+{
+  "title": "flowmap is ready to publish as an Apache 2.0 repo",
+  "pr": "PR #6",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/6",
+  "intent": "Prepare the repo to be made public, so the plugin installs on any machine without GitHub credentials, and people can find and use flowmap and the Fjall deploy behind it.",
+  "delta": "No flow, step, symbol or call edge moves: the CLI is untouched. The repo gains an Apache 2.0 license, loses the GitHub Pages workflow that the hosted viewer replaced in PR #5, and loses the agent planning notes. The README gets setup steps for a new machine that assume a public repo. Making the repo public is a separate step, done by hand in GitHub settings.",
+  "chapters": [
+    {
+      "title": "flowmap is licensed Apache 2.0",
+      "role": "core",
+      "kind": "license",
+      "symbols": [],
+      "files": [
+        "LICENSE",
+        ".claude-plugin/plugin.json",
+        "README.md"
+      ],
+      "before": "No license: a public repo would be readable, but nobody could legally use, copy or change it.",
+      "after": "LICENSE holds the unmodified Apache 2.0 text from apache.org. plugin.json declares `\"license\": \"Apache-2.0\"` and the repository URL, and the README ends with a License section.",
+      "claim": "Anyone can use, change and ship flowmap, with an explicit patent grant.",
+      "why": "This decides whether someone who finds the repo can adopt it at work. Apache 2.0's patent grant is what company legal teams usually ask for.",
+      "questions": [
+        {
+          "q": "Should flowmap also ship a NOTICE file, which Apache 2.0 asks redistributors to carry forward?",
+          "why": "Only matters if you want attribution to travel with forks.",
+          "kind": "ask"
+        },
+        {
+          "q": "Does `claude plugin validate .` still pass with the new `license` and `repository` fields in plugin.json?",
+          "why": "An invalid manifest stops the plugin from installing.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "A new machine installs the plugin with two commands",
+      "role": "supporting",
+      "kind": "docs",
+      "symbols": [],
+      "files": [
+        "README.md"
+      ],
+      "before": "The README covered `/plugin install` but not what a second machine needs, and with a private repo every install needed stored GitHub credentials.",
+      "after": "An 'On a new machine' section lists Python 3.11+ and git, the two `/plugin` commands, `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` for machines without a GitHub SSH key, how to put `bin/` on the shell PATH, and how updates arrive: only when `version` in plugin.json changes.",
+      "claim": "Once the repo is public, setup needs no GitHub login.",
+      "why": "Until the repo is public, these steps fail without credentials. Merge this when you flip the visibility.",
+      "questions": [
+        {
+          "q": "plugin.json pins `version` at 0.1.0, so installed plugins never pick up new commits. Bump it on each release, or remove it so installs follow commits?",
+          "why": "Decides whether the work machine ever gets fixes without a reinstall.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "The GitHub Pages publisher and the planning notes are gone",
+      "role": "outside",
+      "kind": "cleanup",
+      "symbols": [],
+      "files": [
+        ".github/workflows/flowmap-pages.yml",
+        "docs/superpowers/plans/2026-10-05-language-neutral-callgraph.md",
+        ".gitignore"
+      ],
+      "before": "`.github/workflows/flowmap-pages.yml` pushed change pages to a `gh-pages` branch that nothing linked to, and Pages was never turned on. The plan for PR #4 sat in `docs/superpowers/plans/`.",
+      "after": "The workflow is deleted (the `gh-pages` branch is deleted on the remote too). The plan is deleted, and `/docs/superpowers/` is gitignored so later agent plans stay local.",
+      "claim": "Nothing public points at a dead publishing path.",
+      "why": "In a public repo, Pages would start working and serve stale pages next to the hosted viewer.",
+      "questions": [
+        {
+          "q": "The deleted plan is still in the history of PR #4. Is that acceptable in a public repo?",
+          "why": "Removing it from history means rewriting main and losing the PR refs.",
+          "kind": "ask"
+        }
+      ]
+    }
+  ]
+}
