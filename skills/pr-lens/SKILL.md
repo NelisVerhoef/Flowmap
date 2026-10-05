@@ -101,9 +101,10 @@ Also write the change as a page people can read without the diff:
    refactor gets its own `refactor` chapter so it can be read quickly. Prose that steers an
    agent (skills, prompts) is behaviour: give it a chapter. Two to five questions per chapter.
    "Ask" means only the author can answer; "check" means the reviewer can settle it themselves.
-3. `flowmap change <base> <head> --name <name>` writes
-   `docs/flowmap/changes/<name>.html`. Symbols the story leaves out land in a "not in the story"
-   chapter, so nothing changed is hidden.
+3. `flowmap change <base> <head> --name <name> --link` writes
+   `docs/flowmap/changes/<name>.html` and prints a viewer link carrying the whole page, for the
+   PR body. Symbols the story leaves out land in a "not in the story" chapter, so nothing
+   changed is hidden. Without `viewer` in `flowmap.toml`, drop `--link` and link the committed page.
 
 ## After
 

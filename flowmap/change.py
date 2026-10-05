@@ -5,17 +5,22 @@ The facts are deterministic (diff, call graph at base and head, map.json). The p
 and comes from a story file the /pr-lens skill writes; without one, chapters are grouped by the
 flow steps that run the changed code and say only what the graph can.
 
-    python tools/flowmap/change.py <base> [<head>] [--name pr-12] [--story path.json] [--facts]
+    python tools/flowmap/change.py <base> [<head>] [--name pr-12] [--story path.json] [--facts] [--link]
 
 Writes <out>/changes/<name>.html. --facts prints the facts as JSON instead (input for a story).
+--link also prints a link to the hosted viewer (`viewer` in flowmap.toml, or FLOWMAP_VIEWER) that
+carries the whole page in its fragment, so it renders in any browser without publishing the data.
 Story format: see STORY in the /pr-lens skill.
 """
 
 import argparse
+import base64
 import json
 import math
+import os
 import re
 import sys
+import zlib
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -220,6 +225,22 @@ def merge(fx, story):
             "chapters": chapters, "folded": [f["path"] for f in folded if f["path"] not in loose]}
 
 
+def viewer_html():
+    """The page with no data in it: it reads a link's fragment or a dropped file. No fonts or other
+    requests, and a CSP that forbids any, so a reader can see their data stays in the tab."""
+    csp = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; "
+           "base-uri 'none'; form-action 'none'")
+    return re.sub(r"<!--fonts-->.*?<!--/fonts-->", f'<meta http-equiv="Content-Security-Policy" content="{csp}">',
+                  TEMPLATE.read_text(), count=1, flags=re.S).replace("__TITLE__", "flowmap change")
+
+
+def link(data, viewer):
+    """The viewer URL with the data in its fragment: #v1.<base64url of raw-deflated JSON>."""
+    z = zlib.compressobj(9, zlib.DEFLATED, -15)
+    packed = z.compress(json.dumps(data, separators=(",", ":")).encode()) + z.flush()
+    return f"{viewer}#v1.{base64.urlsafe_b64encode(packed).rstrip(b'=').decode()}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base")
@@ -227,6 +248,7 @@ def main():
     ap.add_argument("--name", help="output name (default: <head>)")
     ap.add_argument("--story", help="story JSON (default: <out>/changes/<name>.story.json if present)")
     ap.add_argument("--facts", action="store_true", help="print facts as JSON and exit")
+    ap.add_argument("--link", action="store_true", help="also print a viewer link carrying the page")
     a = ap.parse_args()
     fx = facts(a.base, a.head)
     if a.facts:
@@ -244,7 +266,18 @@ def main():
     out = out_dir / f"{name}.html"
     out.write_text(html)
     print(f"wrote {out.relative_to(ROOT)} ({len(data['chapters'])} chapters"
-          f"{', story ' + str(story_path.relative_to(ROOT) if story_path.is_relative_to(ROOT) else story_path) if story else ', no story'})")
+          f"{', story ' + str(story_path.relative_to(ROOT) if story_path.is_relative_to(ROOT) else story_path) if story else ', no story'})",
+          file=sys.stderr if a.link else sys.stdout)  # with --link, stdout is just the link
+    if a.link:
+        viewer = os.environ.get("FLOWMAP_VIEWER") or config.load().get("viewer")
+        if not viewer:
+            sys.exit("no viewer: set viewer = \"https://.../change.html\" in flowmap.toml or FLOWMAP_VIEWER "
+                     "(build it with `flowmap viewer <dir>`)")
+        url = link(data, viewer)
+        if len(url) > 60000:  # a PR body holds 65536 characters
+            print(f"warning: link is {len(url)} characters, too long for a PR body; "
+                  f"open {out.relative_to(ROOT)} in the viewer instead", file=sys.stderr)
+        print(url)
 
 
 if __name__ == "__main__":

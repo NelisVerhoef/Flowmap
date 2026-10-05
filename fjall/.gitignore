@@ -1,0 +1,13 @@
+# Fjall-managed local state.
+#
+# `fjall-config.json` beside this file is deliberately NOT ignored: it is
+# committed project state, and its `capacityIdentity` block is load-bearing
+# deployed state — losing it renames (replaces) every stateful resource in its
+# slot on the next deploy.
+
+# Per-checkout active deploy target. Never committed: a committed value
+# silently re-aims a teammate's deploy or a CI pipeline at the wrong target.
+/.fjall/local.json
+/.fjall/history/
+/.fjall/baseline/
+/.fjall/logs/

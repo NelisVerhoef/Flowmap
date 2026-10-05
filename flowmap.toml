@@ -1,4 +1,5 @@
 name = "flowmap"
+viewer = "https://flowmap.testabl.ai/v1/change.html"
 
 [[entry]]
 adapter = "cli"

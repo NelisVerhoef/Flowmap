@@ -1,0 +1,134 @@
+{
+  "title": "A change page opens from a link, without publishing its data",
+  "pr": "PR #5",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/5",
+  "intent": "Make change pages readable in a browser without putting a company's code on a public site: GitHub Pages cannot serve this private repo, and publishing the pages would expose their contents.",
+  "delta": "No flow or step on the map moves; the map does not yet have a step for `flowmap change`. That command gains `--link`, which prints a URL whose `#` fragment carries the whole page, and a new `flowmap viewer` command builds the page that renders such a link in the browser. Browsers never send the fragment, so the data stays in the tab. The viewer is deployed as a static site at flowmap.testabl.ai, and the PR instructions now link to it instead of GitHub Pages. The committed HTML change page is still written and renders as before.",
+  "chapters": [
+    {
+      "title": "`flowmap change --link` prints a link that carries the page",
+      "role": "core",
+      "kind": "new capability",
+      "symbols": [
+        "flowmap/change.py:link",
+        "flowmap/change.py:main"
+      ],
+      "files": [
+        "flowmap/config.py",
+        "flowmap.toml"
+      ],
+      "before": "`flowmap change` wrote `<out>/changes/<name>.html` and nothing else; reading it in a browser needed a published copy (GitHub Pages).",
+      "after": "With `--link` it also prints `<viewer>#v1.<base64url of raw-deflated page data>`, with only the link on stdout so it can be captured. It reads the viewer URL from `FLOWMAP_VIEWER` or `viewer` in flowmap.toml, exits with guidance when neither is set, and warns on stderr when the link passes 60,000 characters (a PR body holds 65,536).",
+      "claim": "The page travels inside the link, so nothing has to be hosted per change.",
+      "why": "Every PR in this repo links its change page this way from now on (CLAUDE.md). PR #3's page is a 21 KB link; a large PR could pass the PR-body limit, and then the reviewer needs the dropped-file fallback.",
+      "questions": [
+        {
+          "q": "The payload is versioned in the fragment (`#v1.`), and the viewer is versioned in its path (`/v1/change.html`). When the page data's shape changes, which one should bump, and do old links keep working?",
+          "why": "Decides whether links in merged PRs still render after the template changes.",
+          "kind": "ask"
+        },
+        {
+          "q": "Over 60,000 characters `--link` only warns. Should it fail instead, or print the committed page's path as the link to open?",
+          "why": "A truncated link in a PR body renders an error page for every reviewer.",
+          "kind": "ask"
+        },
+        {
+          "q": "Paste the link from `flowmap change 770f1a7 a56bd10 --name pr-3 --link` into a browser: does PR #3's page render with its 4 chapters?",
+          "why": "Confirms the encoder and the viewer agree end to end.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "One template renders from embedded data, a link, or a dropped file",
+      "role": "supporting",
+      "kind": "viewer",
+      "symbols": [
+        "flowmap/change.py:viewer_html",
+        "flowmap/viewer.py:main",
+        "flowmap/viewer.py:__main__"
+      ],
+      "files": [
+        "flowmap/change.template.html",
+        "bin/flowmap"
+      ],
+      "before": "The change template only worked with data embedded by `flowmap change`; its chapter links replaced the URL fragment.",
+      "after": "The template loads embedded data first, then a `#v1.` fragment, then asks for a dropped change page (old `const DATA` pages too) or its JSON. `flowmap viewer <dir>` writes it with no data, Google Fonts swapped for a CSP of `default-src 'none'`, so the hosted page cannot make any request. With a fragment, in-page links scroll instead of replacing it, and pasting a new link into the tab reloads it.",
+      "claim": "The hosted viewer is provably unable to send the data anywhere.",
+      "why": "This is what a company has to trust: that the page they open reads their change locally. The CSP is the evidence; a request-free page also means no fonts, so the viewer falls back to system fonts.",
+      "questions": [
+        {
+          "q": "The script is an inline module allowed by `script-src 'unsafe-inline'`. Should the viewer pin its script by hash instead, so an injected script could not run?",
+          "why": "Decides how strong the 'data never leaves the tab' claim is under review by a security team.",
+          "kind": "ask"
+        },
+        {
+          "q": "Open https://flowmap.testabl.ai/v1/change.html with no fragment and drop `docs/flowmap/changes/pr-1.html` on it: does it render, with no requests in the network tab?",
+          "why": "Confirms the fallback and the CSP on the deployed copy.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "The viewer is hosted on S3 and CloudFront via Fjall",
+      "role": "outside",
+      "kind": "infrastructure",
+      "symbols": [],
+      "files": [
+        "fjall/flowmap/infrastructure.ts",
+        "fjall/flowmap/package.json",
+        "fjall/flowmap/package-lock.json",
+        "fjall/flowmap/cdk.json",
+        "fjall/flowmap/cdk.context.json",
+        "fjall/flowmap/tsconfig.json",
+        "fjall/flowmap/.gitignore",
+        "fjall/fjall-config.json",
+        "fjall/.gitignore",
+        ".gitignore"
+      ],
+      "before": "No hosted viewer; `.github/workflows/flowmap-pages.yml` pushed pages to a gh-pages branch that a private repo cannot serve.",
+      "after": "A Fjall static site (`flowmap`, in the testabl.ai organisation) builds with `python3 bin/flowmap viewer site/v1` and serves it from a private S3 bucket behind CloudFront at https://flowmap.testabl.ai/v1/change.html. testabl.ai's DNS is on Cloudflare, so the certificate validation and `flowmap` CNAMEs live there; the Route53 zone the infrastructure names is not authoritative.",
+      "claim": "Hosting costs pennies and holds no change data.",
+      "why": "Deploys run from a laptop with Fjall credentials today; if the infrastructure and the DNS drift apart (Cloudflare vs Route53), the next certificate renewal or rebuild is where it shows.",
+      "questions": [
+        {
+          "q": "The infrastructure names Route53 zone Z074708715PBLRVPFKB72, but Cloudflare serves testabl.ai. Delegate flowmap.testabl.ai to Route53 so Fjall owns its records, or keep them by hand in Cloudflare?",
+          "why": "Decides who fixes DNS when the viewer is rebuilt or its certificate is re-issued.",
+          "kind": "ask"
+        },
+        {
+          "q": "Should the viewer deploy from CI on merge (a Fjall CI token), so the hosted copy cannot lag the template?",
+          "why": "Today a template change only reaches flowmap.testabl.ai when someone runs `fjall deploy flowmap`.",
+          "kind": "ask"
+        },
+        {
+          "q": "`.github/workflows/flowmap-pages.yml` still runs and nothing links to its output. Remove it here or in a follow-up?",
+          "why": "Leaving it keeps publishing pages that the docs no longer point at.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "PRs link the viewer instead of GitHub Pages",
+      "role": "supporting",
+      "kind": "process",
+      "symbols": [],
+      "files": [
+        "CLAUDE.md",
+        "README.md",
+        "skills/pr-lens/SKILL.md"
+      ],
+      "before": "CLAUDE.md, the README and the pr-lens skill told authors to link `https://nelisverhoef.github.io/Flowmap/changes/pr-<n>.html`.",
+      "after": "They tell authors to run `flowmap change ... --link` and put that link in the PR body; the pr-lens skill drops `--link` when no viewer is configured.",
+      "claim": "The agent that writes each PR now produces the link itself.",
+      "why": "CLAUDE.md steers every PR an agent opens here, so this is behaviour, not documentation.",
+      "questions": [
+        {
+          "q": "Other repos that install the plugin have no `viewer` configured. Should flowmap default to https://flowmap.testabl.ai/v1/change.html so `--link` works everywhere?",
+          "why": "Decides whether the hosted viewer is this repo's tool or the plugin's.",
+          "kind": "ask"
+        }
+      ]
+    }
+  ]
+}

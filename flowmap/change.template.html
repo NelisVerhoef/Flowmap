@@ -2,9 +2,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>__TITLE__</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<!--fonts--><link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><!--/fonts-->
 <style>
 /* Layout: a change told as chapters on a fixed system map. The map keeps the atlas's positions
    so the same place always looks the same; each chapter says where, before -> after, why, and
@@ -99,7 +99,7 @@ header h1 { font: 800 clamp(28px, 4.4vw, 44px)/1.02 var(--display); font-stretch
   padding: 20px; display: grid; gap: 16px; scroll-margin-top: 16px; border-top: 4px solid var(--role); }
 .chapter.core { --role: var(--core); } .chapter.supporting { --role: var(--support); }
 .chapter.refactor { --role: var(--refactor); } .chapter.outside, .chapter.unassigned, .chapter.off-map { --role: var(--outside); }
-.chapter:target { box-shadow: 0 0 0 3px var(--accent-soft); }
+.chapter:target, .chapter.targeted { box-shadow: 0 0 0 3px var(--accent-soft); }
 .ch-head { display: grid; gap: 6px; }
 .ch-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .num { font: 800 13px var(--mono); color: var(--surface); background: var(--role); border-radius: 6px; padding: 2px 8px; }
@@ -170,6 +170,13 @@ details.code summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 button.primary { font: 600 14px var(--body); background: var(--accent); color: var(--surface); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
 .status { font-size: 13px; color: var(--muted); }
 .folded { font-size: 13px; color: var(--muted); }
+
+/* viewer mode: no data in the page or the link, so ask for a file */
+.drop { background: var(--surface); border: 2px dashed var(--rule); border-radius: 12px; padding: 32px 20px; display: grid; gap: 10px; justify-items: start; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h1 { font: 800 28px/1.1 var(--display); font-stretch: 74%; margin: 0; }
+.drop p { margin: 0; max-width: 68ch; color: var(--muted); }
+.drop .err { color: var(--loss); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 html { scroll-behavior: smooth; }
 </style>
@@ -195,8 +202,71 @@ html { scroll-behavior: smooth; }
   </section>
 </div>
 
-<script>
-const DATA = /*__CHANGE_DATA__*/null;
+<script type="module">
+// The data is embedded by `flowmap change`, or, in the hosted viewer, carried in the link's fragment
+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server; failing both,
+// the reader drops a change page or its JSON. Either way it is read here and goes nowhere else.
+const EMBEDDED = /*__CHANGE_DATA__*/null;
+const PAYLOAD = /^#v1\.([\w-]+)$/.exec(location.hash);
+// another link pasted into this tab changes only the fragment, which does not reload the page
+addEventListener("hashchange", () => { if (location.hash.startsWith("#v1.")) location.reload(); });
+
+async function inflate(b64) {
+  const bytes = Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+
+function fromFile(error) {
+  const box = document.createElement("section");
+  box.className = "drop";
+  box.innerHTML = `<h1>Open a flowmap change</h1>
+    <p>Drop a change page (<code>docs/flowmap/changes/&lt;name&gt;.html</code>) or its data as JSON here.
+    It is read in this tab and sent nowhere.</p>
+    <p><input type="file" accept=".html,.json"></p><p class="err" hidden></p>`;
+  const err = box.querySelector(".err");
+  if (error) { err.hidden = false; err.textContent = error; }
+  document.querySelector(".wrap").replaceChildren(box);
+  return new Promise((resolve) => {
+    const read = async (f) => {
+      try {
+        const text = await f.text();
+        const m = /const EMBEDDED = (\{.*?\});\n/s.exec(text) || /const DATA = (\{.*?\});\n/s.exec(text);
+        const data = JSON.parse(m ? m[1] : text);
+        if (!data.facts || !data.chapters) throw new Error("not flowmap change data");
+        resolve(data);
+      } catch (e) { err.hidden = false; err.textContent = `Could not read ${f.name}: ${e.message}`; }
+    };
+    box.querySelector("input").addEventListener("change", (e) => e.target.files[0] && read(e.target.files[0]));
+    addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("over"); });
+    addEventListener("dragleave", () => box.classList.remove("over"));
+    addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("over"); e.dataTransfer.files[0] && read(e.dataTransfer.files[0]); });
+  });
+}
+
+async function load() {
+  if (EMBEDDED) return EMBEDDED;
+  if (PAYLOAD) {
+    try { return await inflate(PAYLOAD[1]); }
+    catch (e) { return fromFile("The link's data is cut off or damaged. Was the whole link copied?"); }
+  }
+  return fromFile();
+}
+
+const WRAP = document.querySelector(".wrap").cloneNode(true);
+const DATA = await load();
+document.querySelector(".wrap").replaceWith(WRAP);
+if (DATA.story.title) document.title = DATA.story.title;
+// the fragment holds the data, so in-page links scroll instead of replacing it
+if (PAYLOAD) document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  const to = a && document.getElementById(a.getAttribute("href").slice(1));
+  if (!to) return;
+  e.preventDefault();
+  document.querySelectorAll(".targeted").forEach((n) => n.classList.remove("targeted"));
+  to.classList.add("targeted");
+  to.scrollIntoView();
+});
 const F = DATA.facts, S = DATA.story;
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => {

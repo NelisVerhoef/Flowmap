@@ -1,0 +1,16 @@
+{
+  "name": "flowmap",
+  "version": "39.0.5",
+  "type": "module",
+  "scripts": {},
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.3"
+  },
+  "dependencies": {
+    "@fjall/components-infrastructure": "^39.0.5",
+    "aws-cdk-lib": "^2.265.0",
+    "constructs": "^10.7.2"
+  }
+}

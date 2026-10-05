@@ -6,6 +6,7 @@ Every key is optional; a repo with no config gets discovery mode and auto-detect
 
     name = "Acme"                              # shown on the atlas; defaults to the repo folder name
     out = "docs/flowmap"                       # where the map lives in the target repo
+    viewer = "https://.../change.html"         # hosted `flowmap viewer`, for `flowmap change --link`
 
     [[entry]]                                  # one per app; see adapters/ for options
     adapter = "fastapi"                        # fastapi | rails | nextjs | cli
