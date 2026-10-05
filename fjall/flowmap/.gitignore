@@ -1,0 +1,25 @@
+*.js
+*.d.ts
+node_modules
+.cdk.staging
+**/**/cdk.out
+
+.DS_Store
+
+# Fjall-managed state directories. Kept here as well as at the project anchor
+# because codemod runs resolve them against the working directory.
+/.fjall/history/
+/.fjall/baseline/
+/.fjall/logs/
+
+# Fjall per-target deploy state — a per-machine cache, never a deploy oracle.
+.fjall-state*.json
+.deploy-state.json
+.fjall-state*.json.*.tmp
+.deploy-state.json.*.tmp
+.fjall-state*.json.tmp
+.deploy-state.json.tmp
+
+# Fjall backup files (sibling `.bak` from codemod mutations + domain eject)
+**/backup/
+*.bak
