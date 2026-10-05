@@ -1,0 +1,65 @@
+{
+ "base": "main",
+ "head": "pr-23",
+ "files": [
+  "backend/app/api/routes/login.py"
+ ],
+ "code": [
+  "backend/app/api/routes/login.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/login.py:recover_password_html_content"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "recover-forgotten-password",
+   "step": "admin-previews-recovery-email",
+   "matched": [
+    "backend/app/api/routes/login.py:recover_password_html_content"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/login.py:recover_password_html_content": [
+   "POST /password-recovery-html-content/{email}"
+  ]
+ },
+ "reach_steps": [
+  "recover-forgotten-password/admin-previews-recovery-email"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 1,
+  "gained": {},
+  "lost": {
+   "backend/app/models.py:TokenPayload": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:TokenDep": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:get_current_active_superuser": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:CurrentUser": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:get_current_user": [
+    "POST /password-recovery-html-content/{email}"
+   ]
+  }
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "POST /password-recovery-html-content/{email}"
+ ]
+}

@@ -1,0 +1,85 @@
+{
+ "base": "main",
+ "head": "pr-20",
+ "files": [
+  "backend/app/api/routes/items.py"
+ ],
+ "code": [
+  "backend/app/api/routes/items.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/items.py:delete_item",
+  "backend/app/api/routes/items.py:get_owned_item",
+  "backend/app/api/routes/items.py:read_item",
+  "backend/app/api/routes/items.py:update_item"
+ ],
+ "new_symbols": [
+  "backend/app/api/routes/items.py:get_owned_item"
+ ],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "manage-items",
+   "step": "user-edits-item",
+   "matched": [
+    "backend/app/api/routes/items.py:update_item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-deletes-item",
+   "matched": [
+    "backend/app/api/routes/items.py:delete_item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "api-client-reads-item",
+   "matched": [
+    "backend/app/api/routes/items.py:read_item"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/items.py:delete_item": [
+   "DELETE /items/{id}"
+  ],
+  "backend/app/api/routes/items.py:get_owned_item": [
+   "DELETE /items/{id}",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ],
+  "backend/app/api/routes/items.py:read_item": [
+   "GET /items/{id}"
+  ],
+  "backend/app/api/routes/items.py:update_item": [
+   "PUT /items/{id}"
+  ]
+ },
+ "reach_steps": [
+  "manage-items/api-client-reads-item",
+  "manage-items/user-deletes-item",
+  "manage-items/user-edits-item"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 6,
+  "edges_removed": 3,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/api/routes/items.py:get_owned_item"
+ ],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "DELETE /items/{id}",
+  "GET /items/{id}",
+  "PUT /items/{id}"
+ ]
+}

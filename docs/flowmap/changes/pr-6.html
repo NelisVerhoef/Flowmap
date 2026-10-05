@@ -1,0 +1,519 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>flowmap is ready to publish as an Apache 2.0 repo</title>
+<!--fonts--><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><!--/fonts-->
+<style>
+/* Layout: a change told as chapters on a fixed system map. The map keeps the atlas's positions
+   so the same place always looks the same; each chapter says where, before -> after, why, and
+   what to ask. Code is folded at the end of each chapter. */
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6676;
+  --rule: #cdd4dc;
+  --line: #9aa6b4;
+  --accent: #2e5bff;
+  --accent-soft: rgba(46, 91, 255, .12);
+  --core: #2e5bff;
+  --support: #0f7c86;
+  --refactor: #6b7686;
+  --outside: #b7791f;
+  --gain: #1e8a4c;
+  --loss: #c8423b;
+  --code-bg: #f6f8fa;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+    --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+    --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+    --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+  --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+  --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+  --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { padding-inline: 16px; padding-block: 28px 64px; max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+p code, li code, dd code { background: var(--accent-soft); padding: 0 .3em; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+
+/* header */
+header { display: grid; gap: 12px; }
+header h1 { font: 800 clamp(28px, 4.4vw, 44px)/1.02 var(--display); font-stretch: 74%; margin: 0; max-width: 24ch; }
+.range { color: var(--muted); font-size: 13px; }
+.range a { color: inherit; }
+.delta { font-size: 18px; line-height: 1.5; max-width: 68ch; margin: 0; }
+.intent { color: var(--muted); max-width: 68ch; margin: 0; font-size: 14px; }
+
+/* system numbers: each with what drives it */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.tile { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile b { font: 700 22px/1.1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; }
+.tile small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.tile.zero b { color: var(--muted); }
+
+/* the map */
+.map { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
+.map-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; }
+.map-head h2 { font: 700 15px var(--display); font-stretch: 80%; margin: 0; letter-spacing: .02em; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lines { overflow-x: auto; }
+.lines-inner { display: grid; grid-template-columns: repeat(var(--flows, 3), minmax(190px, 1fr)); gap: 14px; }
+.flow h3 { font: 700 13px/1.2 var(--display); font-stretch: 78%; margin: 0 0 8px; padding-left: 4px; letter-spacing: .02em; }
+.flow.quiet h3 { color: var(--muted); }
+.stations { list-style: none; margin: 0; padding: 0; position: relative; display: grid; gap: 2px; }
+.stations::before { content: ""; position: absolute; left: 11px; top: 12px; bottom: 12px; width: 3px; background: var(--line); border-radius: 2px; }
+.st { position: relative; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 6px; align-items: start;
+  padding: 5px 6px 5px 0; border-radius: 6px; font-size: 12.5px; line-height: 1.3; }
+.st .pin { width: 13px; height: 13px; border-radius: 50%; background: var(--surface); border: 3px solid var(--line);
+  justify-self: center; margin-top: 2px; position: relative; z-index: 1; }
+.st.hit .pin { border-color: var(--accent); background: var(--accent); }
+.st.quiet { color: var(--muted); }
+.st .refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ref { font: 600 11px/1 var(--mono); border-radius: 999px; padding: 3px 7px; border: 1px solid currentColor; color: var(--role, var(--accent));
+  background: none; cursor: pointer; text-decoration: none; }
+.ref:hover { background: var(--accent-soft); }
+.offmap { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* chapters */
+.chapters { display: grid; gap: 22px; counter-reset: ch; }
+.chapter { --role: var(--accent); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+  padding: 20px; display: grid; gap: 16px; scroll-margin-top: 16px; border-top: 4px solid var(--role); }
+.chapter.core { --role: var(--core); } .chapter.supporting { --role: var(--support); }
+.chapter.refactor { --role: var(--refactor); } .chapter.outside, .chapter.unassigned, .chapter.off-map { --role: var(--outside); }
+.chapter:target, .chapter.targeted { box-shadow: 0 0 0 3px var(--accent-soft); }
+.ch-head { display: grid; gap: 6px; }
+.ch-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.num { font: 800 13px var(--mono); color: var(--surface); background: var(--role); border-radius: 6px; padding: 2px 8px; }
+.tag { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--role); }
+.kind { font-size: 12px; color: var(--muted); }
+.chapter h2 { font: 750 clamp(20px, 2.6vw, 26px)/1.15 var(--display); font-stretch: 80%; margin: 0; }
+.claim { margin: 0; color: var(--muted); max-width: 70ch; }
+
+.where { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 720px) { .where { grid-template-columns: minmax(0, 1fr); } }
+.here { display: grid; gap: 8px; }
+.minimap { background: var(--paper); border-radius: 8px; padding: 10px; }
+.minimap svg { display: block; width: 100%; height: auto; }
+.minimap .dot { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+.minimap .dot.on { fill: var(--role); stroke: var(--role); }
+.minimap .rail { stroke: var(--line); stroke-width: 2; }
+.minimap text { fill: var(--muted); font: 9px var(--body); }
+.crumbs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.crumbs li { display: grid; gap: 1px; }
+.crumbs .flow-name { color: var(--muted); font-size: 11.5px; }
+
+.morph { display: grid; gap: 10px; margin: 0; }
+.morph > div { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; }
+.morph dt { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: 3px; }
+.morph dd { margin: 0; }
+.morph .after dd { font-weight: 500; }
+.why { border-left: 3px solid var(--role); padding: 6px 12px; background: var(--paper); border-radius: 0 8px 8px 0; display: grid; gap: 2px; }
+.why p { margin: 0; max-width: 72ch; }
+
+.evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px 24px; }
+.evidence > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.paths, .callers, .edges { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.path span { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
+.path span.end { border-color: var(--role); color: var(--role); }
+.path i { color: var(--muted); font-style: normal; }
+.callers li, .edges li { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.mark { font-family: var(--body); font-size: 11px; font-weight: 600; flex: none; width: 72px; }
+.mark.yes { color: var(--gain); } .mark.no { color: var(--outside); }
+.edges .add { color: var(--gain); } .edges .rem { color: var(--loss); }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+.qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: q; }
+.q { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.q input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+.q label { display: grid; gap: 3px; cursor: pointer; }
+.q .qtext { font-weight: 500; }
+.q .qwhy { color: var(--muted); font-size: 13px; }
+.qkind { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+.qkind.ask { background: var(--accent-soft); color: var(--accent); }
+.qkind.check { background: var(--paper); color: var(--muted); border: 1px solid var(--rule); }
+.qkind.graph { background: var(--paper); color: var(--support); border: 1px solid var(--rule); }
+
+details.code { border-top: 1px dashed var(--rule); padding-top: 10px; }
+details.code summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.hunk { margin-top: 10px; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.hunk .hh { font: 11.5px var(--mono); color: var(--muted); padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.hunk pre { margin: 0; overflow-x: auto; background: var(--code-bg); font: 12px/1.5 var(--mono); padding: 6px 0; }
+.hunk pre span { display: block; padding: 0 10px; white-space: pre; min-width: max-content; }
+.hunk .a { background: rgba(30, 138, 76, .13); } .hunk .r { background: rgba(200, 66, 59, .13); }
+
+/* the review note */
+.ask-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: grid; gap: 12px; }
+.ask-box h2 { font: 750 22px var(--display); font-stretch: 80%; margin: 0; }
+.ask-box textarea { width: 100%; min-height: 160px; font: 13px/1.5 var(--mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 8px; padding: 10px; resize: vertical; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button.primary { font: 600 14px var(--body); background: var(--accent); color: var(--surface); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.status { font-size: 13px; color: var(--muted); }
+.folded { font-size: 13px; color: var(--muted); }
+
+/* viewer mode: no data in the page or the link, so ask for a file */
+.drop { background: var(--surface); border: 2px dashed var(--rule); border-radius: 12px; padding: 32px 20px; display: grid; gap: 10px; justify-items: start; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h1 { font: 800 28px/1.1 var(--display); font-stretch: 74%; margin: 0; }
+.drop p { margin: 0; max-width: 68ch; color: var(--muted); }
+.drop .err { color: var(--loss); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+  <header id="top"></header>
+  <section class="tiles" id="tiles" aria-label="How the system moved"></section>
+  <section class="map" aria-label="System map">
+    <div class="map-head">
+      <h2>Where this lands on the system</h2>
+      <div class="legend"><span><i class="ref" style="cursor:default">1</i> chapter that runs here</span><span>grey: untouched</span></div>
+    </div>
+    <div class="lines"><div class="lines-inner" id="lines"></div></div>
+    <div class="offmap" id="offmap" hidden></div>
+  </section>
+  <section class="chapters" id="chapters" aria-label="Chapters"></section>
+  <section class="ask-box" aria-labelledby="ask-h">
+    <h2 id="ask-h">Questions for the author</h2>
+    <p class="note">Ticked questions collect here. Copy them into the PR as your review.</p>
+    <textarea id="note" aria-label="Review note" readonly></textarea>
+    <div class="row"><button class="primary" id="copy" type="button">Copy questions</button><span class="status" id="status" aria-live="polite"></span></div>
+    <p class="folded" id="folded"></p>
+  </section>
+</div>
+
+<script type="module">
+// The data is embedded by `flowmap change`, or, in the hosted viewer, carried in the link's fragment
+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server; failing both,
+// the reader drops a change page or its JSON. Either way it is read here and goes nowhere else.
+const EMBEDDED = {"facts":{"base":"origin/main","head":"HEAD","base_sha":"36a255c","head_sha":"f71572f","name":"flowmap","map":[{"id":"new:discover-entry-points","steps":[{"key":"new:discover-entry-points/list-entry-points","name":"Maintainer lists every entry point the repo exposes into inventory.json","endpoints":["CLI flowmap inventory"],"evidence":"agreed"}]},{"id":"new:review-change-on-map","steps":[{"key":"new:review-change-on-map/generate-diagrams","name":"Maintainer generates Mermaid diagrams at system, flow and step zoom","endpoints":["CLI flowmap diagrams"],"evidence":"agreed"},{"key":"new:review-change-on-map/lens-place-change","name":"Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)","endpoints":["CLI flowmap lens"],"evidence":"agreed"},{"key":"new:review-change-on-map/callgraph-impact","name":"Developer asks which entry points and flows can reach a file:symbol","endpoints":["CLI flowmap callgraph"],"evidence":"agreed"},{"key":"new:review-change-on-map/build-atlas","name":"Maintainer builds the interactive atlas page and browses flows, steps and components","endpoints":["CLI flowmap atlas"],"evidence":"agreed"}]},{"id":"new:run-mapping-passes","steps":[{"key":"new:run-mapping-passes/write-pass-brief","name":"Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)","endpoints":["CLI flowmap brief"],"evidence":"agreed"},{"key":"new:run-mapping-passes/reconcile-runs","name":"Maintainer votes the passes into one map with evidence levels and a list of open questions","endpoints":["CLI flowmap reconcile"],"evidence":"agreed"},{"key":"new:run-mapping-passes/verify-pass-citations","name":"Maintainer checks each pass's anchors exist and every entry point is placed","endpoints":["CLI flowmap verify"],"evidence":"agreed"}]}],"files":[{"path":".claude-plugin/plugin.json","kind":"outside","added":3,"removed":1},{"path":".gitignore","kind":"outside","added":3,"removed":0},{"path":"LICENSE","kind":"doc","added":202,"removed":0},{"path":"README.md","kind":"doc","added":28,"removed":0}],"symbols":[],"endpoints":{"added":[],"removed":[]},"reach":{"gained":{},"lost":{}},"edges":{"added":[],"removed":[]},"modules":{"added":[],"removed":[]},"flow_share":{},"flow_entropy":0.0,"tests":{"configured":false,"changed":[]},"hunks":[{"file":".claude-plugin/plugin.json","old":5,"new":5,"ctx":"","lines":["   \"author\": {","     \"name\": \"Nelis Verhoef\"","-  }","+  },","+  \"license\": \"Apache-2.0\",","+  \"repository\": \"https://github.com/NelisVerhoef/flowmap\""," }"],"symbols":[]},{"file":".github/workflows/flowmap-pages.yml","old":1,"new":0,"ctx":"","lines":["-# Publishes the flowmap HTML pages to the gh-pages branch so they render in a browser.","-# GitHub shows committed .html as source; Pages serves it.","-#   change pages (any branch): https://<owner>.github.io/<repo>/changes/<name>.html","-#   atlas (default branch):    https://<owner>.github.io/<repo>/atlas.html","-# One-time setup: Settings -> Pages -> Deploy from a branch -> gh-pages / (root).","-name: flowmap pages","-","-on:","-  push:","-    paths: [\"docs/flowmap/**\", \".github/workflows/flowmap-pages.yml\"]","-  workflow_dispatch:","-","-permissions:","-  contents: write","-","-concurrency:","-  group: flowmap-pages","-  cancel-in-progress: false","-","-jobs:","-  publish:","-    runs-on: ubuntu-latest","-    steps:","-      - uses: actions/checkout@v4","-        with:","-          path: src","-","-      - name: Check out gh-pages (or start it)","-        run: |","-          if git ls-remote --exit-code --heads \"https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}\" gh-pages >/dev/null; then","-            git clone --depth 1 --branch gh-pages \"https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}\" site","-          else","-            git init -b gh-pages site","-            git -C site remote add origin \"https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}\"","-            touch site/.nojekyll","-          fi","-","-      - name: Copy pages","-        run: |","-          OUT=src/docs/flowmap","-          mkdir -p site/changes","-          cp \"$OUT\"/changes/*.html site/changes/ 2>/dev/null || true","-          if [ \"${{ github.ref_name }}\" = \"${{ github.event.repository.default_branch }}\" ] && [ -f \"$OUT/atlas.html\" ]; then","-            cp \"$OUT/atlas.html\" site/atlas.html","-          fi","-          {","-            echo '<!doctype html><meta charset=\"utf-8\"><title>flowmap pages<\/title><ul>'","-            [ -f site/atlas.html ] && echo '<li><a href=\"atlas.html\">atlas<\/a><\/li>'","-            for f in site/changes/*.html; do [ -e \"$f\" ] && n=$(basename \"$f\") && echo \"<li><a href=\\\"changes/$n\\\">${n%.html}<\/a><\/li>\"; done","-            echo '<\/ul>'","-          } > site/index.html","-","-      - name: Push","-        working-directory: site","-        run: |","-          git config user.name \"github-actions[bot]\"","-          git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"","-          git add -A","-          git diff --cached --quiet && exit 0","-          git commit -m \"flowmap pages from ${{ github.ref_name }}@${GITHUB_SHA::7}\"","-          git push origin gh-pages"],"symbols":[]},{"file":".gitignore","old":3,"new":3,"ctx":"__pycache__/","lines":[" /site/"," .fjall/","+","+# agent planning notes stay local","+/docs/superpowers/"],"symbols":[]},{"file":"LICENSE","old":0,"new":1,"ctx":"","lines":["+","+                                 Apache License","+                           Version 2.0, January 2004","+                        http://www.apache.org/licenses/","+","+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION","+","+   1. Definitions.","+","+      \"License\" shall mean the terms and conditions for use, reproduction,","+      and distribution as defined by Sections 1 through 9 of this document.","+","+      \"Licensor\" shall mean the copyright owner or entity authorized by","+      the copyright owner that is granting the License.","+","+      \"Legal Entity\" shall mean the union of the acting entity and all","+      other entities that control, are controlled by, or are under common","+      control with that entity. For the purposes of this definition,","+      \"control\" means (i) the power, direct or indirect, to cause the","+      direction or management of such entity, whether by contract or","+      otherwise, or (ii) ownership of fifty percent (50%) or more of the","+      outstanding shares, or (iii) beneficial ownership of such entity.","+","+      \"You\" (or \"Your\") shall mean an individual or Legal Entity","+      exercising permissions granted by this License.","+","+      \"Source\" form shall mean the preferred form for making modifications,","+      including but not limited to software source code, documentation","+      source, and configuration files.","+","+      \"Object\" form shall mean any form resulting from mechanical","+      transformation or translation of a Source form, including but","+      not limited to compiled object code, generated documentation,","+      and conversions to other media types.","+","+      \"Work\" shall mean the work of authorship, whether in Source or","+      Object form, made available under the License, as indicated by a","+      copyright notice that is included in or attached to the work","+      (an example is provided in the Appendix below).","+","+      \"Derivative Works\" shall mean any work, whether in Source or Object","+      form, that is based on (or derived from) the Work and for which the","+      editorial revisions, annotations, elaborations, or other modifications","+      represent, as a whole, an original work of authorship. For the purposes","+      of this License, Derivative Works shall not include works that remain","+      separable from, or merely link (or bind by name) to the interfaces of,","+      the Work and Derivative Works thereof.","+","+      \"Contribution\" shall mean any work of authorship, including","+      the original version of the Work and any modifications or additions","+      to that Work or Derivative Works thereof, that is intentionally","+      submitted to Licensor for inclusion in the Work by the copyright owner","+      or by an individual or Legal Entity authorized to submit on behalf of","+      the copyright owner. For the purposes of this definition, \"submitted\"","+      means any form of electronic, verbal, or written communication sent","+      to the Licensor or its representatives, including but not limited to","+      communication on electronic mailing lists, source code control systems,","+      and issue tracking systems that are managed by, or on behalf of, the","+      Licensor for the purpose of discussing and improving the Work, but","+      excluding communication that is conspicuously marked or otherwise","+      designated in writing by the copyright owner as \"Not a Contribution.\"","+","+      \"Contributor\" shall mean Licensor and any individual or Legal Entity","+      on behalf of whom a Contribution has been received by Licensor and","+      subsequently incorporated within the Work.","+","+   2. Grant of Copyright License. Subject to the terms and conditions of","+      this License, each Contributor hereby grants to You a perpetual,","+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable","+      copyright license to reproduce, prepare Derivative Works of,","+      publicly display, publicly perform, sublicense, and distribute the","+      Work and such Derivative Works in Source or Object form.","+","+   3. Grant of Patent License. Subject to the terms and conditions of","+      this License, each Contributor hereby grants to You a perpetual,","+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable","+      (except as stated in this section) patent license to make, have made,","+      use, offer to sell, sell, import, and otherwise transfer the Work,","+      where such license applies only to those patent claims licensable","+      by such Contributor that are necessarily infringed by their","+      Contribution(s) alone or by combination of their Contribution(s)","+      with the Work to which such Contribution(s) was submitted. If You","+      institute patent litigation against any entity (including a","+      cross-claim or counterclaim in a lawsuit) alleging that the Work","+      or a Contribution incorporated within the Work constitutes direct","+      or contributory patent infringement, then any patent licenses","+      granted to You under this License for that Work shall terminate","+      as of the date such litigation is filed.","+","+   4. Redistribution. You may reproduce and distribute copies of the","+      Work or Derivative Works thereof in any medium, with or without","+      modifications, and in Source or Object form, provided that You","+      meet the following conditions:","+","+      (a) You must give any other recipients of the Work or","+          Derivative Works a copy of this License; and","+","+      (b) You must cause any modified files to carry prominent notices","+          stating that You changed the files; and","+","+      (c) You must retain, in the Source form of any Derivative Works","+          that You distribute, all copyright, patent, trademark, and","+          attribution notices from the Source form of the Work,","+          excluding those notices that do not pertain to any part of","+          the Derivative Works; and","+","+      (d) If the Work includes a \"NOTICE\" text file as part of its","+          distribution, then any Derivative Works that You distribute must","+          include a readable copy of the attribution notices contained","+          within such NOTICE file, excluding those notices that do not","+          pertain to any part of the Derivative Works, in at least one","+          of the following places: within a NOTICE text file distributed","+          as part of the Derivative Works; within the Source form or","+          documentation, if provided along with the Derivative Works; or,","+          within a display generated by the Derivative Works, if and","+          wherever such third-party notices normally appear. The contents","+          of the NOTICE file are for informational purposes only and","+          do not modify the License. You may add Your own attribution","+          notices within Derivative Works that You distribute, alongside","+          or as an addendum to the NOTICE text from the Work, provided","+          that such additional attribution notices cannot be construed","+          as modifying the License.","+","+      You may add Your own copyright statement to Your modifications and","+      may provide additional or different license terms and conditions","+      for use, reproduction, or distribution of Your modifications, or","+      for any such Derivative Works as a whole, provided Your use,","+      reproduction, and distribution of the Work otherwise complies with","+      the conditions stated in this License.","+","+   5. Submission of Contributions. Unless You explicitly state otherwise,","+      any Contribution intentionally submitted for inclusion in the Work","+      by You to the Licensor shall be under the terms and conditions of","+      this License, without any additional terms or conditions.","+      Notwithstanding the above, nothing herein shall supersede or modify","+      the terms of any separate license agreement you may have executed","+      with Licensor regarding such Contributions.","+","+   6. Trademarks. This License does not grant permission to use the trade","+      names, trademarks, service marks, or product names of the Licensor,","+      except as required for reasonable and customary use in describing the","+      origin of the Work and reproducing the content of the NOTICE file.","+","+   7. Disclaimer of Warranty. Unless required by applicable law or","+      agreed to in writing, Licensor provides the Work (and each","+      Contributor provides its Contributions) on an \"AS IS\" BASIS,","+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or","+      implied, including, without limitation, any warranties or conditions","+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A","+      PARTICULAR PURPOSE. You are solely responsible for determining the","+      appropriateness of using or redistributing the Work and assume any","+      risks associated with Your exercise of permissions under this License.","+","+   8. Limitation of Liability. In no event and under no legal theory,","+      whether in tort (including negligence), contract, or otherwise,","+      unless required by applicable law (such as deliberate and grossly","+      negligent acts) or agreed to in writing, shall any Contributor be","+      liable to You for damages, including any direct, indirect, special,","+      incidental, or consequential damages of any character arising as a","+      result of this License or out of the use or inability to use the","+      Work (including but not limited to damages for loss of goodwill,","+      work stoppage, computer failure or malfunction, or any and all","+      other commercial damages or losses), even if such Contributor","+      has been advised of the possibility of such damages.","+","+   9. Accepting Warranty or Additional Liability. While redistributing","+      the Work or Derivative Works thereof, You may choose to offer,","+      and charge a fee for, acceptance of support, warranty, indemnity,","+      or other liability obligations and/or rights consistent with this","+      License. However, in accepting such obligations, You may act only","+      on Your own behalf and on Your sole responsibility, not on behalf","+      of any other Contributor, and only if You agree to indemnify,","+      defend, and hold each Contributor harmless for any liability","+      incurred by, or claims asserted against, such Contributor by reason","+      of your accepting any such warranty or additional liability.","+","+   END OF TERMS AND CONDITIONS","+","+   APPENDIX: How to apply the Apache License to your work.","+","+      To apply the Apache License to your work, attach the following","+      boilerplate notice, with the fields enclosed by brackets \"[]\"","+      replaced with your own identifying information. (Don't include","+      the brackets!)  The text should be enclosed in the appropriate","+      comment syntax for the file format. We also recommend that a","+      file or class name and description of purpose be included on the","+      same \"printed page\" as the copyright notice for easier","+      identification within third-party archives.","+","+   Copyright [yyyy] [name of copyright owner]","+","+   Licensed under the Apache License, Version 2.0 (the \"License\");","+   you may not use this file except in compliance with the License.","+   You may obtain a copy of the License at","+","+       http://www.apache.org/licenses/LICENSE-2.0","+","+   Unless required by applicable law or agreed to in writing, software","+   distributed under the License is distributed on an \"AS IS\" BASIS,","+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.","+   See the License for the specific language governing permissions and","+   limitations under the License."],"symbols":[]},{"file":"README.md","old":18,"new":18,"ctx":"Python 3.11+, no dependencies.","lines":[" | Python CLI | `if __name__ == \"__main__\"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |"," ","+## On a new machine","+","+Python 3.11+ and `git`. In Claude Code, inside any session:","+","+```","+/plugin marketplace add NelisVerhoef/flowmap","+/plugin install flowmap@flowmap","+```","+","+Claude Code clones over SSH when `ssh -T git@github.com` works, else over HTTPS; on a machine","+without a GitHub SSH key, `export CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` skips the probe.","+","+For `flowmap` in your own terminal too (the plugin's copy is only on Claude Code's PATH):","+","+```bash","+git clone https://github.com/NelisVerhoef/flowmap.git ~/src/flowmap","+echo 'export PATH=\"$HOME/src/flowmap/bin:$PATH\"' >> ~/.zshrc && exec zsh","+flowmap                          # prints the command list","+```","+","+To update: `git pull` in the clone, and `/plugin marketplace update flowmap` in Claude Code.","+The plugin only refreshes when `version` in `.claude-plugin/plugin.json` changes, so bump it","+on each release. The change viewer at `flowmap.testabl.ai` needs nothing on the machine.","+"," ## First time in a repo"," "],"symbols":[]},{"file":"README.md","old":119,"new":143,"ctx":"with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (se","lines":[" `flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node"," the builder emits.","+","+## License","+","+Apache 2.0, see [LICENSE](LICENSE)."],"symbols":[]},{"file":"docs/superpowers/plans/2026-10-05-language-neutral-callgraph.md","old":1,"new":0,"ctx":"","lines":["-# Language-neutral call graph (phase 1 of 3) Implementation Plan","-","-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.","-","-**Goal:** Split flowmap's Python-only call graph into a language-neutral core plus per-language builders. Remove every `.py` assumption from the code that uses the graph, so a TypeScript (Next.js) or Ruby (Rails) builder can be added later without touching lens, change, atlas or diagrams.","-","-**Architecture:** `flowmap/callgraph.py` keeps the `Graph` class and its walking API (`defs`, `edges`, `reverse`, `bases`, `callers`, `callees`, `reaches`, `edge_set`). It no longer parses anything. Instead it asks each builder in the new `flowmap/graphs/` package to parse the files with its suffixes, then merges the results. The existing Python AST code moves almost unchanged into `flowmap/graphs/python.py`. Graph sources come from a new `[code].graph` key in `flowmap.toml`, with `python` kept as an alias. A new `flowmap callgraph check` reports whether every entry point's handler is a graph node. That check is the acceptance test for the Next.js and Ruby builders in phases 2 and 3.","-","-**Tech Stack:** Python 3.11+ standard library only (`ast`, `tomllib`, `unittest`, `subprocess`). Fixture repos are built with git.","-","-**Spec:** The gap analysis in this session, summarized under *Background* below.","-","-## Global Constraints","-","-- Python 3.11+, **no third-party dependencies**. Tests use `unittest`, not pytest.","-- Modules import each other flat (`sys.path.insert(0, <flowmap dir>)`, then `import config`), the same way the existing tools do. Packages under `flowmap/` (`adapters/`, `graphs/`) use relative imports internally.","-- **No behaviour change for Python repos.** The golden outputs captured in Task 1 must stay byte-identical (lens) or JSON-equal (change facts, graph dumps) through every later task.","-- Node ids are always `repo/relative/file:Qual.name`. This is the spelling adapters use for handlers.","-- Match the existing style: dense code, short docstrings that say *why*, few inline comments, commit subjects like `area: lowercase summary`.","-- Do **not** regenerate anything under `docs/flowmap/`. The goldens read `docs/flowmap/map.json`, and the repo's own map is refreshed separately.","-","-## Background","-","-The Python-only parts of flowmap today:","-","-- `callgraph.Graph` parses `[code].python` with `ast`.","-- `lens.graph_at`, `atlas.overlay` and `diagrams.Diagrams` filter on `.py` and `python_roots()`.","-- `lens.main` skips non-`.py` symbols for Reach (`lens.py:286`) and gates Reach diff on `python_roots()` (`lens.py:321`).","-- `change.signature` is Python AST only.","-- `lens.defs` dispatches to `py_symbols`, or to regex fallbacks for Ruby and TypeScript.","-","-Phase 1 (this plan) makes all of these go through one builder registry. Phase 2 (a TypeScript builder through the target repo's `node_modules/typescript`) and phase 3 (a Ruby builder through Ruby's Ripper or Prism) each get their own plan once this one lands.","-","-## Review Focus","-","-1. **A file that doesn't parse at a git revision** (a syntax error at base or head). The graph skips it and `lens`, `change` and `callgraph dump` still run. Pinned in Task 2.","-2. **A repo with no graph roots configured.** `lens` runs and simply has no Reach section. Pinned in Task 3.","-3. **A graph root that doesn't exist at the revision being read** (a directory added in the PR). `git ls-tree` returns nothing, the graph is empty there, and nothing crashes. Pinned in Task 3.","-4. **Vendored code under a graph root** (`node_modules/`, `.venv/`). It stays out of the graph, so it doesn't swamp the by-name method matching. Pinned in Task 3.","-5. **A handler in a language with no builder yet** (a Next.js route next to a Python CLI). `callgraph check` reports it as *not graphed*, not *broken*, and exits 0. Pinned in Task 4.","-","----","-","-### Task 1: Test harness and golden outputs of today's behaviour","-","-**Files:**","-- Modify: `flowmap/callgraph.py` (the `__main__` block, add `dump`)","-- Create: `tests/__init__.py` (empty)","-- Create: `tests/helpers.py`","-- Create: `tests/test_golden.py`","-- Create: `tests/golden/lens-6d9eaff-770f1a7.md`, `tests/golden/change-facts-6d9eaff-770f1a7.json`, `tests/golden/graph-6d9eaff.json`, `tests/golden/graph-770f1a7.json` (generated)","-","-**Interfaces:**","-- Produces: `flowmap callgraph dump [<ref>]` prints `{\"defs\": {node: [start, end]}, \"edges\": [[a, b], ...]}` sorted, from `lens.graph_at(ref)` or, with no ref, the working-tree `Graph()`.","-- Produces: `tests.helpers.flowmap(*args, root=REPO) -> str`, `tests.helpers.fixture_repo(test, files) -> (Path, sha)`, `tests.helpers.commit(root, files, message=\"change\") -> sha`, `tests.helpers.cli_app(code='python = [\"tool\"]', extra=\"\") -> dict[str, str]`.","-","-- [ ] **Step 1: Add `dump` to the callgraph command**","-","-In `flowmap/callgraph.py`, replace the `if __name__ == \"__main__\":` block with:","-","-```python","-if __name__ == \"__main__\":","-    if sys.argv[1:2] == [\"dump\"]:","-        import lens  # late: lens imports this module","-        g = lens.graph_at(sys.argv[2]) if len(sys.argv) > 2 else Graph()","-        print(json.dumps({\"defs\": {k: list(v) for k, v in sorted(g.defs.items())},","-                          \"edges\": sorted([a, b] for a, b in g.edge_set())}, indent=1))","-        sys.exit(0)","-    g = Graph()","-    if sys.argv[1:2] == [\"impact\"]:","-        for nid in sys.argv[2:]:","-            hits = impact(g, nid)","-            flows = sorted({f for _, f in hits})","-            print(f\"{nid}: reachable from {len(hits)} endpoints in {len(flows)} flows: {', '.join(flows)}\")","-    else:","-        n_edges = sum(len(v) for v in g.edges.values())","-        print(f\"{len(g.defs)} definitions, {n_edges} edges\")","-```","-","-Run: `bin/flowmap callgraph dump 770f1a7 | head -5`","-Expected: JSON starting with `{` and `\"defs\": {` and node ids like `\"flowmap/atlas.py:...\"`.","-","-- [ ] **Step 2: Write the test helpers**","-","-`tests/__init__.py`: empty file.","-","-`tests/helpers.py`:","-","-```python","-\"\"\"Run flowmap as a user would (a subprocess per command, FLOWMAP_ROOT set) against this repo","-or a throwaway fixture repo. Subprocesses because config caches the repo root per process.\"\"\"","-","-import os","-import subprocess","-import sys","-import tempfile","-import textwrap","-from pathlib import Path","-","-REPO = Path(__file__).resolve().parent.parent","-FLOWMAP = REPO / \"bin\" / \"flowmap\"","-","-","-def flowmap(*args, root=REPO):","-    env = {**os.environ, \"FLOWMAP_ROOT\": str(root)}","-    r = subprocess.run([sys.executable, str(FLOWMAP), *args], cwd=root, env=env, capture_output=True, text=True)","-    if r.returncode:","-        raise AssertionError(f\"flowmap {' '.join(args)} exited {r.returncode}\\n{r.stdout}\\n{r.stderr}\")","-    return r.stdout","-","-","-def git(root, *args):","-    return subprocess.run([\"git\", \"-c\", \"user.name=flowmap\", \"-c\", \"user.email=flowmap@example.com\", *args],","-                          cwd=root, capture_output=True, text=True, check=True).stdout.strip()","-","-","-def commit(root, files, message=\"change\"):","-    for rel, text in files.items():","-        p = Path(root) / rel","-        p.parent.mkdir(parents=True, exist_ok=True)","-        p.write_text(textwrap.dedent(text).lstrip())","-    git(root, \"add\", \"-A\")","-    git(root, \"commit\", \"-qm\", message)","-    return git(root, \"rev-parse\", \"HEAD\")","-","-","-def fixture_repo(test, files):","-    \"\"\"A git repo holding `files`, deleted when the test ends. Returns (root, sha of that commit).\"\"\"","-    tmp = tempfile.TemporaryDirectory()","-    test.addCleanup(tmp.cleanup)","-    root = Path(tmp.name).resolve()  # macOS: /var -> /private/var, as config.root() resolves it","-    git(root, \"init\", \"-q\")","-    return root, commit(root, files, \"base\")","-","-","-def cli_app(code='python = [\"tool\"]', extra=\"\"):","-    \"\"\"A two-file Python CLI: `tool run` calls helpers.shout. `code` is the [code] body;","-    `extra` is more TOML placed before [code] (another [[entry]], say).\"\"\"","-    return {","-        \"flowmap.toml\": f'[[entry]]\\nadapter = \"cli\"\\nprog = \"tool\"\\ncommands = \"tool\"\\n{extra}\\n[code]\\n{code}\\n',","-        \"tool/run.py\": '''","-            from helpers import shout","-","-","-            def main():","-                print(shout(\"hi\"))","-","-","-            if __name__ == \"__main__\":","-                main()","-        ''',","-        \"tool/helpers.py\": '''","-            def shout(s):","-                return s.upper()","-        ''',","-        \"docs/flowmap/map.json\": '{\"flows\": [], \"runs\": []}\\n',","-    }","-```","-","-- [ ] **Step 3: Write the golden test (it fails because there are no goldens yet)**","-","-`tests/test_golden.py`:","-","-```python","-\"\"\"Characterisation: flowmap's output on this repo's own history must not move while the call","-graph is restructured. Regenerate only on purpose (python3 -m tests.test_golden --regen) and","-read the diff: a changed golden is a behaviour change.\"\"\"","-","-import json","-import sys","-import unittest","-","-from tests.helpers import REPO, flowmap","-","-GOLDEN = REPO / \"tests\" / \"golden\"","-BASE, HEAD = \"6d9eaff\", \"770f1a7\"","-","-","-def facts(text):","-    fx = json.loads(text)","-    fx[\"symbols\"] = sorted(fx[\"symbols\"], key=lambda s: s[\"id\"])  # built from a set: order varies per run","-    return fx","-","-","-CASES = {","-    f\"lens-{BASE}-{HEAD}.md\": lambda: flowmap(\"lens\", BASE, HEAD),","-    f\"change-facts-{BASE}-{HEAD}.json\": lambda: flowmap(\"change\", BASE, HEAD, \"--facts\"),","-    f\"graph-{BASE}.json\": lambda: flowmap(\"callgraph\", \"dump\", BASE),","-    f\"graph-{HEAD}.json\": lambda: flowmap(\"callgraph\", \"dump\", HEAD),","-}","-","-","-class GoldenTest(unittest.TestCase):","-    def test_lens(self):","-        name = f\"lens-{BASE}-{HEAD}.md\"","-        self.assertEqual(CASES[name](), (GOLDEN / name).read_text())","-","-    def test_change_facts(self):","-        name = f\"change-facts-{BASE}-{HEAD}.json\"","-        self.assertEqual(facts(CASES[name]()), facts((GOLDEN / name).read_text()))","-","-    def test_graph_dumps(self):","-        for ref in (BASE, HEAD):","-            name = f\"graph-{ref}.json\"","-            with self.subTest(ref=ref):","-                self.assertEqual(json.loads(CASES[name]()), json.loads((GOLDEN / name).read_text()))","-","-","-if __name__ == \"__main__\" and \"--regen\" in sys.argv:","-    GOLDEN.mkdir(exist_ok=True)","-    for name, run in CASES.items():","-        (GOLDEN / name).write_text(run())","-        print(f\"wrote tests/golden/{name}\")","-```","-","-Run: `python3 -m unittest tests.test_golden -v`","-Expected: FAIL / ERROR with `FileNotFoundError` for `tests/golden/...`.","-","-- [ ] **Step 4: Generate the goldens from today's code**","-","-Run: `python3 -m tests.test_golden --regen`","-Expected: four `wrote tests/golden/...` lines. `tests/golden/lens-6d9eaff-770f1a7.md` starts with `# Flow lens: \\`6d9eaff..770f1a7\\`` and has `## Reach (call graph, deterministic)` and `## Reach diff (call graph, base \u2192 head)` sections.","-","-- [ ] **Step 5: Run the goldens twice to prove they are stable**","-","-Run: `python3 -m unittest tests.test_golden -v && python3 -m unittest tests.test_golden -v`","-Expected: 3 tests pass both times. If a test fails only on the second run, the output depends on set ordering. Sort that field in `facts()` the same way `symbols` is sorted, then regenerate.","-","-- [ ] **Step 6: Commit**","-","-```bash","-git add flowmap/callgraph.py tests/","-git commit -m \"tests: golden lens, change facts and graph dumps; callgraph dump\"","-```","-","----","-","-### Task 2: Builder registry and the Python builder; `Graph` becomes language-neutral","-","-**Files:**","-- Create: `flowmap/graphs/__init__.py`","-- Create: `flowmap/graphs/part.py`","-- Create: `flowmap/graphs/python.py`","-- Modify: `flowmap/callgraph.py` (whole file except `endpoint_flows`, `impact` and `__main__`)","-- Modify: `flowmap/lens.py:47-65` (delete `py_symbols`), `flowmap/lens.py:97-101` (`defs`)","-- Modify: `flowmap/change.py:839-855` (`signature`) and its call site at `flowmap/change.py:883`","-- Test: `tests/test_graphs.py`","-","-**Interfaces:**","-- Consumes: `config.module_name(rel)`, `adapters.cli.main_guard(tree)`.","-- Produces:","-  - `graphs.Part(defs: dict[str, tuple[int, int]], edges: dict[str, set[str]], bases: dict[str, set[str]])`","-  - `graphs.BUILDERS: list[module]`","-  - `graphs.builder_for(rel: str) -> module | None`","-  - `graphs.suffixes() -> tuple[str, ...]`","-  - Each builder module has:","-    - `EXT: tuple[str, ...]`","-    - `build(files: list[str], read: Callable[[str], str | None]) -> Part`","-    - `symbols(text: str) -> list[tuple[int, int, str]]`","-    - `signature(text: str, sym: str) -> str | None`","-  - `callgraph.Graph(read=None, files=None)` keeps its public attributes and methods unchanged.","-","-- [ ] **Step 1: Write the failing tests**","-","-`tests/test_graphs.py`:","-","-```python","-import json","-import sys","-import unittest","-","-from tests.helpers import REPO, cli_app, fixture_repo, flowmap","-","-sys.path.insert(0, str(REPO / \"flowmap\"))","-import graphs  # noqa: E402","-","-","-class RegistryTest(unittest.TestCase):","-    def test_builder_dispatch_by_suffix(self):","-        self.assertIs(graphs.builder_for(\"app/x.py\"), graphs.python)","-        self.assertIsNone(graphs.builder_for(\"app/page.tsx\"))","-        self.assertIn(\".py\", graphs.suffixes())","-","-    def test_python_symbols_and_signature(self):","-        text = \"class A:\\n    def m(self, x=1):\\n        pass\\n\"","-        self.assertEqual(graphs.python.symbols(text), [(1, 3, \"A\"), (2, 3, \"A.m\")])","-        self.assertEqual(graphs.python.signature(text, \"A.m\"), \"self, x=1\")","-        self.assertIsNone(graphs.python.signature(text, \"A\"))","-","-","-class PythonBuilderTest(unittest.TestCase):","-    def test_unparseable_file_is_skipped(self):","-        files = cli_app()","-        files[\"tool/broken.py\"] = \"def oops(:\\n\"","-        root, base = fixture_repo(self, files)","-        for args in ((\"callgraph\", \"dump\", base), (\"callgraph\", \"dump\")):","-            with self.subTest(args=args):","-                g = json.loads(flowmap(*args, root=root))","-                self.assertIn([\"tool/run.py:main\", \"tool/helpers.py:shout\"], g[\"edges\"])","-                self.assertIn([\"tool/run.py:__main__\", \"tool/run.py:main\"], g[\"edges\"])","-                self.assertFalse([d for d in g[\"defs\"] if d.startswith(\"tool/broken.py\")])","-```","-","-Run: `python3 -m unittest tests.test_graphs -v`","-Expected: ERROR `ModuleNotFoundError: No module named 'graphs'`. (`PythonBuilderTest` already describes today's behaviour. It's there to guard the move.)","-","-- [ ] **Step 2: Create `flowmap/graphs/part.py`**","-","-```python","-from collections import defaultdict","-from dataclasses import dataclass, field","-","-","-@dataclass","-class Part:","-    \"\"\"One builder's share of the graph.\"\"\"","-    defs: dict = field(default_factory=dict)                   # node id -> (first line, last line)","-    edges: dict = field(default_factory=lambda: defaultdict(set))  # node id -> {node ids it can call}","-    bases: dict = field(default_factory=dict)                  # class node id -> {base class names}","-```","-","-- [ ] **Step 3: Create `flowmap/graphs/__init__.py`**","-","-```python","-\"\"\"Call-graph builders: one per language, all spelling nodes the same way.","-","-A builder module exposes:","-    EXT = (\".py\",)                                  # file suffixes it parses","-    build(files, read) -> Part                      # definitions, call edges, classes","-    symbols(text) -> [(start, end, \"Qual.name\")]    # places diff lines on definitions","-    signature(text, \"Qual.name\") -> str | None      # a def's parameters, for contract changes","-","-Node ids are \"repo/relative/file:Qual.name\", the spelling adapters use for handlers, so every","-entry point's handler is a node the graph can walk from (`flowmap callgraph check` says which","-are not). `read(rel) -> text | None` lets a builder parse any git revision.","-\"\"\"","-","-from . import python","-from .part import Part  # noqa: F401","-","-BUILDERS = [python]","-","-","-def builder_for(rel):","-    return next((b for b in BUILDERS if rel.endswith(b.EXT)), None)","-","-","-def suffixes():","-    return tuple(s for b in BUILDERS for s in b.EXT)","-```","-","-- [ ] **Step 4: Create `flowmap/graphs/python.py` by moving code out of `callgraph.py` and `lens.py`**","-","-Move the bodies over verbatim. The only changes are the ones listed after the code:","-","-```python","-\"\"\"Python: the standard library's AST, resolved by what it can see.","-","-- `f()` / `mod.f()` / `from x import f` -> exact edge.","-- `obj.method()` where obj's type is unknown -> an edge to EVERY app method of that","-  name (over-approximates; capped by AMBIGUOUS so `.get()` doesn't connect everything).","-- a function referenced without being called (`Depends(f)`, `run_in_background(f)`,","-  callbacks) -> edge, since it will be called by someone on our behalf.","-- a script's `if __name__ == \"__main__\":` block -> node `file:__main__` (CLI entry points).","-Missed on purpose: string/registry dispatch (system workflows by name, block registry).","-\"\"\"","-","-import ast","-from collections import defaultdict","-","-import config","-from adapters.cli import main_guard","-","-from .part import Part","-","-EXT = (\".py\",)","-AMBIGUOUS = 6  # an obj.method() matching more app methods than this is too generic to follow","-","-","-def build(files, read):","-    b = _Builder(files, read)","-    return Part(defs=b.defs, edges=b.edges, bases=b.bases)","-","-","-def symbols(text):","-    \"\"\"[(start, end, 'Class.method' or 'fn')] innermost-last.\"\"\"","-    # body: lens.py py_symbols, lines 49-65, unchanged","-","-","-def signature(text, sym):","-    \"\"\"Argument list of a def, for spotting contract changes.\"\"\"","-    # body: change.py signature, lines 841-855, unchanged","-","-","-class _Builder:","-    def __init__(self, files, read):","-        self.defs = {}                          # \"rel:Qual.name\" -> (lineno, end)","-        self.by_module = defaultdict(dict)      # module -> {top-level name: node id}","-        self.methods = defaultdict(set)         # method name -> {node ids}","-        self.bases = {}                         # class node id -> {base class names}","-        self.edges = defaultdict(set)","-        self.packages = {config.module_name(rel).split(\".\")[0] for rel in files}","-        trees = {}","-        for rel in files:","-            text = read(rel)","-            if text is None:","-                continue","-            try:","-                trees[rel] = ast.parse(text)","-            except (SyntaxError, ValueError):","-                continue","-            self._collect(rel, trees[rel])","-        for rel, tree in trees.items():","-            self._link(rel, tree)","-","-    # _collect, _imports, _link, _one_interface: moved from callgraph.Graph unchanged,","-    # except `module_of(rel)` becomes `config.module_name(rel)` (3 places).","-```","-","-The actual file has the real bodies wherever the comments above say \"body: \u2026\" or \"moved \u2026\". Copy each one character for character. The only edits are:","-","-- `module_of(rel)` \u2192 `config.module_name(rel)`","-- the `read`/parse loop shown above, which skips `None` the same way the old default reader's `FileNotFoundError` did, and also skips `ValueError` for files with null bytes.","-","-`AMBIGUOUS` is used inside `_link`, which now lives in this module, so it moves here.","-","-- [ ] **Step 5: Rewrite `flowmap/callgraph.py` as the language-neutral core**","-","-Replace everything above `@cache def endpoint_flows` with the code below. Keep `endpoint_flows`, `impact` and the Task 1 `__main__` block.","-","-```python","-\"\"\"Static call graph of the app, for deterministic impact: which entry points can reach a symbol.","-","-Language-neutral: each builder in graphs/ parses its language into node ids","-\"repo/relative/file:Qual.name\" (the spelling adapters use for handlers) and call edges, and","-this merges them into one graph to walk. What a builder resolves, and what it misses on","-purpose, is in its own docstring.","-","-    flowmap callgraph                       definitions and edges in the working tree","-    flowmap callgraph impact <file:sym>...  which entry points (and flows) can reach a symbol","-    flowmap callgraph dump [<ref>]          the graph as JSON, at a git revision or the working tree","-\"\"\"","-","-import json","-import sys","-from collections import defaultdict, deque","-from functools import cache","-from pathlib import Path","-","-sys.path.insert(0, str(Path(__file__).parent))","-import config  # noqa: E402","-import graphs  # noqa: E402","-","-ROOT = config.root()","-","-","-def _read_worktree(rel):","-    p = ROOT / rel","-    return p.read_text(errors=\"replace\") if p.is_file() else None","-","-","-class Graph:","-    def __init__(self, read=None, files=None):","-        \"\"\"`read`/`files` let callers build the graph at any git revision; by default it is the","-        working tree's graph sources.\"\"\"","-        read = read or _read_worktree","-        if files is None:","-            files = [p.relative_to(ROOT).as_posix() for d in config.python_roots() for p in (ROOT / d).rglob(\"*.py\")]","-        self.defs, self.edges, self.bases = {}, defaultdict(set), {}","-        for builder in graphs.BUILDERS:","-            mine = [f for f in files if f.endswith(builder.EXT)]","-            if not mine:","-                continue","-            part = builder.build(mine, read)","-            self.defs.update(part.defs)","-            self.bases.update(part.bases)","-            for a, bs in part.edges.items():","-                self.edges[a] |= bs","-        self.reverse = defaultdict(set)","-        for a, bs in self.edges.items():","-            for b in bs:","-                self.reverse[b].add(a)","-","-    # callers, callees, _closure, edge_set, reaches: unchanged from the old Graph","-```","-","-(Copy `callers`, `callees`, `_closure`, `edge_set` and `reaches` over unchanged. Delete `module_of`, `AMBIGUOUS`, `_collect`, `_imports`, `_link`, `_one_interface`, and the imports `ast` and `from adapters.cli import main_guard`. The `files is None` default is temporary; Task 3 replaces it with `config.graph_files()`.)","-","-- [ ] **Step 6: Point `lens.defs` and `change.signature` at the builders**","-","-In `flowmap/lens.py`, delete `py_symbols` (lines 47-65), add `import graphs  # noqa: E402` next to the other flat imports, and replace `defs`:","-","-```python","-def defs(rel, text):","-    \"\"\"[(start, end, name)] for any supported language: its graph builder's parser if it has","-    one, else a regex outline.\"\"\"","-    if not text:","-        return []","-    builder = graphs.builder_for(rel)","-    if builder:","-        return builder.symbols(text)","-    return rb_symbols(text) if rel.endswith(\".rb\") else ts_symbols(text)","-```","-","-If `main_guard` is no longer used in `lens.py`, remove its import.","-","-In `flowmap/change.py`, add `import graphs  # noqa: E402` next to `import lens`, drop `import ast`, and replace `signature`:","-","-```python","-def signature(rel, text, sym):","-    \"\"\"A def's parameter list, for spotting contract changes (None where no builder parses rel).\"\"\"","-    builder = graphs.builder_for(rel)","-    return builder.signature(text, sym) if builder else None","-```","-","-Then update its call site (around `change.py:883`):","-","-```python","-            sig_b, sig_h = signature(rel, base_text, s), signature(rel, head_text, s)","-```","-","-- [ ] **Step 7: Run all the tests**","-","-Run: `python3 -m unittest discover -s tests -t . -v`","-Expected: all pass, including the 3 golden tests (the Python output is unchanged).","-","-- [ ] **Step 8: Smoke-test the commands that build the graph from the working tree**","-","-Run: `bin/flowmap callgraph && bin/flowmap callgraph impact flowmap/callgraph.py:Graph.callers`","-Expected: a `N definitions, M edges` line (the numbers differ from before because the code moved), and an impact line that lists flows. No traceback.","-","-- [ ] **Step 9: Commit**","-","-```bash","-git add flowmap/graphs flowmap/callgraph.py flowmap/lens.py flowmap/change.py tests/test_graphs.py","-git commit -m \"callgraph: language-neutral core over per-language builders; python builder\"","-```","-","----","-","-### Task 3: `[code].graph` roots, and no `.py` assumptions in lens, atlas and diagrams","-","-**Files:**","-- Modify: `flowmap/config.py` (docstring, `load`, replace `python_roots` with `graph_roots`, add `graph_files`, `app_dirs`)","-- Modify: `flowmap/callgraph.py` (`Graph.__init__` default files)","-- Modify: `flowmap/lens.py:135-170` (`importers`, `graph_at`), `flowmap/lens.py:286`, `flowmap/lens.py:321`","-- Modify: `flowmap/atlas.py:18,82-85` (use `lens.graph_at`, drop the `Graph` import)","-- Modify: `flowmap.toml` (this repo: `python` \u2192 `graph`)","-- Modify: `skills/flowmap-build/SKILL.md:17`","-- Test: `tests/test_graph_roots.py`","-","-**Interfaces:**","-- Consumes: `graphs.suffixes()` from Task 2.","-- Produces:","-  - `config.graph_roots() -> list[str]`: `[code].graph` followed by `[code].python`, deduplicated.","-  - `config.graph_files(ref: str | None = None) -> list[str]`: repo-relative files under the graph roots that some builder parses, at `ref` or in the working tree, with vendored directories skipped.","-  - `config.python_roots` is removed.","-","-- [ ] **Step 1: Write the failing tests**","-","-`tests/test_graph_roots.py`:","-","-```python","-import json","-import unittest","-","-from tests.helpers import cli_app, commit, fixture_repo, flowmap","-","-REACH = \"- `tool/helpers.py:shout` \u2014 reachable from 1 endpoints in 0 flows\"","-","-","-class GraphRootsTest(unittest.TestCase):","-    def lens_after_editing_helper(self, code):","-        root, base = fixture_repo(self, cli_app(code))","-        head = commit(root, {\"tool/helpers.py\": \"def shout(s):\\n    return s.upper() + '!'\\n\"})","-        return flowmap(\"lens\", base, head, root=root)","-","-    def test_graph_key_drives_reach(self):","-        self.assertIn(REACH, self.lens_after_editing_helper('graph = [\"tool\"]'))","-","-    def test_python_key_still_works(self):","-        self.assertIn(REACH, self.lens_after_editing_helper('python = [\"tool\"]'))","-","-    def test_no_graph_roots_means_no_reach(self):","-        out = self.lens_after_editing_helper('tests = []')","-        self.assertIn(\"# Flow lens:\", out)","-        self.assertNotIn(\"## Reach\", out)","-","-    def test_vendored_dirs_and_missing_roots_stay_out(self):","-        files = cli_app('graph = [\"tool\", \"later\"]')","-        files[\"tool/node_modules/dep/index.py\"] = \"def vendored():\\n    pass\\n\"","-        files[\"tool/.venv/lib/site.py\"] = \"def vendored():\\n    pass\\n\"","-        root, base = fixture_repo(self, files)","-        for args in ((\"callgraph\", \"dump\", base), (\"callgraph\", \"dump\")):","-            with self.subTest(args=args):","-                defs = json.loads(flowmap(*args, root=root))[\"defs\"]","-                self.assertIn(\"tool/helpers.py:shout\", defs)","-                self.assertEqual([d for d in defs if \"node_modules\" in d or \".venv\" in d], [])","-```","-","-Run: `python3 -m unittest tests.test_graph_roots -v`","-Expected: `test_graph_key_drives_reach` FAILS (no Reach line, because `graph` is ignored), and `test_vendored_dirs_and_missing_roots_stay_out` FAILS (`graph` ignored, so `defs` is empty). The other two pass.","-","-- [ ] **Step 2: Add graph roots and graph files to `flowmap/config.py`**","-","-In the module docstring, replace the `python = [...]` line with:","-","-```","-    graph = [\"backend/app\", \"web/src\"]         # call-graph sources (deterministic reach); `python` is the old name","-```","-","-In `load()`, change the `for k in (\"python\", \"tests\", \"other\"):` line to:","-","-```python","-    for k in (\"graph\", \"python\", \"tests\", \"other\"):","-```","-","-Replace `python_roots()` with:","-","-```python","-VENDORED = {\"node_modules\", \".venv\", \"venv\", \"__pycache__\", \".next\", \"vendor\"}","-","-","-def graph_roots():","-    \"\"\"Directories the call graph is built from: [code].graph, plus its old name `python`.\"\"\"","-    code = load()[\"code\"]","-    return list(dict.fromkeys(code[\"graph\"] + code[\"python\"]))","-","-","-def graph_files(ref=None):","-    \"\"\"Files under graph_roots() that some call-graph builder parses: at a git revision, or in","-    the working tree (untracked files included) when ref is None. Vendored dirs never count.\"\"\"","-    import graphs  # late: graphs imports config","-    roots, ext = graph_roots(), graphs.suffixes()","-    if not roots:","-        return []","-    if ref:","-        listed = subprocess.run([\"git\", \"ls-tree\", \"-r\", \"--name-only\", ref, \"--\", *roots], cwd=root(),","-                                capture_output=True, text=True, check=True).stdout.splitlines()","-    else:","-        listed = [p.relative_to(root()).as_posix() for d in roots for p in sorted((root() / d).rglob(\"*\"))","-                  if p.is_file()]","-    return [f for f in dict.fromkeys(listed) if f.endswith(ext) and not VENDORED.intersection(f.split(\"/\"))]","-```","-","-In `app_dirs()`, change the first line of the body that builds `dirs` to:","-","-```python","-    dirs = graph_roots() + list(cfg[\"code\"][\"other\"])","-```","-","-- [ ] **Step 3: Use `graph_files` everywhere the graph is built**","-","-`flowmap/callgraph.py`, `Graph.__init__`: replace the temporary default with:","-","-```python","-        files = config.graph_files() if files is None else files","-```","-","-`flowmap/lens.py`, `graph_at`:","-","-```python","-def graph_at(ref):","-    \"\"\"The static call graph of the graph roots as they are at `ref`.\"\"\"","-    return Graph(read=lambda rel: show(ref, rel) or \"\", files=config.graph_files(ref))","-```","-","-`flowmap/lens.py`, `importers`: change `where = config.python_roots() or [\".\"]` to `where = config.graph_roots() or [\".\"]`.","-","-`flowmap/lens.py`, in the Reach loop (line 286): change","-","-```python","-        if c not in graph.defs or not c.endswith(\".py\") and \".py:\" not in c:","-```","-","-to","-","-```python","-        if c not in graph.defs:","-```","-","-`flowmap/lens.py`, line 321: change `if config.python_roots():` to `if config.graph_roots():`.","-","-`flowmap/atlas.py`, in `overlay`, replace the three lines from `roots = config.python_roots()` to `g = Graph(...)` with:","-","-```python","-    g = lens.graph_at(head)","-```","-","-and delete `from callgraph import Graph  # noqa: E402` (nothing else in atlas uses it).","-","-`flowmap/diagrams.py` needs no change: `Graph()` now defaults to `config.graph_files()`.","-","-Run: `grep -n \"python_roots\\|endswith(\\\".py\\\")\" flowmap/*.py`","-Expected: no hits in `config.py`, `callgraph.py`, `lens.py`, `atlas.py` or `diagrams.py`. Hits in `adapters/` (CLI and FastAPI adapters, which are legitimately Python) and in `reconcile.py:100` (CLI module names for test detection) are fine.","-","-- [ ] **Step 4: Switch this repo and the build skill to the new key**","-","-`flowmap.toml`: change `python = [\"flowmap\"]` to `graph = [\"flowmap\"]`.","-","-`skills/flowmap-build/SKILL.md:17`: change `and, for Python, \\`python = [...]\\`` to `and \\`graph = [...]\\` (the app's source dirs the call graph is built from; Python today)`.","-","-- [ ] **Step 5: Run all the tests**","-","-Run: `python3 -m unittest discover -s tests -t . -v`","-Expected: all pass. The goldens stay unchanged even though this repo now uses `graph`, which shows the new key is equivalent.","-","-- [ ] **Step 6: Smoke-test atlas and diagrams without overwriting committed docs**","-","-Run: `bin/flowmap atlas --pr '6d9eaff..770f1a7=PR #1' && bin/flowmap diagrams && git status --short docs/flowmap && git checkout -- docs/flowmap`","-Expected: `wrote docs/flowmap/atlas.html (\u2026, 1 overlays)` and the diagrams output with no traceback. Then `git checkout` discards the regenerated docs. The repo's own map is refreshed separately.","-","-- [ ] **Step 7: Commit**","-","-```bash","-git add flowmap/config.py flowmap/callgraph.py flowmap/lens.py flowmap/atlas.py flowmap.toml skills/flowmap-build/SKILL.md tests/test_graph_roots.py","-git commit -m \"config: [code].graph roots; lens, atlas and diagrams build the graph from any language\"","-```","-","----","-","-### Task 4: `flowmap callgraph check`, which tells you whether handlers and graph nodes agree","-","-**Files:**","-- Modify: `flowmap/callgraph.py` (add `classify`, a `check` branch in `__main__`, docstring line)","-- Modify: `bin/flowmap` (docstring)","-- Modify: `README.md` (the *Adding a stack* section)","-- Test: `tests/test_check.py`","-","-**Interfaces:**","-- Consumes: `config.graph_files()`, `graphs.builder_for`, `inventory.endpoints()`.","-- Produces:","-  - `callgraph.classify(eps: list[dict], defs: dict, parsed: set[str]) -> {\"node\": [...], \"not graphed\": [...], \"broken\": [...]}`","-  - `flowmap callgraph check` exits 1 if anything is broken. Phases 2 and 3 use it as their acceptance test.","-","-- [ ] **Step 1: Write the failing tests**","-","-`tests/test_check.py`:","-","-```python","-import sys","-import unittest","-","-from tests.helpers import REPO, cli_app, fixture_repo, flowmap","-","-sys.path.insert(0, str(REPO / \"flowmap\"))","-import callgraph  # noqa: E402","-","-NEXT_ROUTE = \"export async function GET() {\\n  return Response.json({ ok: true })\\n}\\n\"","-","-","-class ClassifyTest(unittest.TestCase):","-    def test_sorts_handlers_by_whether_the_graph_can_walk_from_them(self):","-        eps = [{\"endpoint\": \"A\", \"handler\": \"a.py:f\"}, {\"endpoint\": \"B\", \"handler\": \"a.py:g\"},","-               {\"endpoint\": \"C\", \"handler\": \"b.ts:GET\"}]","-        got = callgraph.classify(eps, {\"a.py:f\": (1, 2)}, {\"a.py\"})","-        self.assertEqual({k: [e[\"endpoint\"] for e in v] for k, v in got.items()},","-                         {\"node\": [\"A\"], \"not graphed\": [\"C\"], \"broken\": [\"B\"]})","-","-","-class CheckCommandTest(unittest.TestCase):","-    def test_python_handlers_resolve(self):","-        root, _ = fixture_repo(self, cli_app('graph = [\"tool\"]'))","-        out = flowmap(\"callgraph\", \"check\", root=root)","-        self.assertIn(\"1 entry points: 1 handlers are graph nodes, 0 not graphed, 0 broken\", out)","-","-    def test_handler_without_builder_is_not_graphed_not_broken(self):","-        files = cli_app('graph = [\"tool\"]', extra='\\n[[entry]]\\nadapter = \"nextjs\"\\nroot = \"web\"\\n')","-        files[\"web/next.config.js\"] = \"module.exports = {}\\n\"","-        files[\"web/app/api/ping/route.ts\"] = NEXT_ROUTE","-        root, _ = fixture_repo(self, files)","-        out = flowmap(\"callgraph\", \"check\", root=root)  # raises if it exits non-zero","-        self.assertIn(\"2 entry points: 1 handlers are graph nodes, 1 not graphed, 0 broken\", out)","-        self.assertIn(\"NOT GRAPHED GET /api/ping -> web/app/api/ping/route.ts:GET (no builder for .ts)\", out)","-```","-","-Run: `python3 -m unittest tests.test_check -v`","-Expected: `AttributeError: module 'callgraph' has no attribute 'classify'`, and the command tests fail because `check` falls through to the stats line.","-","-- [ ] **Step 2: Add `classify` and the `check` branch to `flowmap/callgraph.py`**","-","-Add after `impact`:","-","-```python","-def classify(eps, defs, parsed):","-    \"\"\"Can the graph walk from each entry point's handler? 'node': yes. 'not graphed': its file","-    is outside the graph roots or no builder parses that language yet (expected, not a fault).","-    'broken': the file is parsed but has no such node, so the adapter and the builder spell the","-    handler differently, and every reach number for that entry point is silently zero.\"\"\"","-    out = {\"node\": [], \"not graphed\": [], \"broken\": []}","-    for e in eps:","-        h = e[\"handler\"]","-        out[\"node\" if h in defs else \"broken\" if h.rsplit(\":\", 1)[0] in parsed else \"not graphed\"].append(e)","-    return out","-```","-","-In `__main__`, add this branch right after the `dump` branch, before `g = Graph()`:","-","-```python","-    if sys.argv[1:2] == [\"check\"]:","-        import inventory","-        files = config.graph_files()","-        eps = inventory.endpoints()","-        got = classify(eps, Graph(files=files).defs, set(files))","-        print(f\"{len(eps)} entry points: {len(got['node'])} handlers are graph nodes, \"","-              f\"{len(got['not graphed'])} not graphed, {len(got['broken'])} broken\")","-        for e in got[\"not graphed\"]:","-            rel = e[\"handler\"].rsplit(\":\", 1)[0]","-            why = f\"no builder for {Path(rel).suffix or rel}\" if graphs.builder_for(rel) is None else \"outside [code].graph\"","-            print(f\"  NOT GRAPHED {e['endpoint']} -> {e['handler']} ({why})\")","-        for e in got[\"broken\"]:","-            print(f\"  BROKEN {e['endpoint']} -> {e['handler']} (file is parsed, no such node)\")","-        sys.exit(1 if got[\"broken\"] else 0)","-```","-","-Add this line to the module docstring's usage block:","-","-```","-    flowmap callgraph check                 is every entry point's handler a node the graph can walk from?","-```","-","-- [ ] **Step 3: Run the tests**","-","-Run: `python3 -m unittest tests.test_check -v`","-Expected: 3 pass.","-","-- [ ] **Step 4: Run `check` on this repo**","-","-Run: `bin/flowmap callgraph check`","-Expected: `8 entry points: 8 handlers are graph nodes, 0 not graphed, 0 broken`, exit 0. (All 8 are `CLI flowmap <cmd>` with `file:__main__` handlers.)","-","-- [ ] **Step 5: Update the docs**","-","-`bin/flowmap` docstring: replace the `flowmap callgraph impact <file:sym>   which entry points can reach a symbol (Python)` line with:","-","-```","-  flowmap callgraph impact <file:sym>   which entry points can reach a symbol","-  flowmap callgraph check               is every entry point's handler a call-graph node?","-```","-","-`README.md`, *Adding a stack* section: replace the paragraph with:","-","-```markdown","-Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{\"endpoint\", \"handler\", \"line\",","-\"aliases\"?}]`, register it in `adapters/__init__.py`, and add its guidance to `STACK` in","-`flowmap/brief.py`. The `endpoint` string is the join key between passes, so derive it from code,","-never from a model.","-","-For deterministic reach, the language also needs a call-graph builder: `flowmap/graphs/<lang>.py`","-with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (see","-`graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then","-`flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node","-the builder emits.","-```","-","-- [ ] **Step 6: Run the full suite and commit**","-","-Run: `python3 -m unittest discover -s tests -t . -v`","-Expected: all pass.","-","-```bash","-git add flowmap/callgraph.py bin/flowmap README.md tests/test_check.py","-git commit -m \"callgraph: check that every entry point's handler is a graph node\"","-```","-","----","-","-## Follow-on plans (not in this plan)","-","-- **Phase 2, the TypeScript/Next.js builder** (`graphs/typescript.py`). It runs `node` with the target repo's `node_modules/typescript` (`ts.createSourceFile`, syntax only) and passes file contents in as JSON on stdin. It resolves ES imports exactly, including `tsconfig` `paths` and barrel re-exports. JSX `<Comp/>` counts as a call, and a reference that isn't called (`action={fn}`) counts as an edge. Node ids must match the adapter's `rel:GET` and `rel:<DefaultName>`. Done when `callgraph check` reports 0 broken on a Next.js fixture app.","-- **Phase 3, the Ruby/Rails builder** (`graphs/ruby.py`). It runs `ruby` with Ripper or Prism. Constants resolve to files by Zeitwerk naming. A bare `foo` resolves through the class, its concerns and its superclass. `before_action :x` becomes edges from every action, and `perform_later` becomes an edge to `#perform`. This phase also settles the handler spelling: today the Rails adapter emits `controller.rb:action` but the builder will naturally emit `UsersController.action`."],"symbols":[]}]},"story":{"title":"flowmap is ready to publish as an Apache 2.0 repo","pr":"PR #6","url":"https://github.com/NelisVerhoef/Flowmap/pull/6","intent":"Prepare the repo to be made public, so the plugin installs on any machine without GitHub credentials, and people can find and use flowmap and the Fjall deploy behind it.","delta":"No flow, step, symbol or call edge moves: the CLI is untouched. The repo gains an Apache 2.0 license, loses the GitHub Pages workflow that the hosted viewer replaced in PR #5, and loses the agent planning notes. The README gets setup steps for a new machine that assume a public repo. Making the repo public is a separate step, done by hand in GitHub settings."},"chapters":[{"title":"flowmap is licensed Apache 2.0","role":"core","kind":"license","symbols":[],"files":["LICENSE",".claude-plugin/plugin.json","README.md"],"before":"No license: a public repo would be readable, but nobody could legally use, copy or change it.","after":"LICENSE holds the unmodified Apache 2.0 text from apache.org. plugin.json declares `\"license\": \"Apache-2.0\"` and the repository URL, and the README ends with a License section.","claim":"Anyone can use, change and ship flowmap, with an explicit patent grant.","why":"This decides whether someone who finds the repo can adopt it at work. Apache 2.0's patent grant is what company legal teams usually ask for.","questions":[{"q":"Should flowmap also ship a NOTICE file, which Apache 2.0 asks redistributors to carry forward?","why":"Only matters if you want attribution to travel with forks.","kind":"ask"},{"q":"Does `claude plugin validate .` still pass with the new `license` and `repository` fields in plugin.json?","why":"An invalid manifest stops the plugin from installing.","kind":"check"}]},{"title":"A new machine installs the plugin with two commands","role":"supporting","kind":"docs","symbols":[],"files":["README.md"],"before":"The README covered `/plugin install` but not what a second machine needs, and with a private repo every install needed stored GitHub credentials.","after":"An 'On a new machine' section lists Python 3.11+ and git, the two `/plugin` commands, `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` for machines without a GitHub SSH key, how to put `bin/` on the shell PATH, and how updates arrive: only when `version` in plugin.json changes.","claim":"Once the repo is public, setup needs no GitHub login.","why":"Until the repo is public, these steps fail without credentials. Merge this when you flip the visibility.","questions":[{"q":"plugin.json pins `version` at 0.1.0, so installed plugins never pick up new commits. Bump it on each release, or remove it so installs follow commits?","why":"Decides whether the work machine ever gets fixes without a reinstall.","kind":"ask"}]},{"title":"The GitHub Pages publisher and the planning notes are gone","role":"outside","kind":"cleanup","symbols":[],"files":[".github/workflows/flowmap-pages.yml","docs/superpowers/plans/2026-10-05-language-neutral-callgraph.md",".gitignore"],"before":"`.github/workflows/flowmap-pages.yml` pushed change pages to a `gh-pages` branch that nothing linked to, and Pages was never turned on. The plan for PR #4 sat in `docs/superpowers/plans/`.","after":"The workflow is deleted (the `gh-pages` branch is deleted on the remote too). The plan is deleted, and `/docs/superpowers/` is gitignored so later agent plans stay local.","claim":"Nothing public points at a dead publishing path.","why":"In a public repo, Pages would start working and serve stale pages next to the hosted viewer.","questions":[{"q":"The deleted plan is still in the history of PR #4. Is that acceptable in a public repo?","why":"Removing it from history means rewriting main and losing the PR refs.","kind":"ask"}]}],"folded":[]};
+const PAYLOAD = /^#v1\.([\w-]+)$/.exec(location.hash);
+// another link pasted into this tab changes only the fragment, which does not reload the page
+addEventListener("hashchange", () => { if (location.hash.startsWith("#v1.")) location.reload(); });
+
+async function inflate(b64) {
+  const bytes = Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+
+function fromFile(error) {
+  const box = document.createElement("section");
+  box.className = "drop";
+  box.innerHTML = `<h1>Open a flowmap change</h1>
+    <p>Drop a change page (<code>docs/flowmap/changes/&lt;name&gt;.html</code>) or its data as JSON here.
+    It is read in this tab and sent nowhere.</p>
+    <p><input type="file" accept=".html,.json"></p><p class="err" hidden></p>`;
+  const err = box.querySelector(".err");
+  if (error) { err.hidden = false; err.textContent = error; }
+  document.querySelector(".wrap").replaceChildren(box);
+  return new Promise((resolve) => {
+    const read = async (f) => {
+      try {
+        const text = await f.text();
+        const m = /const EMBEDDED = (\{.*?\});\n/s.exec(text) || /const DATA = (\{.*?\});\n/s.exec(text);
+        const data = JSON.parse(m ? m[1] : text);
+        if (!data.facts || !data.chapters) throw new Error("not flowmap change data");
+        resolve(data);
+      } catch (e) { err.hidden = false; err.textContent = `Could not read ${f.name}: ${e.message}`; }
+    };
+    box.querySelector("input").addEventListener("change", (e) => e.target.files[0] && read(e.target.files[0]));
+    addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("over"); });
+    addEventListener("dragleave", () => box.classList.remove("over"));
+    addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("over"); e.dataTransfer.files[0] && read(e.dataTransfer.files[0]); });
+  });
+}
+
+async function load() {
+  if (EMBEDDED) return EMBEDDED;
+  if (PAYLOAD) {
+    try { return await inflate(PAYLOAD[1]); }
+    catch (e) { return fromFile("The link's data is cut off or damaged. Was the whole link copied?"); }
+  }
+  return fromFile();
+}
+
+const WRAP = document.querySelector(".wrap").cloneNode(true);
+const DATA = await load();
+document.querySelector(".wrap").replaceWith(WRAP);
+if (DATA.story.title) document.title = DATA.story.title;
+// the fragment holds the data, so in-page links scroll instead of replacing it
+if (PAYLOAD) document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  const to = a && document.getElementById(a.getAttribute("href").slice(1));
+  if (!to) return;
+  e.preventDefault();
+  document.querySelectorAll(".targeted").forEach((n) => n.classList.remove("targeted"));
+  to.classList.add("targeted");
+  to.scrollIntoView();
+});
+const F = DATA.facts, S = DATA.story;
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k === "html") n.innerHTML = v; else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+};
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const md = (s) => esc(s || "").replace(/`([^`]+)`/g, "<code>$1</code>");
+const sym = (id) => id.split(":").pop();
+const file = (id) => id.split(":")[0].split("/").pop();
+const flowName = (id) => id.replace(/^new:/, "").replace(/-/g, " ");
+const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Outside the map",
+  unassigned: "Not in the story", "off-map": "Off the map" };
+
+const steps = new Map();
+F.map.forEach((f, fi) => f.steps.forEach((s, si) => steps.set(s.key, { ...s, flow: f.id, fi, si })));
+const symById = new Map(F.symbols.map(s => [s.id, s]));
+
+// chapter facts
+const chapters = DATA.chapters.map((c, i) => {
+  const syms = (c.symbols || []).map(id => symById.get(id)).filter(Boolean);
+  const keys = new Set(syms.flatMap(s => s.steps));
+  const ids = new Set(c.symbols || []);
+  const mine = (n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
+  const edgesIn = (list) => list.filter(([a, b]) => mine(a) || mine(b));
+  const callers = new Map();
+  syms.filter(s => s.status === "modified").forEach(s => s.callers.forEach(c => { if (!ids.has(c.id)) callers.set(c.id, c.edited); }));
+  const hunks = F.hunks.filter(h => h.symbols.some(x => ids.has(x)) || (c.files || []).includes(h.file));
+  const role = c.role || (c.kind === "outside" ? "outside" : c.kind === "unassigned" ? "unassigned" : c.kind === "off-map" ? "off-map" : i === 0 ? "core" : "supporting");
+  return { ...c, n: i + 1, id: "ch" + (i + 1), syms, keys, role, callers,
+    added: edgesIn(F.edges.added), removed: edgesIn(F.edges.removed), hunks };
+});
+
+// header
+const range = el("div", { class: "range" });
+range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", S.pr ? " · " : "",
+  el("span", { class: "mono", text: `${F.base_sha} → ${F.head_sha}` }), ` · ${F.name}`);
+$("#top").append(range, el("h1", { text: S.title || `${F.base}..${F.head}` }));
+if (S.delta) $("#top").append(el("p", { class: "delta", html: md(S.delta) }));
+if (S.intent) $("#top").append(el("p", { class: "intent", html: "<b>Author's intent:</b> " + md(S.intent) }));
+
+// system numbers, each with its drivers
+const touchedFlows = new Set(F.symbols.flatMap(s => s.steps.map(k => k.split("/")[0])));
+const gained = Object.keys(F.reach.gained), lost = Object.keys(F.reach.lost);
+const outside = F.files.filter(f => f.kind === "outside" || f.kind === "doc");
+const tiles = [
+  [`${touchedFlows.size} of ${F.map.length}`, "flows run changed code",
+    touchedFlows.size ? [...touchedFlows].map(flowName).join(", ") + (F.flow_entropy === 0 ? " · one flow, no spread" : ` · spread ${F.flow_entropy} bits`) : "none"],
+  [`+${F.endpoints.added.length} −${F.endpoints.removed.length}`, "entry points",
+    [...F.endpoints.added.map(e => "+ " + e), ...F.endpoints.removed.map(e => "− " + e)].join(", ") || "no capability added or removed"],
+  [`+${gained.length} −${lost.length}`, "existing code reached",
+    [...gained.slice(0, 2).map(s => "+ " + sym(s)), ...lost.slice(0, 2).map(s => "− " + sym(s))].join(", ") || "no entry point gains or loses existing code"],
+  [`+${F.modules.added.length} −${F.modules.removed.length}`, "module dependencies",
+    [...F.modules.added.map(([a, b]) => `${a.split("/").pop()} → ${b.split("/").pop()}`)].join(", ") || "no new links between modules"],
+  [`+${F.edges.added.length} −${F.edges.removed.length}`, "calls", `${F.symbols.filter(s => s.status === "new").length} new functions, ${F.symbols.filter(s => s.status === "modified").length} changed`],
+  [`${outside.length}`, "files outside the map", outside.map(f => f.path).join(", ") || "none"],
+  [F.tests.changed.length ? `${F.tests.changed.length}` : "0", "tests changed", F.tests.configured ? (F.tests.changed.join(", ") || "none changed") : "no test suite configured"],
+];
+for (const [v, k, d] of tiles) {
+  const zero = /^(\+0 −0|0|0 of \d+)$/.test(v);
+  $("#tiles").append(el("div", { class: "tile" + (zero ? " zero" : "") }, el("span", { class: "label", text: k }), el("b", { text: v }), el("small", { text: d })));
+}
+
+// the map: positions fixed by map.json, refs say which chapters run where
+$("#lines").style.setProperty("--flows", F.map.length);
+for (const f of F.map) {
+  const ol = el("ol", { class: "stations" });
+  let any = false;
+  for (const s of f.steps) {
+    const hits = chapters.filter(c => c.keys.has(s.key));
+    any = any || hits.length > 0;
+    const refs = el("span", { class: "refs" }, ...hits.map(c => el("a", { class: "ref", href: "#" + c.id, text: String(c.n),
+      style: `--role: var(--${c.role === "core" ? "core" : c.role === "supporting" ? "support" : c.role === "refactor" ? "refactor" : "outside"})`,
+      title: c.title })));
+    ol.append(el("li", { class: "st" + (hits.length ? " hit" : " quiet") }, el("span", { class: "pin", "aria-hidden": "true" }),
+      el("span", {}, s.name, hits.length ? refs : null)));
+  }
+  $("#lines").append(el("section", { class: "flow" + (any ? "" : " quiet") }, el("h3", { text: flowName(f.id) }), ol));
+}
+const offChapters = chapters.filter(c => !c.keys.size);
+if (offChapters.length) {
+  const box = $("#offmap");
+  box.hidden = false;
+  box.append("Not on any flow:", ...offChapters.map(c => el("a", { class: "ref", href: "#" + c.id, text: `${c.n} · ${c.title}`, style: "--role: var(--outside)" })));
+}
+
+// minimap: same positions as the big map, dots only
+function minimap(c) {
+  const cols = F.map.length, rows = Math.max(...F.map.map(f => f.steps.length));
+  const W = 240, colW = W / cols, rowH = 16, top = 22, H = top + rows * rowH + 4;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `System map, ${c.keys.size} of ${steps.size} steps highlighted`);
+  F.map.forEach((f, fi) => {
+    const x = colW * fi + colW / 2;
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", x); t.setAttribute("y", 11); t.setAttribute("text-anchor", "middle");
+    const nm = flowName(f.id);
+    t.textContent = nm.length > 18 ? nm.slice(0, 17) + "…" : nm;
+    svg.append(t);
+    if (f.steps.length > 1) {
+      const l = document.createElementNS(ns, "line");
+      Object.entries({ x1: x, x2: x, y1: top, y2: top + (f.steps.length - 1) * rowH, class: "rail" }).forEach(([k, v]) => l.setAttribute(k, v));
+      svg.append(l);
+    }
+    f.steps.forEach((s, si) => {
+      const d = document.createElementNS(ns, "circle");
+      Object.entries({ cx: x, cy: top + si * rowH, r: 5, class: "dot" + (c.keys.has(s.key) ? " on" : "") }).forEach(([k, v]) => d.setAttribute(k, v));
+      const tip = document.createElementNS(ns, "title"); tip.textContent = s.name; d.append(tip);
+      svg.append(d);
+    });
+  });
+  return el("div", { class: "minimap" }, svg);
+}
+
+function pathEl(p) {
+  const box = el("div", { class: "path" });
+  p.forEach((n, i) => {
+    if (i) box.append(el("i", { text: "›" }));
+    box.append(el("span", { class: i === p.length - 1 ? "end" : "", title: n, text: i === 0 ? file(n) : sym(n) }));
+  });
+  return box;
+}
+
+const picked = new Set();
+function renderNote() {
+  const lines = [];
+  for (const c of chapters) {
+    const qs = (c._qs || []).filter(q => picked.has(q.id));
+    if (!qs.length) continue;
+    lines.push(`${c.n}. ${c.title}`);
+    qs.forEach(q => lines.push(`   - ${q.q}`));
+  }
+  $("#note").value = lines.join("\n") || "";
+}
+
+for (const c of chapters) {
+  const card = el("article", { class: `chapter ${c.role}`, id: c.id });
+  card.append(el("div", { class: "ch-head" },
+    el("div", { class: "ch-tags" }, el("span", { class: "num", text: String(c.n) }), el("span", { class: "tag", text: ROLE[c.role] || c.role }),
+      c.kind && c.kind !== c.role ? el("span", { class: "kind", text: c.kind }) : null),
+    el("h2", { text: c.title }),
+    c.claim ? el("p", { class: "claim", html: md(c.claim) }) : null));
+
+  // where + before/after
+  const crumbs = el("ul", { class: "crumbs" });
+  const keys = [...c.keys].sort((a, b) => (steps.get(a).fi - steps.get(b).fi) || (steps.get(a).si - steps.get(b).si));
+  for (const k of keys) {
+    const s = steps.get(k);
+    crumbs.append(el("li", {}, el("span", { class: "flow-name", text: flowName(s.flow) }), el("span", { text: s.name })));
+  }
+  if (!keys.length) crumbs.append(el("li", {}, el("span", { class: "flow-name", text: "No flow runs this" }),
+    el("span", { text: (c.files || []).join(", ") || c.syms.map(s => s.id).join(", ") })));
+  const here = el("div", { class: "here" }, el("span", { class: "label", text: "You are here" }), minimap(c), crumbs);
+  const morph = el("dl", { class: "morph" });
+  if (c.before) morph.append(el("div", {}, el("dt", { text: "Before" }), el("dd", { html: md(c.before) })));
+  if (c.after) morph.append(el("div", { class: "after" }, el("dt", { text: "After" }), el("dd", { html: md(c.after) })));
+  const right = el("div", { class: "here" }, el("span", { class: "label", text: "How the system changes" }), morph);
+  if (c.why) right.append(el("div", { class: "why" }, el("span", { class: "label", text: "Why it matters" }), el("p", { html: md(c.why) })));
+  if (!c.before && !c.after && !c.why) right.append(el("p", { class: "note", text: "No story for this chapter: the graph facts below are all flowmap knows. Add it to the story file to say what changes and why." }));
+  card.append(el("div", { class: "where" }, here, right));
+
+  // evidence from the graph
+  const ev = el("div", { class: "evidence" });
+  const graphQs = [];
+  const witnesses = new Map();
+  c.syms.forEach(s => Object.entries(s.witness).forEach(([k, p]) => { if (!witnesses.has(k) || witnesses.get(k).length > p.length) witnesses.set(k, p); }));
+  if (witnesses.size) {
+    const ul = el("ul", { class: "paths" });
+    for (const [k, p] of witnesses) ul.append(el("li", {}, el("div", { class: "note", text: steps.get(k).endpoints.join(", ") }), pathEl(p)));
+    const unproved = keys.filter(k => !witnesses.has(k));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Runs under (call path as proof)" }), ul,
+      unproved.length ? el("p", { class: "note", text: `Also on the map's own anchors for: ${unproved.map(k => steps.get(k).name).join("; ")} (no call path found).` }) : null));
+  }
+  if (c.callers.size) {
+    const ul = el("ul", { class: "callers" });
+    [...c.callers].sort((a, b) => a[1] - b[1]).forEach(([id, edited]) =>
+      ul.append(el("li", {}, el("span", { class: "mark " + (edited ? "yes" : "no"), text: edited ? "edited" : "not edited" }), el("span", { title: id, text: `${file(id)} · ${sym(id)}` }))));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Callers of what changed" }), ul));
+  }
+  if (c.added.length || c.removed.length) {
+    const ul = el("ul", { class: "edges" });
+    c.added.slice(0, 8).forEach(([a, b]) => ul.append(el("li", {}, el("span", { class: "mark add", text: "+ call" }), el("span", { text: `${sym(a)} → ${sym(b)}` }))));
+    c.removed.slice(0, 8).forEach(([a, b]) => ul.append(el("li", {}, el("span", { class: "mark rem", text: "− call" }), el("span", { text: `${sym(a)} → ${sym(b)}` }))));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Calls added and removed" }), ul));
+  }
+  // reach that moved under this chapter's steps, though the code reached may be untouched
+  const myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
+  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
+  const gainedHere = moved(F.reach.gained), lostHere = moved(F.reach.lost);
+  if (gainedHere.length || lostHere.length) {
+    const ul = el("ul", { class: "edges" });
+    lostHere.forEach(([s, eps]) => ul.append(el("li", {}, el("span", { class: "mark rem", text: "no longer" }), el("span", { title: s, text: `${file(s)} · ${sym(s)} from ${eps.join(", ")}` }))));
+    gainedHere.forEach(([s, eps]) => ul.append(el("li", {}, el("span", { class: "mark add", text: "now reaches" }), el("span", { title: s, text: `${file(s)} · ${sym(s)} from ${eps.join(", ")}` }))));
+    ev.prepend(el("div", {}, el("span", { class: "label", text: "Reach that moved (unedited code)" }), ul));
+    lostHere.forEach(([s, eps], i) => graphQs.push({ id: `${c.id}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
+    gainedHere.forEach(([s, eps], i) => graphQs.push({ id: `${c.id}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
+  }
+  if (ev.children.length) card.append(ev);
+
+  // questions: the story's, then what the graph raises on its own
+  const qs = [...graphQs, ...(c.questions || []).map((q, i) => ({ ...q, id: `${c.id}q${i}` }))];
+  c.syms.filter(s => s.contract).forEach((s, i) => {
+    const still = s.callers.filter(x => !x.edited).map(x => sym(x.id));
+    if (still.length) qs.push({ id: `${c.id}g${i}`, kind: "graph", q: `${sym(s.id)} changed its arguments (${s.signature[0]} → ${s.signature[1]}) but ${still.length} caller(s) were not edited: ${still.join(", ")}. Are they still correct?`, why: "Signature changed, callers did not." });
+  });
+  c.syms.filter(s => s.status === "new" && !s.steps.length).forEach((s, i) =>
+    qs.push({ id: `${c.id}o${i}`, kind: "graph", q: `New ${sym(s.id)} is not run by any flow on the map. Which step is it for?`, why: "New code no flow reaches is either a map gap or dead." }));
+  c._qs = qs;
+  if (qs.length) {
+    const ol = el("ol", { class: "qs" });
+    for (const q of qs) {
+      const box = el("input", { type: "checkbox", id: q.id });
+      if (q.kind === "ask" || q.kind === "graph") { box.checked = true; picked.add(q.id); }
+      box.addEventListener("change", () => { box.checked ? picked.add(q.id) : picked.delete(q.id); renderNote(); });
+      const kind = { ask: "Ask the author", check: "Check yourself", graph: "From the graph" }[q.kind] || q.kind;
+      ol.append(el("li", { class: "q" }, box, el("label", { for: q.id },
+        el("span", { class: "qtext", html: `<span class="qkind ${esc(q.kind)}">${esc(kind)}</span>` + md(q.q) }),
+        q.why ? el("span", { class: "qwhy", html: md(q.why) }) : null)));
+    }
+    card.append(el("div", { class: "here" }, el("span", { class: "label", text: "Questions, most decisive first" }), ol));
+  }
+
+  // code last
+  if (c.hunks.length) {
+    const d = el("details", { class: "code" }, el("summary", { text: `Code: ${c.hunks.length} hunk${c.hunks.length === 1 ? "" : "s"} in ${[...new Set(c.hunks.map(h => h.file))].join(", ")}` }));
+    for (const h of c.hunks) {
+      const pre = el("pre");
+      h.lines.forEach(l => pre.append(el("span", { class: l[0] === "+" ? "a" : l[0] === "-" ? "r" : "", text: l })));
+      d.append(el("div", { class: "hunk" }, el("div", { class: "hh", text: `${h.file} @ ${h.new}${h.ctx ? " · " + h.ctx : ""}` }), pre));
+    }
+    card.append(d);
+  }
+  $("#chapters").append(card);
+}
+renderNote();
+if (DATA.folded.length) $("#folded").textContent = "Folded, not shown: " + DATA.folded.join(", ");
+
+$("#copy").addEventListener("click", async () => {
+  const t = $("#note");
+  try { await navigator.clipboard.writeText(t.value); $("#status").textContent = "Copied"; }
+  catch (e) { t.focus(); t.select(); $("#status").textContent = "Selected: press Ctrl+C or Cmd+C to copy"; }
+});
+</script>

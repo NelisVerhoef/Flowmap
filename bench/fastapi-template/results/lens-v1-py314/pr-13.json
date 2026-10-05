@@ -1,0 +1,49 @@
+{
+ "base": "main",
+ "head": "pr-13",
+ "files": [
+  "backend/app/api/routes/users.py"
+ ],
+ "code": [
+  "backend/app/api/routes/users.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/users.py:read_users"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-lists-users",
+   "matched": [
+    "backend/app/api/routes/users.py:read_users"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/users.py:read_users": [
+   "GET /users/"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-lists-users"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "GET /users/"
+ ]
+}

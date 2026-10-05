@@ -1,0 +1,47 @@
+{
+ "base": "main",
+ "head": "pr-07",
+ "files": [
+  "backend/app/models.py"
+ ],
+ "code": [
+  "backend/app/models.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/models.py:UserRegister"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [],
+ "reach": {
+  "backend/app/models.py:UserRegister": [
+   "POST /users/signup"
+  ]
+ },
+ "reach_steps": [
+  "sign-in/visitor-registers-account"
+ ],
+ "hidden_steps": [
+  "sign-in/visitor-registers-account"
+ ],
+ "reach_diff": {
+  "edges_added": 1,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/models.py:UserRegister"
+ ],
+ "blind": [
+  "1 other file(s) could not be parsed, so reach through them is missing: `backend/app/api/deps.py`"
+ ],
+ "verdict": "blind",
+ "spreads_to": [
+  "POST /users/signup"
+ ]
+}

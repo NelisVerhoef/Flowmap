@@ -6,6 +6,10 @@ which changed code the map has never heard of. The /pr-lens skill reads this
 and writes the before/after and the questions.
 
     python tools/flowmap/lens.py <base> [<head>]      # e.g. main HEAD, or abc123^ abc123
+    python tools/flowmap/lens.py <base> <head> --json # the same facts as JSON, for scripts
+
+It opens with a verdict: contained (no existing entry point runs changed code), spreads (names
+the entry points it reaches) or blind (the change holds something the call graph can't see).
 """
 
 import json
@@ -87,14 +91,23 @@ def symbols_at(rel, text, lines):
     if text is None or not lines:
         return set()
     syms = defs(rel, text)
+    builder = graphs.builder_for(rel)
+    live = builder.live(text) if hasattr(builder, "live") else None  # None: every module line counts
     hit = set()
     for ln in lines:
         inner = [s for s in syms if s[0] <= ln <= s[1]]
         if inner:
             hit.add(max(inner, key=lambda s: s[0])[2])
-        else:
+        elif live is None or ln in live:
             hit.add("<module>")
     return hit
+
+
+def cosmetic(rel, sym, base_text, head_text):
+    """The edit to sym changes nothing at runtime (docstrings, comments, formatting)."""
+    builder = graphs.builder_for(rel)
+    return (sym != "<module>" and base_text is not None and head_text is not None
+            and hasattr(builder, "same") and builder.same(base_text, head_text, sym))
 
 
 def changed_lines(base, head):
@@ -135,12 +148,16 @@ def importers(ref, rel):
     return len([h for h in hits.splitlines() if not h.endswith(rel)])
 
 
+INVENTORY_ERRORS = {}  # ref -> why its inventory failed: a blind spot, not a crash
+
+
 def endpoint_set(ref):
     try:
         reader = lambda rel: show(ref, rel)  # noqa: E731
         reader.ref = ref
         return {e["endpoint"]: e["handler"] for e in inventory.endpoints(reader)}
-    except SyntaxError:
+    except Exception as e:  # noqa: BLE001
+        INVENTORY_ERRORS[ref] = f"{type(e).__name__}: {e}"
         return {}
 
 
@@ -178,7 +195,56 @@ def reach_diff(old, new, old_eps, new_eps):
     return added, removed, dict(moved)
 
 
-def main(base, head="HEAD"):
+def blind_spots(files, code, tests, changed, new_symbols, reach_of, graphs_at, base_eps, head_eps):
+    """What this lens can't see in the change. Any of these means it must not say "contained"."""
+    blind = []
+    head_graph = graphs_at[-1]
+    unparsed = sorted({f for g in graphs_at for f in g.unparsed})
+    mine = [f for f in unparsed if f in code]
+    if mine:
+        blind.append(f"could not parse {', '.join(f'`{f}`' for f in mine)} with Python "
+                     f"{sys.version_info.major}.{sys.version_info.minor}: nothing in them is placed or reached "
+                     "(run flowmap with the project's Python, or set FLOWMAP_PYTHON)")
+    others = [f for f in unparsed if f not in code]
+    if others:
+        blind.append(f"{len(others)} other file(s) could not be parsed, so reach through them is missing: "
+                     + ", ".join(f"`{f}`" for f in others[:5]))
+    for ref, err in INVENTORY_ERRORS.items():
+        blind.append(f"the entry-point inventory failed at `{ref}` ({err}): endpoint changes are unknown")
+    migrations = [f for f in code if re.search(r"(^|/)(alembic|migrations?|migrate)/", f)]
+    if migrations:
+        blind.append("schema migration: " + ", ".join(f"`{f}`" for f in migrations)
+                     + " (runs against existing data at deploy; the call graph can't judge it)")
+    module_level = sorted({c.rsplit(":", 1)[0] for c in changed if c.endswith(":<module>")} - set(migrations))
+    if module_level:
+        blind.append("module-level code changed (constants, config, router registration): "
+                     + ", ".join(f"`{f}`" for f in module_level))
+    classes = sorted(c for c in changed - new_symbols if not reach_of.get(c)
+                     and c.rsplit(":", 1)[1][:1].isupper() and "." not in c.rsplit(":", 1)[1])
+    if classes:
+        blind.append("class bodies changed whose fields the call graph doesn't follow (models, settings): "
+                     + ", ".join(f"`{c.rsplit(':', 1)[1]}`" for c in classes))
+    roots = [r.strip("/") for r in config.graph_roots()]
+    graphed = lambda f: f.endswith(graphs.suffixes()) and any(r in ("", ".") or f.startswith(r + "/") for r in roots)  # noqa: E731
+    no_graph = [f for f in code if not graphed(f)]
+    if no_graph:
+        blind.append("code with no call graph (no builder for its language, or outside [code].graph): "
+                     + ", ".join(f"`{f}`" for f in no_graph[:6]) + (f" +{len(no_graph) - 6}" if len(no_graph) > 6 else ""))
+    out_dir = config.out().relative_to(ROOT).as_posix()
+    docs = re.compile(r"\.(md|rst|txt|png|jpe?g|svg|gif)$|(^|/)(docs?|LICENSE)(/|$)", re.I)
+    unanalysed = [f for f in files if f not in code and f not in tests and not f.startswith(out_dir + "/")
+                  and not docs.search(f)]
+    if unanalysed:
+        blind.append("files outside the analysed code: " + ", ".join(f"`{f}`" for f in unanalysed[:6])
+                     + (f" +{len(unanalysed) - 6}" if len(unanalysed) > 6 else ""))
+    vanished = [e for e in sorted(set(base_eps) - set(head_eps)) if base_eps[e] in head_graph.defs]
+    if vanished:
+        blind.append(f"{len(vanished)} entry point(s) left the inventory although their handlers still exist "
+                     "(registration the adapter can't read?): " + ", ".join(f"`{e}`" for e in vanished[:4]))
+    return blind
+
+
+def main(base, head="HEAD", as_json=False):
     the_map = json.loads(MAP.read_text())
     changes = changed_lines(base, head)
     files = sorted(changes)
@@ -187,11 +253,15 @@ def main(base, head="HEAD"):
 
     changed = set()  # "rel:symbol"
     new_symbols = set()    # symbols that did not exist at base
+    cosmetic_only = set()  # symbols whose edit is docstrings, comments or formatting only
     for rel in code:
         old, new = changes[rel]
-        base_text = show(base, rel)
+        base_text, head_text = show(base, rel), show(head, rel)
         base_syms = {sym for *_, sym in defs(rel, base_text)}
-        for s in symbols_at(rel, show(head, rel), new) | symbols_at(rel, base_text, old):
+        for s in symbols_at(rel, head_text, new) | symbols_at(rel, base_text, old):
+            if cosmetic(rel, s, base_text, head_text):
+                cosmetic_only.add(f"{rel}:{s}")
+                continue
             changed.add(f"{rel}:{s}")
             if s != "<module>" and s not in base_syms:
                 new_symbols.add(f"{rel}:{s}")
@@ -203,6 +273,11 @@ def main(base, head="HEAD"):
 
     base_eps, head_eps = endpoint_set(base), endpoint_set(head)
     handlers = {**base_eps, **head_eps}
+    facts = {"base": base, "head": head, "files": files, "code": code, "tests": tests,
+             "other": [f for f in files if f not in code and f not in tests],
+             "changed": sorted(changed), "new_symbols": sorted(new_symbols), "cosmetic": sorted(cosmetic_only),
+             "endpoints_added": sorted(set(head_eps) - set(base_eps)),
+             "endpoints_removed": sorted(set(base_eps) - set(head_eps))}
 
     touched = []  # (flow, step, matched anchors)
     anchor_uses = defaultdict(list)
@@ -215,6 +290,7 @@ def main(base, head="HEAD"):
             if matched:
                 touched.append((f, s, matched))
 
+    facts["touched"] = [{"flow": f["id"], "step": s["id"], "matched": matched} for f, s, matched in touched]
     mapped = {a for a in anchor_uses if hits(a)}
     off_map = sorted(c for c in changed
                      if not any(c.rsplit(":", 1)[0] == a.rsplit(":", 1)[0]
@@ -261,11 +337,13 @@ def main(base, head="HEAD"):
     anchored = {(f["id"], s["id"]) for f, s, _ in touched}
     reach = defaultdict(set)      # (flow, step id) -> changed symbols that reach it
     step_by_key, widest = {}, []
+    facts["reach"] = {}           # changed symbol -> endpoints that can execute it
     for c in sorted(changed):
         if c not in graph.defs:
             continue
         eps = {e for n in graph.callers(c) | {c} for e in handler_eps.get(n, [])}
         flows = {fid for e in eps for fid, _ in step_of.get(e, [])}
+        facts["reach"][c] = sorted(eps)
         if eps and c not in new_symbols:
             # new helpers only inherit their caller's reach; modified existing code is the risk
             widest.append((len(eps), len(flows), c))
@@ -275,6 +353,8 @@ def main(base, head="HEAD"):
                     reach[(fid, s["id"])].add(c)
                 step_by_key[(fid, s["id"])] = s
     hidden = {k: v for k, v in reach.items() if k not in anchored}
+    facts["reach_steps"] = sorted(f"{fid}/{sid}" for fid, sid in reach)
+    facts["hidden_steps"] = sorted(f"{fid}/{sid}" for fid, sid in hidden)
     if widest:
         out += ["## Reach (call graph, deterministic)", "",
                 f"Changed backend code can execute under **{len(reach)} steps in "
@@ -297,13 +377,19 @@ def main(base, head="HEAD"):
 
     # Reach diff: the call graph at base vs head. Catches a change that makes existing code
     # run under new endpoints (or stop running under old ones) without that code changing.
+    graphs_at = [graph]
     if config.graph_roots():
-        added_edges, removed_edges, moved = reach_diff(graph_at(base), graph, base_eps, head_eps)
+        base_graph = graph_at(base)
+        graphs_at.insert(0, base_graph)
+        added_edges, removed_edges, moved = reach_diff(base_graph, graph, base_eps, head_eps)
         short = lambda nid: f"{Path(nid.rsplit(':', 1)[0]).stem}.{nid.rsplit(':', 1)[1]}"  # noqa: E731
         flows_of = lambda eps: sorted({fid for e in eps for fid, _ in step_of.get(e, [])})  # noqa: E731
         anchors = set(anchor_uses)
         gained = {sym: g for sym, (g, _) in moved.items() if g}
         lost = {sym: lo for sym, (_, lo) in moved.items() if lo}
+        facts["reach_diff"] = {"edges_added": len(added_edges), "edges_removed": len(removed_edges),
+                               "gained": {k: sorted(v) for k, v in gained.items()},
+                               "lost": {k: sorted(v) for k, v in lost.items()}}
         if added_edges or removed_edges:
             out += ["## Reach diff (call graph, base → head)", "",
                     f"{len(added_edges)} call edges added, {len(removed_edges)} removed. "
@@ -331,6 +417,27 @@ def main(base, head="HEAD"):
                                + (f", … {len(edges) - 8} more" if len(edges) > 8 else ""))
             out.append("")
 
+    facts["off_map"] = off_map
+    blind = blind_spots(files, code, tests, changed, new_symbols, facts["reach"], graphs_at, base_eps, head_eps)
+    existing_reach = {e for c in changed - new_symbols for e in facts["reach"].get(c, [])}
+    diff = facts.get("reach_diff", {})
+    moved_eps = {e for v in [*diff.get("gained", {}).values(), *diff.get("lost", {}).values()] for e in v}
+    spread = existing_reach | moved_eps | set(facts["endpoints_removed"])
+    verdict = "blind" if blind else "spreads" if spread else "contained"
+    facts.update(blind=blind, verdict=verdict, spreads_to=sorted(spread))
+    flows_hit = sorted({fid for e in spread for fid, _ in step_of.get(e, [])})
+    headline = {
+        "contained": "**Verdict: contained.** No existing entry point runs changed code, and none gained or "
+                     "lost reach. Only new code changed.",
+        "spreads": f"**Verdict: spreads** to {len(spread)} existing entry point(s)"
+                   + (f" in {len(flows_hit)} flow(s): {', '.join(flows_hit)}" if flows_hit else "")
+                   + ". Details below.",
+        "blind": "**Verdict: blind.** This change includes things this lens cannot see, so it can't call it "
+                 "contained" + (f"; what it can see spreads to {len(spread)} existing entry point(s)" if spread else "")
+                 + ".",
+    }[verdict]
+    out[2:2] = [headline, ""] + (["## Blind spots", ""] + [f"- {b}" for b in blind] + [""] if blind else [])
+
     if off_map:
         out += ["## Off-map changes (code the map doesn't know)", "",
                 "New code, or a gap in the map. Either way: where does it sit in a flow?", ""]
@@ -357,8 +464,9 @@ def main(base, head="HEAD"):
             f"ratio {len(changed) / max(1, len(touched)):.1f} symbols per step",
             f"- Tests changed: {len(tests)}" + (" — **no tests changed**" if code and not tests else ""),
             ""]
-    print("\n".join(out))
+    print(json.dumps(facts, indent=1) if as_json else "\n".join(out))
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    args = [a for a in sys.argv[1:] if a != "--json"]
+    main(*args[:2], as_json="--json" in sys.argv[1:])

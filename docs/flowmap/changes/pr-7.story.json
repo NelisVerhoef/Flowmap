@@ -1,0 +1,161 @@
+{
+  "title": "lens gives a verdict, and says what it can't see",
+  "pr": "PR #7",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/7",
+  "intent": "Keep the FastAPI bench results and the lens fixes they led to, ported onto the language-neutral call graph, so the research branch can be deleted.",
+  "delta": "The 'place a change on the map' step changes most: `flowmap lens` now opens with a verdict (contained, spreads or blind), lists its blind spots, and prints its facts as JSON with `--json`. Underneath, the Python builder reaches through FastAPI `Annotated[..., Depends(f)]` aliases, starts each def at its first decorator, and reports files it couldn't parse, so the graph shared by diagrams, atlas, callgraph and lens gets those edges too. `bin/flowmap` re-runs itself under the repo's newer .venv Python. No entry points are added or removed, and the change page (`flowmap change`) doesn't use the verdict yet.",
+  "chapters": [
+    {
+      "title": "lens opens with contained, spreads or blind",
+      "role": "core",
+      "kind": "new capability",
+      "symbols": [
+        "flowmap/lens.py:main",
+        "flowmap/lens.py:blind_spots",
+        "flowmap/lens.py:endpoint_set",
+        "flowmap/lens.py:__main__"
+      ],
+      "files": [
+        "tests/test_lens_verdict.py",
+        "tests/golden/lens-6d9eaff-770f1a7.md"
+      ],
+      "before": "lens listed steps, reach and off-map code. When a change landed only in module-level code, a model class, a migration, a file it couldn't parse or a router it couldn't read, it said nothing about existing code, which read as 'safe'. An inventory error other than SyntaxError crashed it.",
+      "after": "The first line is a verdict. *blind* when `blind_spots` finds anything it can't judge (unparsed files, a failed inventory, migrations, module-level code, class bodies without reach, code with no call graph, files outside the analysed code, entry points whose handler still exists but that left the inventory). Otherwise *spreads* to the existing entry points that run modified code or gained or lost reach. Otherwise *contained*. A failed inventory becomes a blind spot. `--json` prints the same facts, including verdict, blind and spreads_to.",
+      "claim": "Quiet now means contained, never 'couldn't see'.",
+      "why": "Reviewers and the pr-lens skill read the first lines. On the bench, 16 of 20 production-breaking changes pass CI; this verdict is what keeps them from reading as safe. The cost is noise: any changed `.gitignore` or JSON makes the verdict blind, as this repo's PR #6 shows.",
+      "questions": [
+        {
+          "q": "`blind_spots` counts every changed non-code, non-doc file (`.gitignore`, `plugin.json`) as a blind spot, so most PRs here will say blind. Should config files the app never reads stay out of it?",
+          "why": "A verdict that is always blind stops being read.",
+          "kind": "ask"
+        },
+        {
+          "q": "Should `flowmap change` show the verdict and the blind spots too, so the change page and lens agree?",
+          "why": "Today the PR body's change page is silent on what lens couldn't see.",
+          "kind": "ask"
+        },
+        {
+          "q": "Run `python3 -m unittest tests.test_lens_verdict`: do all 9 pass, and do they fail on 507cde3?",
+          "why": "Confirms each bench miss is pinned by a test.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "The Python graph reaches through dependency aliases and decorators",
+      "role": "supporting",
+      "kind": "call graph",
+      "symbols": [
+        "flowmap/graphs/python.py:_Builder.__init__",
+        "flowmap/graphs/python.py:_Builder._collect.walk",
+        "flowmap/graphs/python.py:_Builder._link",
+        "flowmap/graphs/python.py:_start",
+        "flowmap/graphs/python.py:symbols.walk",
+        "flowmap/graphs/python.py:build",
+        "flowmap/graphs/part.py:Part",
+        "flowmap/callgraph.py:Graph.__init__",
+        "flowmap/adapters/fastapi.py:_mounts"
+      ],
+      "files": [
+        "tests/golden/graph-6d9eaff.json",
+        "tests/golden/graph-770f1a7.json"
+      ],
+      "before": "`CurrentUser = Annotated[User, Depends(get_current_user)]` was no node, so an endpoint taking `user: CurrentUser` didn't reach `get_current_user` (17 endpoints on the bench). A def began at `def`, so an edit to `@router.get(..., dependencies=[...])` landed in `<module>`. Unparseable files vanished silently. `include_router(import_module(...).router)` crashed the FastAPI adapter.",
+      "after": "A module-level assignment containing a `Depends(...)` call is a node with edges to what it names. Defs start at their first decorator, in both the graph and `symbols()`. Builders return the files they couldn't parse in `Part.unparsed`, merged into `Graph.unparsed`. The adapter skips mounts it can't resolve.",
+      "claim": "Auth dependencies show up in reach.",
+      "why": "Every command that walks the graph (diagrams, atlas, callgraph impact, lens) gets the alias edges. Def line ranges shift by the decorator count, which is all the graph goldens move by.",
+      "questions": [
+        {
+          "q": "The alias rule matches any module-level assignment containing a `Depends` call, by name. Should it also catch `Security(...)` and other FastAPI injectors?",
+          "why": "`Security` carries the scopes check on many FastAPI apps.",
+          "kind": "ask"
+        },
+        {
+          "q": "Diff `tests/golden/graph-770f1a7.json` against main: are the only changes def start lines moving to a decorator?",
+          "why": "Confirms the decorator change moved nothing else in the graph.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "Edits that change nothing don't count",
+      "role": "supporting",
+      "kind": "precision",
+      "symbols": [
+        "flowmap/lens.py:cosmetic",
+        "flowmap/lens.py:symbols_at",
+        "flowmap/graphs/python.py:live",
+        "flowmap/graphs/python.py:same",
+        "flowmap/graphs/python.py:_find",
+        "flowmap/graphs/python.py:_shape"
+      ],
+      "files": [
+        "flowmap/graphs/__init__.py"
+      ],
+      "before": "A docstring edit changed its def; a blank line or import between defs changed `<module>`, which now makes the verdict blind.",
+      "after": "Builders may expose `live(text)` (module lines that run) and `same(base, head, sym)` (equal ASTs once docstrings are dropped). lens ignores a `<module>` line that isn't live, and a symbol that is `same`, listing it under `cosmetic` in the facts. Only the Python builder has these hooks, so lens itself names no language.",
+      "claim": "A docs-only PR is contained.",
+      "why": "Without this, the new blind verdict would fire on every edit near a def. On this repo's golden range one spurious `<module>` hit goes away (21 symbols to 20).",
+      "questions": [
+        {
+          "q": "`same()` ignores docstrings but not type annotations or default values. Is that the right line for 'cannot change behaviour'?",
+          "why": "Changed defaults do change behaviour, but annotation-only edits don't, and they count today.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "flowmap runs under the project's newer Python",
+      "role": "supporting",
+      "kind": "runtime",
+      "symbols": [],
+      "files": [
+        "bin/flowmap"
+      ],
+      "before": "flowmap parsed the target repo with whatever Python ran it. The template's auth module uses 3.14 syntax, so under 3.11 it was silently dropped.",
+      "after": "`bin/flowmap` re-execs under `FLOWMAP_PYTHON`, or the repo's `.venv/bin/python` or `venv/bin/python` when that is newer; `FLOWMAP_REEXEC` stops loops. What still can't be parsed shows up as a blind spot.",
+      "claim": "Newer syntax in the project no longer hides code.",
+      "why": "Under 3.11 the fixed lens said blind on 26 of 26 bench changes. Re-exec runs flowmap inside the project's venv, which also has that project's packages on its path.",
+      "questions": [
+        {
+          "q": "Re-exec happens on every command, before the command is known. Should only the graph-building commands re-exec?",
+          "why": "Each run pays a subprocess to check the venv's version.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "The bench and the pr-lens skill carry the verdict",
+      "role": "outside",
+      "kind": "evidence",
+      "symbols": [],
+      "files": [
+        "bench/README.md",
+        "bench/fastapi-template/RESULTS.md",
+        "bench/fastapi-template/run.py",
+        "bench/fastapi-template/score.py",
+        "bench/fastapi-template/relens.py",
+        "bench/fastapi-template/plant.py",
+        "bench/runtime_reach.py",
+        "skills/pr-lens/SKILL.md",
+        "README.md"
+      ],
+      "before": "The bench, its results and the market research lived on the unmerged branch claude/product-viability-research-gdei1g.",
+      "after": "`bench/` comes over whole: the planted changes, the answer key, holdout invariants, the runtime-reach recorder, the lens output per version and Python, the blind LLM reviews, and RESULTS.md. The research notes don't. The pr-lens skill tells the agent to lead with the verdict and never upgrade blind to contained. The README summarises the bench, including that plain LLM review without flowmap was right on all 8 cases it ran.",
+      "claim": "The evidence for the fixes is in the repo.",
+      "why": "The bench is what a public reader would check the lens claims against. The template's map.json isn't in it, so re-running the bench means mapping the template again first.",
+      "questions": [
+        {
+          "q": "Commit the template's map.json under `bench/fastapi-template/map/`, so relens.py can reproduce the lens results without re-mapping?",
+          "why": "Today the results can be read but not regenerated from this repo alone.",
+          "kind": "ask"
+        },
+        {
+          "q": "The LLM-only control was right on all 8 subtle cases. Should the README lead with that, or does it undercut the pitch?",
+          "why": "Decides how flowmap is positioned once the repo is public.",
+          "kind": "ask"
+        }
+      ]
+    }
+  ]
+}

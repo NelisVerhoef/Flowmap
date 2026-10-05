@@ -1,6 +1,13 @@
 # Flow lens: `6d9eaff..770f1a7`
 
-11 files changed (3 app code, 0 tests, 8 other) · 21 code symbols changed · 4 map steps touched across 1 flows
+**Verdict: blind.** This change includes things this lens cannot see, so it can't call it contained; what it can see spreads to 5 existing entry point(s).
+
+## Blind spots
+
+- module-level code changed (constants, config, router registration): `flowmap/change.py`
+- files outside the analysed code: `bin/flowmap`, `flowmap/atlas.template.html`, `flowmap/change.template.html`
+
+11 files changed (3 app code, 0 tests, 8 other) · 20 code symbols changed · 4 map steps touched across 1 flows
 
 ## Endpoint changes
 
@@ -48,6 +55,6 @@ New code, or a gap in the map. Either way: where does it sit in a flow?
 
 ## Shape
 
-- Steps touched: 4 · symbols changed: 21 · ratio 5.2 symbols per step
+- Steps touched: 4 · symbols changed: 20 · ratio 5.0 symbols per step
 - Tests changed: 0 — **no tests changed**
 

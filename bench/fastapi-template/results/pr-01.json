@@ -1,0 +1,370 @@
+{
+ "ref": "pr-01",
+ "deploy": {
+  "ok": true,
+  "log": ""
+ },
+ "holdout": {
+  "test_invariants.py::test_existing_users_can_still_log_in[admin@example.com]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_existing_users_can_still_log_in[alice@example.com]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_existing_users_can_still_log_in[bob@example.com]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_wrong_password_and_unknown_email_fail_cleanly": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_inactive_user_cannot_log_in": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_login_does_not_match_an_email_prefix": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_access_token_lives_eight_days": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_deactivated_users_token_stops_working": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/",
+    "GET /users/me"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[GET /items/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[POST /items/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /items/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[GET /items/{item}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[PUT /items/{item}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "PUT /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[DELETE /items/{item}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "DELETE /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[POST /login/test-token]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/test-token"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[GET /users/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /users/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[POST /users/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /users/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[GET /users/me]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /users/me"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[PATCH /users/me]": {
+   "outcome": "passed",
+   "endpoints": [
+    "PATCH /users/me"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[DELETE /users/me]": {
+   "outcome": "passed",
+   "endpoints": [
+    "DELETE /users/me"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[PATCH /users/me/password]": {
+   "outcome": "passed",
+   "endpoints": [
+    "PATCH /users/me/password"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[GET /users/{user}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[PATCH /users/{user}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "PATCH /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[DELETE /users/{user}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "DELETE /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[POST /password-recovery-html-content/{email}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_anonymous_requests_are_rejected[POST /utils/test-email/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /utils/test-email/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[GET /users/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /users/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[POST /users/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /users/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[PATCH /users/{user}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "PATCH /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[DELETE /users/{victim}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "DELETE /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[GET /users/{user}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[POST /password-recovery-html-content/{email}]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[POST /utils/test-email/]": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /utils/test-email/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_users_cannot_touch_each_others_items[GET]": {
+   "outcome": "failed",
+   "endpoints": [
+    "GET /items/{id}"
+   ],
+   "message": "../../../Flowmap/bench/fastapi-template/holdout/test_invariants.py:108: AssertionError"
+  },
+  "test_invariants.py::test_users_cannot_touch_each_others_items[PUT]": {
+   "outcome": "passed",
+   "endpoints": [
+    "PUT /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_users_cannot_touch_each_others_items[DELETE]": {
+   "outcome": "passed",
+   "endpoints": [
+    "DELETE /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_superuser_can_read_any_item": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_item_list_and_count_are_scoped_to_the_owner": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_signup_cannot_grant_superuser": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /users/signup"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_private_api_is_not_mounted_in_production": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /private/users/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_existing_items_with_long_titles_stay_readable": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/",
+    "GET /items/{id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_response_shapes_are_unchanged": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /items/",
+    "GET /users/me"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_admin_user_list_default_page_returns_everyone": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /users/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_cannot_take_another_users_email": {
+   "outcome": "passed",
+   "endpoints": [
+    "PATCH /users/me"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_admin_can_clear_a_users_full_name": {
+   "outcome": "passed",
+   "endpoints": [
+    "PATCH /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_admin_delete_removes_the_users_items": {
+   "outcome": "passed",
+   "endpoints": [
+    "DELETE /users/{user_id}"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_new_signups_can_log_in": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /login/access-token",
+    "POST /users/signup"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_health_check": {
+   "outcome": "passed",
+   "endpoints": [
+    "GET /utils/health-check/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_expired_reset_token_is_rejected": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /reset-password/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_reset_token_for_unknown_email_changes_nobody": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /reset-password/"
+   ],
+   "message": ""
+  },
+  "test_invariants.py::test_reset_links_live_48_hours": {
+   "outcome": "passed",
+   "endpoints": [
+    "POST /password-recovery/{email}"
+   ],
+   "message": ""
+  }
+ },
+ "ci": {
+  "migrate_ok": true,
+  "failed": [
+   "tests/api/routes/test_items.py::test_read_item_not_enough_permissions"
+  ],
+  "summary": "1 failed, 57 passed in 6.44s"
+ }
+}

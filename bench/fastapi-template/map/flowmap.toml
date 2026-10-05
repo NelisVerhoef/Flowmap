@@ -1,0 +1,33 @@
+name = "Full Stack FastAPI Template"
+
+[[entry]]
+adapter = "fastapi"
+main = "backend/app/api/main.py"
+
+[code]
+python = ["backend/app"]
+tests = ["backend/tests"]
+other = ["frontend/src"]
+
+[flows]
+[[flows.vocabulary]]
+id = "administer-users"
+scope = "A superuser manages everyone's accounts: list, create, edit roles/status/passwords and delete users."
+[[flows.vocabulary]]
+id = "manage-items"
+scope = "A signed-in user keeps a personal list of items: view, add, edit and delete them."
+[[flows.vocabulary]]
+id = "manage-own-account"
+scope = "A signed-in user maintains their own profile, password and account from Settings."
+[[flows.vocabulary]]
+id = "operate-deployment"
+scope = "An operator brings the stack up and checks it works: database ready with a first superuser, backend healthy, email delivery working."
+[[flows.vocabulary]]
+id = "recover-forgotten-password"
+scope = "A user who forgot their password gets a reset link by email and sets a new password."
+[[flows.vocabulary]]
+id = "sign-in"
+scope = "A registered user signs in, the app keeps them signed in across pages, and they sign out."
+[[flows.vocabulary]]
+id = "sign-up"
+scope = "A visitor creates their own account so they can start using the app."

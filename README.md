@@ -17,6 +17,30 @@ Python 3.11+, no dependencies.
 | React SPA | its backend's entry points; top-down passes start from its router | via the backend |
 | Python CLI | `if __name__ == "__main__"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |
 
+## On a new machine
+
+Python 3.11+ and `git`. In Claude Code, inside any session:
+
+```
+/plugin marketplace add NelisVerhoef/flowmap
+/plugin install flowmap@flowmap
+```
+
+Claude Code clones over SSH when `ssh -T git@github.com` works, else over HTTPS; on a machine
+without a GitHub SSH key, `export CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` skips the probe.
+
+For `flowmap` in your own terminal too (the plugin's copy is only on Claude Code's PATH):
+
+```bash
+git clone https://github.com/NelisVerhoef/flowmap.git ~/src/flowmap
+echo 'export PATH="$HOME/src/flowmap/bin:$PATH"' >> ~/.zshrc && exec zsh
+flowmap                          # prints the command list
+```
+
+To update: `git pull` in the clone, and `/plugin marketplace update flowmap` in Claude Code.
+The plugin only refreshes when `version` in `.claude-plugin/plugin.json` changes, so bump it
+on each release. The change viewer at `flowmap.testabl.ai` needs nothing on the machine.
+
 ## First time in a repo
 
 ```bash
@@ -100,6 +124,17 @@ comment (`flowmap-pr-hook post <pr> <file>` edits that comment on later pushes i
 another). It stays silent otherwise, and runs once per head commit. Copy the hook block into
 another repo's `.claude/settings.json`, pointing at this repo's `bin/flowmap-pr-hook`, to use it there.
 
+## Does it tell the truth?
+
+`bench/` plants 26 changes with known effects in the FastAPI full-stack template and checks what
+lens says against the app's own tests, a seeded production database and runtime reach. 16 of the
+20 changes that break production pass the template's CI. lens as first shipped said nothing
+about existing code on 4 of those and crashed on 1. After the fixes it found (they are in lens
+now), it says *contained* on none of them and flags 50 of 55 affected endpoints. An LLM review
+with flowmap was right on 13 of 13 subtle cases, but one without flowmap was right on all 8 it
+ran: the claim is a lens a reviewer can trust when it is quiet, not one that finds more bugs. Method and numbers:
+[`bench/README.md`](bench/README.md), [`bench/fastapi-template/RESULTS.md`](bench/fastapi-template/RESULTS.md).
+
 ## flowmap.toml
 
 See the docstring in `flowmap/config.py`. The parts you own: `[[flows.vocabulary]]` (the flow names,
@@ -118,3 +153,7 @@ with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (se
 `graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then
 `flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node
 the builder emits.
+
+## License
+
+Apache 2.0, see [LICENSE](LICENSE).
