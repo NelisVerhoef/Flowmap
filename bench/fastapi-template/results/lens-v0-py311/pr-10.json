@@ -1,0 +1,35 @@
+{
+ "base": "main",
+ "head": "pr-10",
+ "files": [
+  "backend/app/core/security.py",
+  "backend/app/crud.py"
+ ],
+ "code": [
+  "backend/app/core/security.py",
+  "backend/app/crud.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/core/security.py:<module>",
+  "backend/app/crud.py:<module>"
+ ],
+ "new_symbols": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [],
+ "reach": {},
+ "reach_steps": [],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/core/security.py:<module>",
+  "backend/app/crud.py:<module>"
+ ]
+}

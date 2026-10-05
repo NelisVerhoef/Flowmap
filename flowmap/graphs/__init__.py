@@ -5,6 +5,9 @@ A builder module exposes:
     build(files, read) -> Part                      # definitions, call edges, classes
     symbols(text) -> [(start, end, "Qual.name")]    # places diff lines on definitions
     signature(text, "Qual.name") -> str | None      # a def's parameters, for contract changes
+and optionally, so lens can ignore edits that change nothing:
+    live(text) -> {line numbers} | None             # module-level lines that run
+    same(base_text, head_text, "Qual.name") -> bool # the def changed only in docs or formatting
 
 Node ids are "repo/relative/file:Qual.name", the spelling adapters use for handlers, so every
 entry point's handler is a node the graph can walk from (`flowmap callgraph check` says which

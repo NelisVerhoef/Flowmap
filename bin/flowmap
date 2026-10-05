@@ -9,17 +9,48 @@ Run from inside the repo you're mapping (or set FLOWMAP_ROOT).
   flowmap reconcile <run.json>...       vote the passes into map.json, MAP.md, QUESTIONS.md
   flowmap diagrams                      Mermaid at system / flow / step zoom
   flowmap atlas [--pr base..head=label] the interactive map, optionally with PR overlays
-  flowmap lens <base> [<head>]          place a change on the map (flows, reach, off-map code)
+  flowmap lens <base> [<head>] [--json] place a change on the map (verdict, flows, reach, blind spots)
   flowmap change <base> [<head>]        the change as chapters on the map: where, what, why, questions
   flowmap viewer <dir>                  the hosted change viewer, rendering --link links in the browser
   flowmap callgraph impact <file:sym>   which entry points can reach a symbol
   flowmap callgraph check               is every entry point's handler a call-graph node?
+
+Runs under the repo's own .venv Python when that is newer than this one (or FLOWMAP_PYTHON).
 """
+import os
 import runpy
+import subprocess
 import sys
 from pathlib import Path
 
 PKG = Path(__file__).resolve().parent.parent / "flowmap"
+
+
+def project_python():
+    """The target repo's interpreter, if newer than this one: flowmap parses code with `ast`, and
+    a newer project can use syntax an older Python can't read (that file then goes dark)."""
+    if os.environ.get("FLOWMAP_REEXEC"):
+        return None
+    if os.environ.get("FLOWMAP_PYTHON"):
+        return os.environ["FLOWMAP_PYTHON"]
+    try:
+        root = os.environ.get("FLOWMAP_ROOT") or subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    for cand in (Path(root) / ".venv/bin/python", Path(root) / "venv/bin/python"):
+        if cand.exists():
+            r = subprocess.run([str(cand), "-c", f"import sys; print(sys.version_info[:2] > {tuple(sys.version_info[:2])})"],
+                               capture_output=True, text=True)
+            if r.stdout.strip() == "True":
+                return str(cand)
+    return None
+
+
+py = project_python()
+if py:
+    os.environ["FLOWMAP_REEXEC"] = "1"
+    os.execv(py, [py, __file__, *sys.argv[1:]])
 COMMANDS = {"inventory", "brief", "verify", "reconcile", "diagrams", "atlas", "lens", "change", "viewer", "callgraph"}
 
 if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:

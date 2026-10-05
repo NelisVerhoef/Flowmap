@@ -1,0 +1,35 @@
+{
+ "base": "main",
+ "head": "pr-21",
+ "files": [
+  "backend/app/api/routes/users.py"
+ ],
+ "code": [
+  "backend/app/api/routes/users.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [],
+ "new_symbols": [],
+ "cosmetic": [
+  "backend/app/api/routes/users.py:delete_user",
+  "backend/app/api/routes/users.py:read_users",
+  "backend/app/api/routes/users.py:update_user_me"
+ ],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [],
+ "reach": {},
+ "reach_steps": [],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "contained",
+ "spreads_to": []
+}

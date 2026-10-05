@@ -1,0 +1,41 @@
+{
+ "base": "main",
+ "head": "pr-17",
+ "files": [
+  "backend/app/api/routes/items.py"
+ ],
+ "code": [
+  "backend/app/api/routes/items.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/items.py:<module>",
+  "backend/app/api/routes/items.py:count_items"
+ ],
+ "new_symbols": [
+  "backend/app/api/routes/items.py:count_items"
+ ],
+ "endpoints_added": [
+  "GET /items/count"
+ ],
+ "endpoints_removed": [],
+ "touched": [],
+ "reach": {
+  "backend/app/api/routes/items.py:count_items": [
+   "GET /items/count"
+  ]
+ },
+ "reach_steps": [],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 1,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/api/routes/items.py:<module>",
+  "backend/app/api/routes/items.py:count_items"
+ ]
+}

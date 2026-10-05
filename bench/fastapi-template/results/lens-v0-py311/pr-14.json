@@ -1,0 +1,136 @@
+{
+ "base": "main",
+ "head": "pr-14",
+ "files": [
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py",
+  "backend/app/models.py"
+ ],
+ "code": [
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py",
+  "backend/app/models.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:<module>",
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:downgrade",
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:upgrade",
+  "backend/app/models.py:Item"
+ ],
+ "new_symbols": [
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:downgrade",
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:upgrade"
+ ],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-deletes-user",
+   "matched": [
+    "backend/app/models.py:Item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-views-items",
+   "matched": [
+    "backend/app/models.py:Item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-creates-item",
+   "matched": [
+    "backend/app/models.py:Item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-edits-item",
+   "matched": [
+    "backend/app/models.py:Item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-deletes-item",
+   "matched": [
+    "backend/app/models.py:Item"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "api-client-reads-item",
+   "matched": [
+    "backend/app/models.py:Item"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:downgrade": [],
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:upgrade": [],
+  "backend/app/models.py:Item": [
+   "DELETE /items/{id}",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "PUT /items/{id}"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-creates-user",
+  "administer-users/admin-deletes-user",
+  "administer-users/admin-edits-user",
+  "administer-users/admin-lists-users",
+  "administer-users/admin-looks-up-user",
+  "manage-items/api-client-reads-item",
+  "manage-items/user-creates-item",
+  "manage-items/user-deletes-item",
+  "manage-items/user-edits-item",
+  "manage-items/user-views-items",
+  "manage-own-account/user-updates-profile",
+  "recover-forgotten-password/admin-previews-recovery-email",
+  "recover-forgotten-password/user-requests-recovery-email",
+  "recover-forgotten-password/user-sets-new-password",
+  "sign-in/user-logs-in",
+  "sign-in/visitor-registers-account",
+  "sign-up/test-harness-seeds-user"
+ ],
+ "hidden_steps": [
+  "administer-users/admin-creates-user",
+  "administer-users/admin-edits-user",
+  "administer-users/admin-lists-users",
+  "administer-users/admin-looks-up-user",
+  "manage-own-account/user-updates-profile",
+  "recover-forgotten-password/admin-previews-recovery-email",
+  "recover-forgotten-password/user-requests-recovery-email",
+  "recover-forgotten-password/user-sets-new-password",
+  "sign-in/user-logs-in",
+  "sign-in/visitor-registers-account",
+  "sign-up/test-harness-seeds-user"
+ ],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:<module>",
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:downgrade",
+  "backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py:upgrade"
+ ]
+}

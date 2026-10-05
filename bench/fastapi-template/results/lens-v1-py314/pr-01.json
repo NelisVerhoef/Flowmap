@@ -1,0 +1,49 @@
+{
+ "base": "main",
+ "head": "pr-01",
+ "files": [
+  "backend/app/api/routes/items.py"
+ ],
+ "code": [
+  "backend/app/api/routes/items.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/items.py:read_item"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "manage-items",
+   "step": "api-client-reads-item",
+   "matched": [
+    "backend/app/api/routes/items.py:read_item"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/items.py:read_item": [
+   "GET /items/{id}"
+  ]
+ },
+ "reach_steps": [
+  "manage-items/api-client-reads-item"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "GET /items/{id}"
+ ]
+}

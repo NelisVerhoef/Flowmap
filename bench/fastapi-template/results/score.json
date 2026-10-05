@@ -1,0 +1,1522 @@
+{
+ "pr-01": {
+  "id": "pr-01",
+  "short": "item ownership check removed",
+  "subtlety": 1,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Any signed-in user can read any item by id; the ownership check is gone from read_item.",
+  "truth": [
+   "GET /items/{id}"
+  ],
+  "ci_caught": true,
+  "ci_failed": [
+   "tests/api/routes/test_items.py::test_read_item_not_enough_permissions"
+  ],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_users_cannot_touch_each_others_items[GET]"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "GET /items/{id}"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "GET /items/{id}"
+  ],
+  "v1_flows": [
+   "manage-items"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "GET /items/{id}"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-02": {
+  "id": "pr-02",
+  "short": "admin check on delete-user moved, wrong subject",
+  "subtlety": 2,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "The superuser dependency is replaced by a check on the *target* user, so any normal user can delete any non-superuser account (and its items).",
+  "truth": [
+   "DELETE /users/{user_id}"
+  ],
+  "ci_caught": true,
+  "ci_failed": [
+   "tests/api/routes/test_users.py::test_delete_user_current_super_user_error",
+   "tests/api/routes/test_users.py::test_delete_user_without_privileges"
+  ],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[DELETE /users/{victim}]"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "DELETE /users/{user_id}"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "DELETE /users/{user_id}"
+  ],
+  "v1_flows": [
+   "administer-users"
+  ],
+  "v1_blind": [],
+  "v1_lost": {
+   "backend/app/api/deps.py:get_current_active_superuser": [
+    "DELETE /users/{user_id}"
+   ]
+  },
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "DELETE /users/{user_id}"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-03": {
+  "id": "pr-03",
+  "short": "inactive-user check dropped from auth dependency",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Deactivated users keep full access with any token issued before deactivation (tokens live 8 days). Login still refuses them, which is why it looks redundant.",
+  "truth": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /users/",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_deactivated_users_token_stops_working"
+  ],
+  "prod_caught": true,
+  "v0": "quiet",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /users/",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "manage-items",
+   "manage-own-account",
+   "operate-deployment",
+   "recover-forgotten-password",
+   "sign-in"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /users/",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "static_not_executed": [],
+  "llm": "do-not-merge",
+  "llm_control": "do-not-merge",
+  "v0_false_comfort": true,
+  "v1_false_comfort": false
+ },
+ "pr-04": {
+  "id": "pr-04",
+  "short": "dev-only user-creation API mounted in prod",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "The dev-only private router is now mounted in production: anyone can create users without authentication.",
+  "truth": [
+   "POST /private/users/"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_private_api_is_not_mounted_in_production"
+  ],
+  "prod_caught": true,
+  "v0": "quiet",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [],
+  "v1_flows": [],
+  "v1_blind": [
+   "module-level code changed (constants, config, router registration): `backend/app/api/main.py`"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [
+   "POST /private/users/"
+  ],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": "do-not-merge",
+  "llm_control": "do-not-merge",
+  "v0_false_comfort": true,
+  "v1_false_comfort": false
+ },
+ "pr-05": {
+  "id": "pr-05",
+  "short": "token lifetime 8 days \u2192 480 days",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Access tokens now live ACCESS_TOKEN_EXPIRE_MINUTES *hours*: 480 days instead of 8.",
+  "truth": [
+   "POST /login/access-token"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_access_token_lives_eight_days"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "POST /login/access-token"
+  ],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [
+   "POST /login/access-token"
+  ],
+  "v1_flows": [
+   "sign-in"
+  ],
+  "v1_blind": [
+   "module-level code changed (constants, config, router registration): `backend/app/api/routes/login.py`"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "POST /login/access-token"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-06": {
+  "id": "pr-06",
+  "short": "expired reset tokens accepted for 48h more",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Reset tokens are accepted up to 48 hours after they expire, doubling the window for a leaked reset link.",
+  "truth": [
+   "POST /reset-password/"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_expired_reset_token_is_rejected"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "POST /reset-password/"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "POST /reset-password/"
+  ],
+  "v1_flows": [
+   "recover-forgotten-password"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "POST /reset-password/"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-07": {
+  "id": "pr-07",
+  "short": "signup accepts is_superuser",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "UserRegister now inherits is_superuser and is_active from UserBase, so a visitor can sign up as a superuser.",
+  "truth": [
+   "POST /users/signup"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_signup_cannot_grant_superuser"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "POST /users/signup"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "POST /users/signup"
+  ],
+  "v1_flows": [
+   "sign-in"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": "do-not-merge",
+  "llm_control": "do-not-merge",
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-08": {
+  "id": "pr-08",
+  "short": "duplicate email \u2192 500 instead of 409",
+  "subtlety": 1,
+  "kind": "contract",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Taking another user's email now hits the unique index and returns a 500 instead of a 409.",
+  "truth": [
+   "PATCH /users/me"
+  ],
+  "ci_caught": true,
+  "ci_failed": [
+   "tests/api/routes/test_users.py::test_update_user_me_email_exists"
+  ],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_cannot_take_another_users_email"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "PATCH /users/me"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "PATCH /users/me"
+  ],
+  "v1_flows": [
+   "manage-own-account"
+  ],
+  "v1_blind": [],
+  "v1_lost": {
+   "backend/app/crud.py:get_user_by_email": [
+    "PATCH /users/me"
+   ]
+  },
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "PATCH /users/me"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-09": {
+  "id": "pr-09",
+  "short": "case-insensitive email lookup (intended)",
+  "subtlety": 2,
+  "kind": "intended",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "Email lookups become case-insensitive everywhere get_user_by_email is used. Arguably an improvement, but it changes login, signup, admin and recovery behaviour at once.",
+  "truth": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "manage-own-account",
+   "recover-forgotten-password",
+   "sign-in"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-10": {
+  "id": "pr-10",
+  "short": "argon2 dropped: existing users can't log in",
+  "subtlety": 3,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Argon2 is dropped from the hasher list. Every existing user (all hashed with argon2) can no longer log in or change their password; new signups work, so CI stays green.",
+  "truth": [
+   "PATCH /users/me/password",
+   "POST /login/access-token"
+  ],
+  "ci_caught": true,
+  "ci_failed": [
+   "tests/api/routes/test_login.py::test_login_with_bcrypt_password_upgrades_to_argon2",
+   "tests/api/routes/test_login.py::test_login_with_argon2_password_keeps_hash",
+   "tests/crud/test_user.py::test_authenticate_user_with_bcrypt_upgrades_to_argon2"
+  ],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_access_token_lives_eight_days",
+   "test_invariants.py::test_existing_users_can_still_log_in[admin@example.com]",
+   "test_invariants.py::test_existing_users_can_still_log_in[alice@example.com]",
+   "test_invariants.py::test_existing_users_can_still_log_in[bob@example.com]",
+   "test_invariants.py::test_inactive_user_cannot_log_in",
+   "test_invariants.py::test_wrong_password_and_unknown_email_fail_cleanly"
+  ],
+  "prod_caught": true,
+  "v0": "quiet",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [],
+  "v1_flows": [],
+  "v1_blind": [
+   "module-level code changed (constants, config, router registration): `backend/app/core/security.py`, `backend/app/crud.py`"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [
+   "PATCH /users/me/password",
+   "POST /login/access-token"
+  ],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": "do-not-merge",
+  "llm_control": "do-not-merge",
+  "v0_false_comfort": true,
+  "v1_false_comfort": false
+ },
+ "pr-11": {
+  "id": "pr-11",
+  "short": "admins can't clear nullable fields",
+  "subtlety": 2,
+  "kind": "contract",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Admins can no longer clear a user's full name (or any nullable field): explicit nulls are silently dropped.",
+  "truth": [
+   "PATCH /users/{user_id}"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_admin_can_clear_a_users_full_name"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "PATCH /users/{user_id}",
+   "POST /reset-password/"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "PATCH /users/{user_id}",
+   "POST /reset-password/"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "recover-forgotten-password"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [
+   "POST /reset-password/"
+  ],
+  "executed": [
+   "PATCH /users/{user_id}",
+   "POST /reset-password/"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-12": {
+  "id": "pr-12",
+  "short": "item count leaks the global total",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Normal users now see the total number of items in the system as their count (information leak); the list itself stays scoped.",
+  "truth": [
+   "GET /items/"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_item_list_and_count_are_scoped_to_the_owner"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "GET /items/"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "GET /items/"
+  ],
+  "v1_flows": [
+   "manage-items"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "GET /items/"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-13": {
+  "id": "pr-13",
+  "short": "default page size 100 \u2192 20",
+  "subtlety": 2,
+  "kind": "contract",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Clients relying on the default page size silently get 20 users instead of up to 100.",
+  "truth": [
+   "GET /users/"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_admin_user_list_default_page_returns_everyone"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "GET /users/"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "GET /users/"
+  ],
+  "v1_flows": [
+   "administer-users"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "GET /users/"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-14": {
+  "id": "pr-14",
+  "short": "NOT NULL column without default: deploy fails",
+  "subtlety": 2,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "The migration adds a NOT NULL column with no server default, so it fails on any database that already has items: the deploy breaks. An empty CI database migrates fine.",
+  "truth": [],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": false,
+  "holdout_failed": [
+   "test_invariants.py::test_admin_delete_removes_the_users_items",
+   "test_invariants.py::test_existing_items_with_long_titles_stay_readable",
+   "test_invariants.py::test_item_list_and_count_are_scoped_to_the_owner",
+   "test_invariants.py::test_response_shapes_are_unchanged",
+   "test_invariants.py::test_superuser_can_read_any_item",
+   "test_invariants.py::test_users_cannot_touch_each_others_items[DELETE]",
+   "test_invariants.py::test_users_cannot_touch_each_others_items[GET]",
+   "test_invariants.py::test_users_cannot_touch_each_others_items[PUT]"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "DELETE /items/{id}",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "PUT /items/{id}"
+  ],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "manage-items",
+   "manage-own-account",
+   "operate-deployment",
+   "recover-forgotten-password",
+   "sign-in",
+   "sign-up"
+  ],
+  "v1_blind": [
+   "schema migration: `backend/app/alembic/versions/7c1e2d3f4a5b_add_priority_to_item.py` (runs against existing data at deploy; the call graph can't judge it)"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "executed": [],
+  "static_not_executed": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "llm": "do-not-merge",
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-15": {
+  "id": "pr-15",
+  "short": "title cap 100: existing long titles 500",
+  "subtlety": 3,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Existing items with titles over 100 chars fail response validation: listing or opening them returns 500.",
+  "truth": [
+   "GET /items/",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_existing_items_with_long_titles_stay_readable",
+   "test_invariants.py::test_item_list_and_count_are_scoped_to_the_owner",
+   "test_invariants.py::test_response_shapes_are_unchanged"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "DELETE /items/{id}",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "PUT /items/{id}"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "manage-items",
+   "manage-own-account",
+   "operate-deployment",
+   "recover-forgotten-password",
+   "sign-in",
+   "sign-up"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/"
+  ],
+  "executed": [],
+  "static_not_executed": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /private/users/",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/"
+  ],
+  "llm": "do-not-merge",
+  "llm_control": "do-not-merge",
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-16": {
+  "id": "pr-16",
+  "short": "rely on FK cascade (no behaviour change)",
+  "subtlety": 0,
+  "kind": "benign",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "Behaviour-preserving: the foreign key already cascades deletes, so dropping the explicit item delete changes nothing.",
+  "truth": [],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [
+   "DELETE /users/{user_id}"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "DELETE /users/{user_id}"
+  ],
+  "v1_flows": [
+   "administer-users"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [
+   "DELETE /users/{user_id}"
+  ],
+  "executed": [
+   "DELETE /users/{user_id}"
+  ],
+  "static_not_executed": [],
+  "llm": "safe-to-merge",
+  "llm_control": "safe-to-merge",
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-17": {
+  "id": "pr-17",
+  "short": "new count endpoint (additive)",
+  "subtlety": 0,
+  "kind": "feature",
+  "breaks_prod": false,
+  "expected": "contained",
+  "what": "A new endpoint; nothing existing changes.",
+  "truth": [],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "contained",
+  "v1_spreads": [],
+  "v1_flows": [],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": "safe-to-merge",
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-18": {
+  "id": "pr-18",
+  "short": "'search' makes email lookup prefix-match",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Looks additive (a new search endpoint), but get_user_by_email now prefix-matches: logging in as 'dan@example.co' with dan@example.com's password works, and a reset token for a non-existent prefix email resets the real account.",
+  "truth": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_login_does_not_match_an_email_prefix",
+   "test_invariants.py::test_reset_token_for_unknown_email_changes_nobody"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "manage-own-account",
+   "recover-forgotten-password",
+   "sign-in"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "static_not_executed": [],
+  "llm": "do-not-merge",
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-19": {
+  "id": "pr-19",
+  "short": "frontend: confirm-password check dropped",
+  "subtlety": 2,
+  "kind": "frontend",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Signup no longer checks the confirmation field, so a typo'd password locks a new user out. No backend change at all.",
+  "truth": [],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [],
+  "v1_flows": [],
+  "v1_blind": [
+   "code with no call graph (only Python has deterministic reach): `frontend/src/routes/signup.tsx`"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-20": {
+  "id": "pr-20",
+  "short": "extract ownership helper (refactor)",
+  "subtlety": 0,
+  "kind": "benign",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "Behaviour-preserving extraction of the ownership check used by read, update and delete.",
+  "truth": [],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [
+   "DELETE /items/{id}",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "DELETE /items/{id}",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ],
+  "v1_flows": [
+   "manage-items"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [
+   "DELETE /items/{id}",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ],
+  "executed": [
+   "DELETE /items/{id}",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ],
+  "static_not_executed": [],
+  "llm": "safe-to-merge",
+  "llm_control": "safe-to-merge",
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-21": {
+  "id": "pr-21",
+  "short": "docstrings only",
+  "subtlety": 0,
+  "kind": "benign",
+  "breaks_prod": false,
+  "expected": "contained",
+  "what": "Docstrings only.",
+  "truth": [],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [
+   "DELETE /users/{user_id}",
+   "GET /users/",
+   "PATCH /users/me"
+  ],
+  "v1_py311": "blind",
+  "v1": "contained",
+  "v1_spreads": [],
+  "v1_flows": [],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": "safe-to-merge",
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-22": {
+  "id": "pr-22",
+  "short": "GET /users/me now writes",
+  "subtlety": 2,
+  "kind": "behaviour",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "GET /users/me now commits a write on every read (the dashboard calls it on every page). Harmless in tests; a read path that writes.",
+  "truth": [
+   "GET /users/me"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [
+   "GET /users/me"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "GET /users/me"
+  ],
+  "v1_flows": [
+   "sign-in"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {
+   "backend/app/models.py:UserUpdate": [
+    "GET /users/me"
+   ],
+   "backend/app/core/security.py:get_password_hash": [
+    "GET /users/me"
+   ],
+   "backend/app/crud.py:update_user": [
+    "GET /users/me"
+   ]
+  },
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "GET /users/me"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-23": {
+  "id": "pr-23",
+  "short": "recovery-email preview made public",
+  "subtlety": 2,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Anyone can render the password-recovery email for any address, which contains a valid reset link: account takeover. (Upstream's 'subject:' header bug currently makes the endpoint 500, which is the only thing in the way.)",
+  "truth": [
+   "POST /password-recovery-html-content/{email}"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_anonymous_requests_are_rejected[POST /password-recovery-html-content/{email}]",
+   "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[POST /password-recovery-html-content/{email}]"
+  ],
+  "prod_caught": true,
+  "v0": "quiet",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "POST /password-recovery-html-content/{email}"
+  ],
+  "v1_flows": [
+   "recover-forgotten-password"
+  ],
+  "v1_blind": [],
+  "v1_lost": {
+   "backend/app/models.py:TokenPayload": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:TokenDep": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:get_current_active_superuser": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:CurrentUser": [
+    "POST /password-recovery-html-content/{email}"
+   ],
+   "backend/app/api/deps.py:get_current_user": [
+    "POST /password-recovery-html-content/{email}"
+   ]
+  },
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "POST /password-recovery-html-content/{email}"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": true,
+  "v1_false_comfort": false
+ },
+ "pr-24": {
+  "id": "pr-24",
+  "short": "router list drops utils (health check)",
+  "subtlety": 2,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "The utils router is left out of the new list: the health check the deployment probes and the test-email endpoint disappear.",
+  "truth": [
+   "GET /utils/health-check/",
+   "POST /utils/test-email/"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_anonymous_requests_are_rejected[POST /utils/test-email/]",
+   "test_invariants.py::test_health_check",
+   "test_invariants.py::test_normal_users_cannot_use_admin_endpoints[POST /utils/test-email/]"
+  ],
+  "prod_caught": true,
+  "v0": "crashed",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "GET /utils/health-check/",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ],
+  "v1_flows": [
+   "administer-users",
+   "manage-items",
+   "manage-own-account",
+   "operate-deployment",
+   "recover-forgotten-password",
+   "sign-in"
+  ],
+  "v1_blind": [
+   "module-level code changed (constants, config, router registration): `backend/app/api/main.py`",
+   "22 entry point(s) left the inventory although their handlers still exist (registration the adapter can't read?): `DELETE /items/{id}`, `DELETE /users/me`, `DELETE /users/{user_id}`, `GET /items/`"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "PUT /items/{id}"
+  ],
+  "executed": [],
+  "static_not_executed": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/access-token",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup",
+   "PUT /items/{id}"
+  ],
+  "llm": "do-not-merge",
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-25": {
+  "id": "pr-25",
+  "short": "reset links live 14 days",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Reset links now stay valid for 14 days instead of 48 hours.",
+  "truth": [
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [
+   "test_invariants.py::test_reset_links_live_48_hours"
+  ],
+  "prod_caught": true,
+  "v0": "speaks",
+  "v0_flagged": [],
+  "v1_py311": "blind",
+  "v1": "blind",
+  "v1_spreads": [],
+  "v1_flows": [],
+  "v1_blind": [
+   "class bodies changed whose fields the call graph doesn't follow (models, settings): `Settings`"
+  ],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}"
+  ],
+  "extra": [],
+  "executed": [],
+  "static_not_executed": [],
+  "llm": "needs-answers",
+  "llm_control": "needs-answers",
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ },
+ "pr-26": {
+  "id": "pr-26",
+  "short": "unknown-email login skips hashing (timing leak)",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Failed logins for unknown emails return fast, so response timing reveals which emails have accounts.",
+  "truth": [
+   "POST /login/access-token"
+  ],
+  "ci_caught": false,
+  "ci_failed": [],
+  "deploy_ok": true,
+  "holdout_failed": [],
+  "prod_caught": false,
+  "v0": "speaks",
+  "v0_flagged": [
+   "POST /login/access-token"
+  ],
+  "v1_py311": "blind",
+  "v1": "spreads",
+  "v1_spreads": [
+   "POST /login/access-token"
+  ],
+  "v1_flows": [
+   "sign-in"
+  ],
+  "v1_blind": [],
+  "v1_lost": {},
+  "v1_gained": {},
+  "missed": [],
+  "extra": [],
+  "executed": [
+   "POST /login/access-token"
+  ],
+  "static_not_executed": [],
+  "llm": null,
+  "llm_control": null,
+  "v0_false_comfort": false,
+  "v1_false_comfort": false
+ }
+}

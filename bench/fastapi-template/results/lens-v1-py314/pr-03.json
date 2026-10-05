@@ -1,0 +1,186 @@
+{
+ "base": "main",
+ "head": "pr-03",
+ "files": [
+  "backend/app/api/deps.py"
+ ],
+ "code": [
+  "backend/app/api/deps.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/deps.py:get_current_user"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-lists-users",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "administer-users",
+   "step": "admin-deletes-user",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "administer-users",
+   "step": "admin-looks-up-user",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-views-items",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-creates-item",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-edits-item",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "user-deletes-item",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-items",
+   "step": "api-client-reads-item",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-own-account",
+   "step": "user-updates-profile",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-own-account",
+   "step": "user-changes-password",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "manage-own-account",
+   "step": "user-deletes-own-account",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "sign-in",
+   "step": "app-loads-current-user",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  },
+  {
+   "flow": "sign-in",
+   "step": "api-client-checks-token",
+   "matched": [
+    "backend/app/api/deps.py:get_current_user"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/deps.py:get_current_user": [
+   "DELETE /items/{id}",
+   "DELETE /users/me",
+   "DELETE /users/{user_id}",
+   "GET /items/",
+   "GET /items/{id}",
+   "GET /users/",
+   "GET /users/me",
+   "GET /users/{user_id}",
+   "PATCH /users/me",
+   "PATCH /users/me/password",
+   "PATCH /users/{user_id}",
+   "POST /items/",
+   "POST /login/test-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /users/",
+   "POST /utils/test-email/",
+   "PUT /items/{id}"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-creates-user",
+  "administer-users/admin-deletes-user",
+  "administer-users/admin-edits-user",
+  "administer-users/admin-lists-users",
+  "administer-users/admin-looks-up-user",
+  "manage-items/api-client-reads-item",
+  "manage-items/user-creates-item",
+  "manage-items/user-deletes-item",
+  "manage-items/user-edits-item",
+  "manage-items/user-views-items",
+  "manage-own-account/user-changes-password",
+  "manage-own-account/user-deletes-own-account",
+  "manage-own-account/user-updates-profile",
+  "operate-deployment/admin-sends-test-email",
+  "recover-forgotten-password/admin-previews-recovery-email",
+  "sign-in/api-client-checks-token",
+  "sign-in/app-loads-current-user"
+ ],
+ "hidden_steps": [
+  "administer-users/admin-creates-user",
+  "administer-users/admin-edits-user",
+  "operate-deployment/admin-sends-test-email",
+  "recover-forgotten-password/admin-previews-recovery-email"
+ ],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "DELETE /items/{id}",
+  "DELETE /users/me",
+  "DELETE /users/{user_id}",
+  "GET /items/",
+  "GET /items/{id}",
+  "GET /users/",
+  "GET /users/me",
+  "GET /users/{user_id}",
+  "PATCH /users/me",
+  "PATCH /users/me/password",
+  "PATCH /users/{user_id}",
+  "POST /items/",
+  "POST /login/test-token",
+  "POST /password-recovery-html-content/{email}",
+  "POST /users/",
+  "POST /utils/test-email/",
+  "PUT /items/{id}"
+ ]
+}

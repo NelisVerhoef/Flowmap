@@ -1,0 +1,314 @@
+{
+ "_about": "What each planted change really does. subtlety: 1 = a careful reviewer reading the diff spots it, 2 = needs context, 3 = looks like a harmless refactor or improvement. affected = existing endpoints whose behaviour changes for someone. breaks_prod = a user or operator of an existing deployment is hurt. expected = what an honest change-safety verdict should say: spreads (names the existing flows it reaches), blind (says it cannot see this kind of change), contained (no existing behaviour changes).",
+ "pr-01": {
+  "short": "item ownership check removed",
+  "subtlety": 1,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Any signed-in user can read any item by id; the ownership check is gone from read_item.",
+  "affected": [
+   "GET /items/{id}"
+  ]
+ },
+ "pr-02": {
+  "short": "admin check on delete-user moved, wrong subject",
+  "subtlety": 2,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "The superuser dependency is replaced by a check on the *target* user, so any normal user can delete any non-superuser account (and its items).",
+  "affected": [
+   "DELETE /users/{user_id}"
+  ]
+ },
+ "pr-03": {
+  "short": "inactive-user check dropped from auth dependency",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Deactivated users keep full access with any token issued before deactivation (tokens live 8 days). Login still refuses them, which is why it looks redundant.",
+  "affected": [
+   "GET /items/",
+   "POST /items/",
+   "GET /items/{id}",
+   "PUT /items/{id}",
+   "DELETE /items/{id}",
+   "POST /login/test-token",
+   "GET /users/",
+   "POST /users/",
+   "GET /users/me",
+   "PATCH /users/me",
+   "DELETE /users/me",
+   "PATCH /users/me/password",
+   "GET /users/{user_id}",
+   "PATCH /users/{user_id}",
+   "DELETE /users/{user_id}",
+   "POST /password-recovery-html-content/{email}",
+   "POST /utils/test-email/"
+  ]
+ },
+ "pr-04": {
+  "short": "dev-only user-creation API mounted in prod",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "The dev-only private router is now mounted in production: anyone can create users without authentication.",
+  "affected": [
+   "POST /private/users/"
+  ]
+ },
+ "pr-05": {
+  "short": "token lifetime 8 days → 480 days",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Access tokens now live ACCESS_TOKEN_EXPIRE_MINUTES *hours*: 480 days instead of 8.",
+  "affected": [
+   "POST /login/access-token"
+  ]
+ },
+ "pr-06": {
+  "short": "expired reset tokens accepted for 48h more",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Reset tokens are accepted up to 48 hours after they expire, doubling the window for a leaked reset link.",
+  "affected": [
+   "POST /reset-password/"
+  ]
+ },
+ "pr-07": {
+  "short": "signup accepts is_superuser",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "UserRegister now inherits is_superuser and is_active from UserBase, so a visitor can sign up as a superuser.",
+  "affected": [
+   "POST /users/signup"
+  ]
+ },
+ "pr-08": {
+  "short": "duplicate email → 500 instead of 409",
+  "subtlety": 1,
+  "kind": "contract",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Taking another user's email now hits the unique index and returns a 500 instead of a 409.",
+  "affected": [
+   "PATCH /users/me"
+  ]
+ },
+ "pr-09": {
+  "short": "case-insensitive email lookup (intended)",
+  "subtlety": 2,
+  "kind": "intended",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "Email lookups become case-insensitive everywhere get_user_by_email is used. Arguably an improvement, but it changes login, signup, admin and recovery behaviour at once.",
+  "affected": [
+   "POST /login/access-token",
+   "POST /users/",
+   "PATCH /users/me",
+   "POST /users/signup",
+   "PATCH /users/{user_id}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /password-recovery-html-content/{email}"
+  ]
+ },
+ "pr-10": {
+  "short": "argon2 dropped: existing users can't log in",
+  "subtlety": 3,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Argon2 is dropped from the hasher list. Every existing user (all hashed with argon2) can no longer log in or change their password; new signups work, so CI stays green.",
+  "affected": [
+   "POST /login/access-token",
+   "PATCH /users/me/password"
+  ]
+ },
+ "pr-11": {
+  "short": "admins can't clear nullable fields",
+  "subtlety": 2,
+  "kind": "contract",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Admins can no longer clear a user's full name (or any nullable field): explicit nulls are silently dropped.",
+  "affected": [
+   "PATCH /users/{user_id}"
+  ]
+ },
+ "pr-12": {
+  "short": "item count leaks the global total",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Normal users now see the total number of items in the system as their count (information leak); the list itself stays scoped.",
+  "affected": [
+   "GET /items/"
+  ]
+ },
+ "pr-13": {
+  "short": "default page size 100 → 20",
+  "subtlety": 2,
+  "kind": "contract",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Clients relying on the default page size silently get 20 users instead of up to 100.",
+  "affected": [
+   "GET /users/"
+  ]
+ },
+ "pr-14": {
+  "short": "NOT NULL column without default: deploy fails",
+  "subtlety": 2,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "The migration adds a NOT NULL column with no server default, so it fails on any database that already has items: the deploy breaks. An empty CI database migrates fine.",
+  "affected": [
+   "deploy"
+  ]
+ },
+ "pr-15": {
+  "short": "title cap 100: existing long titles 500",
+  "subtlety": 3,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Existing items with titles over 100 chars fail response validation: listing or opening them returns 500.",
+  "affected": [
+   "GET /items/",
+   "GET /items/{id}",
+   "PUT /items/{id}"
+  ]
+ },
+ "pr-16": {
+  "short": "rely on FK cascade (no behaviour change)",
+  "subtlety": 0,
+  "kind": "benign",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "Behaviour-preserving: the foreign key already cascades deletes, so dropping the explicit item delete changes nothing.",
+  "affected": []
+ },
+ "pr-17": {
+  "short": "new count endpoint (additive)",
+  "subtlety": 0,
+  "kind": "feature",
+  "breaks_prod": false,
+  "expected": "contained",
+  "what": "A new endpoint; nothing existing changes.",
+  "affected": []
+ },
+ "pr-18": {
+  "short": "'search' makes email lookup prefix-match",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Looks additive (a new search endpoint), but get_user_by_email now prefix-matches: logging in as 'dan@example.co' with dan@example.com's password works, and a reset token for a non-existent prefix email resets the real account.",
+  "affected": [
+   "POST /login/access-token",
+   "POST /users/",
+   "PATCH /users/me",
+   "POST /users/signup",
+   "PATCH /users/{user_id}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /password-recovery-html-content/{email}"
+  ]
+ },
+ "pr-19": {
+  "short": "frontend: confirm-password check dropped",
+  "subtlety": 2,
+  "kind": "frontend",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Signup no longer checks the confirmation field, so a typo'd password locks a new user out. No backend change at all.",
+  "affected": []
+ },
+ "pr-20": {
+  "short": "extract ownership helper (refactor)",
+  "subtlety": 0,
+  "kind": "benign",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "Behaviour-preserving extraction of the ownership check used by read, update and delete.",
+  "affected": []
+ },
+ "pr-21": {
+  "short": "docstrings only",
+  "subtlety": 0,
+  "kind": "benign",
+  "breaks_prod": false,
+  "expected": "contained",
+  "what": "Docstrings only.",
+  "affected": []
+ },
+ "pr-22": {
+  "short": "GET /users/me now writes",
+  "subtlety": 2,
+  "kind": "behaviour",
+  "breaks_prod": false,
+  "expected": "spreads",
+  "what": "GET /users/me now commits a write on every read (the dashboard calls it on every page). Harmless in tests; a read path that writes.",
+  "affected": [
+   "GET /users/me"
+  ]
+ },
+ "pr-23": {
+  "short": "recovery-email preview made public",
+  "subtlety": 2,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Anyone can render the password-recovery email for any address, which contains a valid reset link: account takeover. (Upstream's 'subject:' header bug currently makes the endpoint 500, which is the only thing in the way.)",
+  "affected": [
+   "POST /password-recovery-html-content/{email}"
+  ]
+ },
+ "pr-24": {
+  "short": "router list drops utils (health check)",
+  "subtlety": 2,
+  "kind": "availability",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "The utils router is left out of the new list: the health check the deployment probes and the test-email endpoint disappear.",
+  "affected": [
+   "GET /utils/health-check/",
+   "POST /utils/test-email/"
+  ]
+ },
+ "pr-25": {
+  "short": "reset links live 14 days",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "blind",
+  "what": "Reset links now stay valid for 14 days instead of 48 hours.",
+  "affected": [
+   "POST /password-recovery/{email}",
+   "POST /password-recovery-html-content/{email}"
+  ]
+ },
+ "pr-26": {
+  "short": "unknown-email login skips hashing (timing leak)",
+  "subtlety": 3,
+  "kind": "security",
+  "breaks_prod": true,
+  "expected": "spreads",
+  "what": "Failed logins for unknown emails return fast, so response timing reveals which emails have accounts.",
+  "affected": [
+   "POST /login/access-token"
+  ]
+ }
+}

@@ -1,0 +1,136 @@
+{
+ "base": "main",
+ "head": "pr-18",
+ "files": [
+  "backend/app/api/routes/users.py",
+  "backend/app/crud.py"
+ ],
+ "code": [
+  "backend/app/api/routes/users.py",
+  "backend/app/crud.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/users.py:<module>",
+  "backend/app/api/routes/users.py:search_users",
+  "backend/app/crud.py:<module>",
+  "backend/app/crud.py:get_user_by_email",
+  "backend/app/crud.py:search_users"
+ ],
+ "new_symbols": [
+  "backend/app/api/routes/users.py:search_users",
+  "backend/app/crud.py:search_users"
+ ],
+ "endpoints_added": [
+  "GET /users/search"
+ ],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-creates-user",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "administer-users",
+   "step": "admin-edits-user",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "manage-own-account",
+   "step": "user-updates-profile",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "recover-forgotten-password",
+   "step": "user-requests-recovery-email",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "recover-forgotten-password",
+   "step": "user-sets-new-password",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "recover-forgotten-password",
+   "step": "admin-previews-recovery-email",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "sign-in",
+   "step": "visitor-registers-account",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  },
+  {
+   "flow": "sign-in",
+   "step": "user-logs-in",
+   "matched": [
+    "backend/app/crud.py:get_user_by_email"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/users.py:search_users": [
+   "GET /users/search"
+  ],
+  "backend/app/crud.py:get_user_by_email": [
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ],
+  "backend/app/crud.py:search_users": [
+   "GET /users/search",
+   "PATCH /users/me",
+   "PATCH /users/{user_id}",
+   "POST /login/access-token",
+   "POST /password-recovery-html-content/{email}",
+   "POST /password-recovery/{email}",
+   "POST /reset-password/",
+   "POST /users/",
+   "POST /users/signup"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-creates-user",
+  "administer-users/admin-edits-user",
+  "manage-own-account/user-updates-profile",
+  "recover-forgotten-password/admin-previews-recovery-email",
+  "recover-forgotten-password/user-requests-recovery-email",
+  "recover-forgotten-password/user-sets-new-password",
+  "sign-in/user-logs-in",
+  "sign-in/visitor-registers-account"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 5,
+  "edges_removed": 0,
+  "gained": {},
+  "lost": {}
+ },
+ "off_map": [
+  "backend/app/api/routes/users.py:<module>",
+  "backend/app/api/routes/users.py:search_users",
+  "backend/app/crud.py:<module>",
+  "backend/app/crud.py:search_users"
+ ]
+}

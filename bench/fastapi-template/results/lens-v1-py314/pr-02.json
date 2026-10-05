@@ -1,0 +1,53 @@
+{
+ "base": "main",
+ "head": "pr-02",
+ "files": [
+  "backend/app/api/routes/users.py"
+ ],
+ "code": [
+  "backend/app/api/routes/users.py"
+ ],
+ "tests": [],
+ "other": [],
+ "changed": [
+  "backend/app/api/routes/users.py:delete_user"
+ ],
+ "new_symbols": [],
+ "cosmetic": [],
+ "endpoints_added": [],
+ "endpoints_removed": [],
+ "touched": [
+  {
+   "flow": "administer-users",
+   "step": "admin-deletes-user",
+   "matched": [
+    "backend/app/api/routes/users.py:delete_user"
+   ]
+  }
+ ],
+ "reach": {
+  "backend/app/api/routes/users.py:delete_user": [
+   "DELETE /users/{user_id}"
+  ]
+ },
+ "reach_steps": [
+  "administer-users/admin-deletes-user"
+ ],
+ "hidden_steps": [],
+ "reach_diff": {
+  "edges_added": 0,
+  "edges_removed": 1,
+  "gained": {},
+  "lost": {
+   "backend/app/api/deps.py:get_current_active_superuser": [
+    "DELETE /users/{user_id}"
+   ]
+  }
+ },
+ "off_map": [],
+ "blind": [],
+ "verdict": "spreads",
+ "spreads_to": [
+  "DELETE /users/{user_id}"
+ ]
+}
