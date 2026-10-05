@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 /site/
 .fjall/
+
+# agent planning notes stay local
+/docs/superpowers/

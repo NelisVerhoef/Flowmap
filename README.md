@@ -17,6 +17,30 @@ Python 3.11+, no dependencies.
 | React SPA | its backend's entry points; top-down passes start from its router | via the backend |
 | Python CLI | `if __name__ == "__main__"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |
 
+## On a new machine
+
+Python 3.11+ and `git`. In Claude Code, inside any session:
+
+```
+/plugin marketplace add NelisVerhoef/flowmap
+/plugin install flowmap@flowmap
+```
+
+Claude Code clones over SSH when `ssh -T git@github.com` works, else over HTTPS; on a machine
+without a GitHub SSH key, `export CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` skips the probe.
+
+For `flowmap` in your own terminal too (the plugin's copy is only on Claude Code's PATH):
+
+```bash
+git clone https://github.com/NelisVerhoef/flowmap.git ~/src/flowmap
+echo 'export PATH="$HOME/src/flowmap/bin:$PATH"' >> ~/.zshrc && exec zsh
+flowmap                          # prints the command list
+```
+
+To update: `git pull` in the clone, and `/plugin marketplace update flowmap` in Claude Code.
+The plugin only refreshes when `version` in `.claude-plugin/plugin.json` changes, so bump it
+on each release. The change viewer at `flowmap.testabl.ai` needs nothing on the machine.
+
 ## First time in a repo
 
 ```bash
@@ -118,3 +142,7 @@ with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (se
 `graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then
 `flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node
 the builder emits.
+
+## License
+
+Apache 2.0, see [LICENSE](LICENSE).
