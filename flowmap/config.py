@@ -9,8 +9,14 @@ Every key is optional; a repo with no config gets discovery mode and auto-detect
     viewer = "https://.../change.html"         # hosted `flowmap viewer`, for `flowmap change --link`
 
     [[entry]]                                  # one per app; see adapters/ for options
-    adapter = "fastapi"                        # fastapi | rails | nextjs | cli
+    adapter = "fastapi"                        # fastapi | rails | nextjs | cli | pattern | list
     main = "backend/app/main.py"
+
+    [[entry]]                                  # any other stack: a regex for its registrations
+    adapter = "pattern"
+    files = ["svc/mcp/*.py"]
+    match = '''@\\w+\\.tool\\b'''              # TOML '''...''': backslashes and quotes stay literal
+    endpoint = "MCP {def}"
 
     [code]
     graph = ["backend/app", "web/src"]         # call-graph sources (deterministic reach); `python` is the old name
@@ -26,6 +32,7 @@ Every key is optional; a repo with no config gets discovery mode and auto-detect
 """
 
 import os
+import re
 import subprocess
 import tomllib
 from functools import cache
@@ -139,6 +146,10 @@ def app_dirs():
         elif e["adapter"] == "cli":
             dirs += [e["commands"].strip("/")] if e.get("commands") else []
             dirs += [str(Path(e["main"]).parent)] if e.get("main") else []
+        elif e["adapter"] == "pattern":  # a glob's directory part, up to its first wildcard
+            dirs += [str(Path(re.split(r"[*?[]", g)[0] + "x").parent) for g in e["files"]]
+        elif e["adapter"] == "list":
+            dirs += [str(Path(x["handler"].split(":", 1)[0]).parent) for x in e["entries"]]
     return sorted(set(dirs))
 
 

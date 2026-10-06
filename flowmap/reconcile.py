@@ -88,10 +88,10 @@ def path_regex(path):
 TEST_EXT = {".py", ".rb", ".ts", ".tsx", ".js", ".jsx", ".mjs"}
 
 
-def tested_endpoints(inventory):
+def tested_endpoints(inventory, text=None):
     """Entry points a test names: their concrete path, or an alias such as a Rails path
     helper (cheap, honest proxy). Test dirs come from flowmap.toml [code].tests."""
-    text = "\n".join(p.read_text(errors="replace") for d in config.load()["code"]["tests"]
+    text = text if text is not None else "\n".join(p.read_text(errors="replace") for d in config.load()["code"]["tests"]
                      for p in (ROOT / d).rglob("*") if p.suffix in TEST_EXT and p.is_file())
     hits = set()
     for e in inventory:
@@ -102,6 +102,8 @@ def tested_endpoints(inventory):
                                    rf"['\"]{re.escape(target.split(' ', 1)[-1])}['\"]", text) if " " in target else None
         elif kind == "ACTION":
             target_hit = re.search(rf"\b{re.escape(target.rsplit('#', 1)[1])}\b", text)
+        elif not target.startswith("/"):  # a named entry (MCP tool, job): tests quote its name
+            target_hit = re.search(rf"['\"]{re.escape(target)}['\"]", text)
         else:
             target_hit = path_regex(re.sub(r"\{(\w+):\w+\}", r"{\1}", target)).search(text)
         if target_hit or any(re.search(rf"\b{re.escape(a)}\b", text) for a in e.get("aliases", [])):
