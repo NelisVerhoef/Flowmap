@@ -1,0 +1,519 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entry points for any stack come from rules the setup session writes</title>
+<!--fonts--><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><!--/fonts-->
+<style>
+/* Layout: a change told as chapters on a fixed system map. The map keeps the atlas's positions
+   so the same place always looks the same; each chapter says where, before -> after, why, and
+   what to ask. Code is folded at the end of each chapter. */
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6676;
+  --rule: #cdd4dc;
+  --line: #9aa6b4;
+  --accent: #2e5bff;
+  --accent-soft: rgba(46, 91, 255, .12);
+  --core: #2e5bff;
+  --support: #0f7c86;
+  --refactor: #6b7686;
+  --outside: #b7791f;
+  --gain: #1e8a4c;
+  --loss: #c8423b;
+  --code-bg: #f6f8fa;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+    --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+    --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+    --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+  --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+  --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+  --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { padding-inline: 16px; padding-block: 28px 64px; max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+p code, li code, dd code { background: var(--accent-soft); padding: 0 .3em; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+
+/* header */
+header { display: grid; gap: 12px; }
+header h1 { font: 800 clamp(28px, 4.4vw, 44px)/1.02 var(--display); font-stretch: 74%; margin: 0; max-width: 24ch; }
+.range { color: var(--muted); font-size: 13px; }
+.range a { color: inherit; }
+.delta { font-size: 18px; line-height: 1.5; max-width: 68ch; margin: 0; }
+.intent { color: var(--muted); max-width: 68ch; margin: 0; font-size: 14px; }
+
+/* system numbers: each with what drives it */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.tile { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile b { font: 700 22px/1.1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; }
+.tile small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.tile.zero b { color: var(--muted); }
+
+/* the map */
+.map { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
+.map-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; }
+.map-head h2 { font: 700 15px var(--display); font-stretch: 80%; margin: 0; letter-spacing: .02em; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lines { overflow-x: auto; }
+.lines-inner { display: grid; grid-template-columns: repeat(var(--flows, 3), minmax(190px, 1fr)); gap: 14px; }
+.flow h3 { font: 700 13px/1.2 var(--display); font-stretch: 78%; margin: 0 0 8px; padding-left: 4px; letter-spacing: .02em; }
+.flow.quiet h3 { color: var(--muted); }
+.stations { list-style: none; margin: 0; padding: 0; position: relative; display: grid; gap: 2px; }
+.stations::before { content: ""; position: absolute; left: 11px; top: 12px; bottom: 12px; width: 3px; background: var(--line); border-radius: 2px; }
+.st { position: relative; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 6px; align-items: start;
+  padding: 5px 6px 5px 0; border-radius: 6px; font-size: 12.5px; line-height: 1.3; }
+.st .pin { width: 13px; height: 13px; border-radius: 50%; background: var(--surface); border: 3px solid var(--line);
+  justify-self: center; margin-top: 2px; position: relative; z-index: 1; }
+.st.hit .pin { border-color: var(--accent); background: var(--accent); }
+.st.quiet { color: var(--muted); }
+.st .refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ref { font: 600 11px/1 var(--mono); border-radius: 999px; padding: 3px 7px; border: 1px solid currentColor; color: var(--role, var(--accent));
+  background: none; cursor: pointer; text-decoration: none; }
+.ref:hover { background: var(--accent-soft); }
+.offmap { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* chapters */
+.chapters { display: grid; gap: 22px; counter-reset: ch; }
+.chapter { --role: var(--accent); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+  padding: 20px; display: grid; gap: 16px; scroll-margin-top: 16px; border-top: 4px solid var(--role); }
+.chapter.core { --role: var(--core); } .chapter.supporting { --role: var(--support); }
+.chapter.refactor { --role: var(--refactor); } .chapter.outside, .chapter.unassigned, .chapter.off-map { --role: var(--outside); }
+.chapter:target, .chapter.targeted { box-shadow: 0 0 0 3px var(--accent-soft); }
+.ch-head { display: grid; gap: 6px; }
+.ch-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.num { font: 800 13px var(--mono); color: var(--surface); background: var(--role); border-radius: 6px; padding: 2px 8px; }
+.tag { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--role); }
+.kind { font-size: 12px; color: var(--muted); }
+.chapter h2 { font: 750 clamp(20px, 2.6vw, 26px)/1.15 var(--display); font-stretch: 80%; margin: 0; }
+.claim { margin: 0; color: var(--muted); max-width: 70ch; }
+
+.where { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 720px) { .where { grid-template-columns: minmax(0, 1fr); } }
+.here { display: grid; gap: 8px; }
+.minimap { background: var(--paper); border-radius: 8px; padding: 10px; }
+.minimap svg { display: block; width: 100%; height: auto; }
+.minimap .dot { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+.minimap .dot.on { fill: var(--role); stroke: var(--role); }
+.minimap .rail { stroke: var(--line); stroke-width: 2; }
+.minimap text { fill: var(--muted); font: 9px var(--body); }
+.crumbs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.crumbs li { display: grid; gap: 1px; }
+.crumbs .flow-name { color: var(--muted); font-size: 11.5px; }
+
+.morph { display: grid; gap: 10px; margin: 0; }
+.morph > div { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; }
+.morph dt { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: 3px; }
+.morph dd { margin: 0; }
+.morph .after dd { font-weight: 500; }
+.why { border-left: 3px solid var(--role); padding: 6px 12px; background: var(--paper); border-radius: 0 8px 8px 0; display: grid; gap: 2px; }
+.why p { margin: 0; max-width: 72ch; }
+
+.evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px 24px; }
+.evidence > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.paths, .callers, .edges { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.path span { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
+.path span.end { border-color: var(--role); color: var(--role); }
+.path i { color: var(--muted); font-style: normal; }
+.callers li, .edges li { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.mark { font-family: var(--body); font-size: 11px; font-weight: 600; flex: none; width: 72px; }
+.mark.yes { color: var(--gain); } .mark.no { color: var(--outside); }
+.edges .add { color: var(--gain); } .edges .rem { color: var(--loss); }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+.qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: q; }
+.q { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.q input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+.q label { display: grid; gap: 3px; cursor: pointer; }
+.q .qtext { font-weight: 500; }
+.q .qwhy { color: var(--muted); font-size: 13px; }
+.qkind { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+.qkind.ask { background: var(--accent-soft); color: var(--accent); }
+.qkind.check { background: var(--paper); color: var(--muted); border: 1px solid var(--rule); }
+.qkind.graph { background: var(--paper); color: var(--support); border: 1px solid var(--rule); }
+
+details.code { border-top: 1px dashed var(--rule); padding-top: 10px; }
+details.code summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.hunk { margin-top: 10px; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.hunk .hh { font: 11.5px var(--mono); color: var(--muted); padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.hunk pre { margin: 0; overflow-x: auto; background: var(--code-bg); font: 12px/1.5 var(--mono); padding: 6px 0; }
+.hunk pre span { display: block; padding: 0 10px; white-space: pre; min-width: max-content; }
+.hunk .a { background: rgba(30, 138, 76, .13); } .hunk .r { background: rgba(200, 66, 59, .13); }
+
+/* the review note */
+.ask-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: grid; gap: 12px; }
+.ask-box h2 { font: 750 22px var(--display); font-stretch: 80%; margin: 0; }
+.ask-box textarea { width: 100%; min-height: 160px; font: 13px/1.5 var(--mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 8px; padding: 10px; resize: vertical; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button.primary { font: 600 14px var(--body); background: var(--accent); color: var(--surface); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.status { font-size: 13px; color: var(--muted); }
+.folded { font-size: 13px; color: var(--muted); }
+
+/* viewer mode: no data in the page or the link, so ask for a file */
+.drop { background: var(--surface); border: 2px dashed var(--rule); border-radius: 12px; padding: 32px 20px; display: grid; gap: 10px; justify-items: start; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h1 { font: 800 28px/1.1 var(--display); font-stretch: 74%; margin: 0; }
+.drop p { margin: 0; max-width: 68ch; color: var(--muted); }
+.drop .err { color: var(--loss); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+  <header id="top"></header>
+  <section class="tiles" id="tiles" aria-label="How the system moved"></section>
+  <section class="map" aria-label="System map">
+    <div class="map-head">
+      <h2>Where this lands on the system</h2>
+      <div class="legend"><span><i class="ref" style="cursor:default">1</i> chapter that runs here</span><span>grey: untouched</span></div>
+    </div>
+    <div class="lines"><div class="lines-inner" id="lines"></div></div>
+    <div class="offmap" id="offmap" hidden></div>
+  </section>
+  <section class="chapters" id="chapters" aria-label="Chapters"></section>
+  <section class="ask-box" aria-labelledby="ask-h">
+    <h2 id="ask-h">Questions for the author</h2>
+    <p class="note">Ticked questions collect here. Copy them into the PR as your review.</p>
+    <textarea id="note" aria-label="Review note" readonly></textarea>
+    <div class="row"><button class="primary" id="copy" type="button">Copy questions</button><span class="status" id="status" aria-live="polite"></span></div>
+    <p class="folded" id="folded"></p>
+  </section>
+</div>
+
+<script type="module">
+// The data is embedded by `flowmap change`, or, in the hosted viewer, carried in the link's fragment
+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server; failing both,
+// the reader drops a change page or its JSON. Either way it is read here and goes nowhere else.
+const EMBEDDED = {"facts":{"base":"origin/main","head":"8c1da12","base_sha":"575d7c4","head_sha":"8c1da12","name":"flowmap","map":[{"id":"new:discover-entry-points","steps":[{"key":"new:discover-entry-points/list-entry-points","name":"Maintainer lists every entry point the repo exposes into inventory.json","endpoints":["CLI flowmap inventory"],"evidence":"agreed"}]},{"id":"new:review-change-on-map","steps":[{"key":"new:review-change-on-map/generate-diagrams","name":"Maintainer generates Mermaid diagrams at system, flow and step zoom","endpoints":["CLI flowmap diagrams"],"evidence":"agreed"},{"key":"new:review-change-on-map/lens-place-change","name":"Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)","endpoints":["CLI flowmap lens"],"evidence":"agreed"},{"key":"new:review-change-on-map/callgraph-impact","name":"Developer asks which entry points and flows can reach a file:symbol","endpoints":["CLI flowmap callgraph"],"evidence":"agreed"},{"key":"new:review-change-on-map/build-atlas","name":"Maintainer builds the interactive atlas page and browses flows, steps and components","endpoints":["CLI flowmap atlas"],"evidence":"agreed"}]},{"id":"new:run-mapping-passes","steps":[{"key":"new:run-mapping-passes/write-pass-brief","name":"Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)","endpoints":["CLI flowmap brief"],"evidence":"agreed"},{"key":"new:run-mapping-passes/reconcile-runs","name":"Maintainer votes the passes into one map with evidence levels and a list of open questions","endpoints":["CLI flowmap reconcile"],"evidence":"agreed"},{"key":"new:run-mapping-passes/verify-pass-citations","name":"Maintainer checks each pass's anchors exist and every entry point is placed","endpoints":["CLI flowmap verify"],"evidence":"agreed"}]}],"files":[{"path":".claude-plugin/plugin.json","kind":"outside","added":1,"removed":1},{"path":"README.md","kind":"doc","added":6,"removed":0},{"path":"flowmap/adapters/__init__.py","kind":"code","added":11,"removed":7},{"path":"flowmap/adapters/listed.py","kind":"code","added":18,"removed":0},{"path":"flowmap/adapters/pattern.py","kind":"code","added":67,"removed":0},{"path":"flowmap/brief.py","kind":"code","added":9,"removed":0},{"path":"flowmap/config.py","kind":"code","added":12,"removed":1},{"path":"flowmap/graphs/python.py","kind":"code","added":33,"removed":35},{"path":"flowmap/reconcile.py","kind":"code","added":4,"removed":2},{"path":"skills/flowmap-build/SKILL.md","kind":"doc","added":12,"removed":2},{"path":"tests/golden/change-facts-6d9eaff-770f1a7.json","kind":"outside","added":101,"removed":93},{"path":"tests/golden/graph-770f1a7.json","kind":"outside","added":8,"removed":0},{"path":"tests/golden/lens-6d9eaff-770f1a7.md","kind":"doc","added":5,"removed":5},{"path":"tests/test_graphs.py","kind":"outside","added":9,"removed":0},{"path":"tests/test_pattern.py","kind":"outside","added":192,"removed":0}],"symbols":[{"id":"flowmap/adapters/__init__.py:entries","file":"flowmap/adapters/__init__.py","sym":"entries","status":"modified","contract":false,"signature":null,"steps":["new:discover-entry-points/list-entry-points","new:review-change-on-map/lens-place-change","new:review-change-on-map/callgraph-impact","new:review-change-on-map/build-atlas"],"witness":{"new:discover-entry-points/list-entry-points":["flowmap/inventory.py:__main__","flowmap/inventory.py:endpoints","flowmap/adapters/__init__.py:entries"],"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:endpoint_set","flowmap/inventory.py:endpoints","flowmap/adapters/__init__.py:entries"],"new:review-change-on-map/callgraph-impact":["flowmap/callgraph.py:__main__","flowmap/inventory.py:endpoints","flowmap/adapters/__init__.py:entries"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay","flowmap/lens.py:endpoint_set","flowmap/inventory.py:endpoints","flowmap/adapters/__init__.py:entries"]},"callers":[{"id":"flowmap/inventory.py:endpoints","edited":false}]},{"id":"flowmap/adapters/listed.py:entries","file":"flowmap/adapters/listed.py","sym":"entries","status":"new","contract":false,"signature":[null,"spec, read"],"steps":[],"witness":{},"callers":[]},{"id":"flowmap/adapters/pattern.py:_files","file":"flowmap/adapters/pattern.py","sym":"_files","status":"new","contract":false,"signature":[null,"globs, ref=None"],"steps":[],"witness":{},"callers":[{"id":"flowmap/adapters/pattern.py:entries","edited":true}]},{"id":"flowmap/adapters/pattern.py:_handler","file":"flowmap/adapters/pattern.py","sym":"_handler","status":"new","contract":false,"signature":[null,"syms, line, name"],"steps":[],"witness":{},"callers":[{"id":"flowmap/adapters/pattern.py:entries","edited":true}]},{"id":"flowmap/adapters/pattern.py:_fill.one","file":"flowmap/adapters/pattern.py","sym":"_fill.one","status":"new","contract":false,"signature":[null,"m"],"steps":[],"witness":{},"callers":[{"id":"flowmap/adapters/pattern.py:_fill","edited":false}]},{"id":"flowmap/adapters/pattern.py:entries","file":"flowmap/adapters/pattern.py","sym":"entries","status":"new","contract":false,"signature":[null,"spec, read"],"steps":[],"witness":{},"callers":[]},{"id":"flowmap/brief.py:main","file":"flowmap/brief.py","sym":"main","status":"modified","contract":false,"signature":null,"steps":["new:run-mapping-passes/write-pass-brief"],"witness":{"new:run-mapping-passes/write-pass-brief":["flowmap/brief.py:__main__","flowmap/brief.py:main"]},"callers":[{"id":"flowmap/brief.py:__main__","edited":false}]},{"id":"flowmap/config.py:app_dirs","file":"flowmap/config.py","sym":"app_dirs","status":"modified","contract":false,"signature":null,"steps":[],"witness":{},"callers":[]},{"id":"flowmap/graphs/python.py:_find","file":"flowmap/graphs/python.py","sym":"_find","status":"modified","contract":false,"signature":null,"steps":["new:review-change-on-map/lens-place-change"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:cosmetic","flowmap/graphs/python.py:same","flowmap/graphs/python.py:_find"]},"callers":[{"id":"flowmap/graphs/python.py:same","edited":false},{"id":"flowmap/graphs/python.py:signature","edited":true}]},{"id":"flowmap/graphs/python.py:signature","file":"flowmap/graphs/python.py","sym":"signature","status":"modified","contract":false,"signature":null,"steps":[],"witness":{},"callers":[{"id":"flowmap/change.py:signature","edited":false}]},{"id":"flowmap/graphs/python.py:_Builder._collect.walk","file":"flowmap/graphs/python.py","sym":"_Builder._collect.walk","status":"modified","contract":true,"signature":["node, prefix, in_class","node, prefix, in_class, skip=None"],"steps":["new:review-change-on-map/generate-diagrams","new:review-change-on-map/lens-place-change","new:review-change-on-map/callgraph-impact","new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/generate-diagrams":["flowmap/diagrams.py:__main__","flowmap/diagrams.py:Diagrams","flowmap/diagrams.py:Diagrams.__init__","flowmap/callgraph.py:Graph","flowmap/callgraph.py:Graph.__init__","flowmap/graphs/python.py:build","flowmap/graphs/python.py:_Builder","flowmap/graphs/python.py:_Builder.__init__","flowmap/graphs/python.py:_Builder._collect","flowmap/graphs/python.py:_Builder._collect.walk"],"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:graph_at","flowmap/callgraph.py:Graph","flowmap/callgraph.py:Graph.__init__","flowmap/graphs/python.py:build","flowmap/graphs/python.py:_Builder","flowmap/graphs/python.py:_Builder.__init__","flowmap/graphs/python.py:_Builder._collect","flowmap/graphs/python.py:_Builder._collect.walk"],"new:review-change-on-map/callgraph-impact":["flowmap/callgraph.py:__main__","flowmap/callgraph.py:Graph","flowmap/callgraph.py:Graph.__init__","flowmap/graphs/python.py:build","flowmap/graphs/python.py:_Builder","flowmap/graphs/python.py:_Builder.__init__","flowmap/graphs/python.py:_Builder._collect","flowmap/graphs/python.py:_Builder._collect.walk"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/diagrams.py:Diagrams","flowmap/diagrams.py:Diagrams.__init__","flowmap/callgraph.py:Graph","flowmap/callgraph.py:Graph.__init__","flowmap/graphs/python.py:build","flowmap/graphs/python.py:_Builder","flowmap/graphs/python.py:_Builder.__init__","flowmap/graphs/python.py:_Builder._collect","flowmap/graphs/python.py:_Builder._collect.walk"]},"callers":[{"id":"flowmap/graphs/python.py:_Builder._collect","edited":false}]},{"id":"flowmap/graphs/python.py:_scope","file":"flowmap/graphs/python.py","sym":"_scope","status":"new","contract":false,"signature":[null,"node, skip=None"],"steps":["new:review-change-on-map/generate-diagrams","new:review-change-on-map/lens-place-change","new:review-change-on-map/callgraph-impact","new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/generate-diagrams":["flowmap/diagrams.py:__main__","flowmap/diagrams.py:Diagrams","flowmap/diagrams.py:Diagrams.__init__","flowmap/callgraph.py:Graph","flowmap/callgraph.py:Graph.__init__","flowmap/graphs/python.py:build","flowmap/graphs/python.py:_Builder","flowmap/graphs/python.py:_Builder.__init__","flowmap/graphs/python.py:_Builder._collect","flowmap/graphs/python.py:_Builder._collect.walk","flowmap/graphs/python.py:_scope"],"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:cosmetic","flowmap/graphs/python.py:same","flowmap/graphs/python.py:_find","flowmap/graphs/python.py:_scope"],"new:review-change-on-map/callgraph-impact":["flowmap/callgraph.py:__main__","flowmap/callgraph.py:Graph","flowmap/callgraph.py:Graph.__init__","flowmap/graphs/python.py:build","flowmap/graphs/python.py:_Builder","flowmap/graphs/python.py:_Builder.__init__","flowmap/graphs/python.py:_Builder._collect","flowmap/graphs/python.py:_Builder._collect.walk","flowmap/graphs/python.py:_scope"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay","flowmap/lens.py:defs","flowmap/graphs/python.py:symbols","flowmap/graphs/python.py:symbols.walk","flowmap/graphs/python.py:_scope"]},"callers":[{"id":"flowmap/graphs/python.py:_Builder._collect.walk","edited":true},{"id":"flowmap/graphs/python.py:_find","edited":true},{"id":"flowmap/graphs/python.py:symbols.walk","edited":true}]},{"id":"flowmap/graphs/python.py:symbols.walk","file":"flowmap/graphs/python.py","sym":"symbols.walk","status":"modified","contract":true,"signature":["node, prefix","node, prefix, skip=None"],"steps":["new:review-change-on-map/lens-place-change","new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/lens-place-change":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:defs","flowmap/graphs/python.py:symbols","flowmap/graphs/python.py:symbols.walk"],"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay","flowmap/lens.py:defs","flowmap/graphs/python.py:symbols","flowmap/graphs/python.py:symbols.walk"]},"callers":[{"id":"flowmap/graphs/python.py:symbols","edited":false}]},{"id":"flowmap/reconcile.py:tested_endpoints","file":"flowmap/reconcile.py","sym":"tested_endpoints","status":"modified","contract":true,"signature":["inventory","inventory, text=None"],"steps":["new:run-mapping-passes/reconcile-runs"],"witness":{"new:run-mapping-passes/reconcile-runs":["flowmap/reconcile.py:__main__","flowmap/reconcile.py:main","flowmap/reconcile.py:tested_endpoints"]},"callers":[{"id":"flowmap/reconcile.py:main","edited":false}]}],"endpoints":{"added":[],"removed":[]},"reach":{"gained":{"flowmap/graphs/python.py:_find":["CLI flowmap change"]},"lost":{}},"edges":{"added":[["flowmap/adapters/listed.py:entries","flowmap/lens.py:defs"],["flowmap/adapters/pattern.py:_files","flowmap/config.py:root"],["flowmap/adapters/pattern.py:_fill","flowmap/adapters/pattern.py:_fill.one"],["flowmap/adapters/pattern.py:entries","flowmap/adapters/pattern.py:_files"],["flowmap/adapters/pattern.py:entries","flowmap/adapters/pattern.py:_fill"],["flowmap/adapters/pattern.py:entries","flowmap/adapters/pattern.py:_handler"],["flowmap/adapters/pattern.py:entries","flowmap/lens.py:defs"],["flowmap/graphs/python.py:_Builder._collect.walk","flowmap/graphs/python.py:_scope"],["flowmap/graphs/python.py:_find","flowmap/graphs/python.py:_scope"],["flowmap/graphs/python.py:signature","flowmap/graphs/python.py:_find"],["flowmap/graphs/python.py:symbols.walk","flowmap/graphs/python.py:_scope"]],"removed":[]},"modules":{"added":[["flowmap/adapters/listed.py","flowmap/lens.py"],["flowmap/adapters/pattern.py","flowmap/config.py"],["flowmap/adapters/pattern.py","flowmap/lens.py"]],"removed":[]},"flow_share":{"new:discover-entry-points":1,"new:review-change-on-map":5,"(off-map)":7,"new:run-mapping-passes":2},"flow_entropy":1.69,"tests":{"configured":false,"changed":[]},"hunks":[{"file":".claude-plugin/plugin.json","old":1,"new":1,"ctx":"","lines":[" {","   \"name\": \"flowmap\",","-  \"version\": \"0.1.0\",","+  \"version\": \"0.2.0\",","   \"description\": \"Map a codebase as user flows -> steps -> code by agreement between independent passes, and review PRs by where they land on that map.\",","   \"author\": {"],"symbols":[]},{"file":"README.md","old":16,"new":16,"ctx":"Python 3.11+, no dependencies.","lines":[" | Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `\"use server\"` actions | not yet |"," | React SPA | its backend's entry points; top-down passes start from its router | via the backend |","+| anything else | `pattern`: a regex for its registrations (`@app.get(...)`, `@server.tool`, `app.get(\"/x\", show)`), written into `flowmap.toml` at setup; the handler is the definition it sits on. `list` for registries no regex finds | yes for Python, including defs built in factory functions |"," | Python CLI | `if __name__ == \"__main__\"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |"," "],"symbols":[]},{"file":"README.md","old":144,"new":145,"ctx":"and `engine` (an optional hub to fold into one node).","lines":[" ## Adding a stack"," ","+Most stacks need no code: a `pattern` entry in `flowmap.toml` (see `flowmap/adapters/pattern.py`)","+turns a regex over the files that register entry points into endpoints, and the `flowmap-build`","+skill writes those rules when it sets a repo up. Write an adapter only for what a regex can't","+express: prefixes composed across files, names a framework derives.","+"," Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{\"endpoint\", \"handler\", \"line\","," \"aliases\"?}]`, register it in `adapters/__init__.py`, and add its guidance to `STACK` in"],"symbols":[]},{"file":"flowmap/adapters/__init__.py","old":10,"new":10,"ctx":"hit it (Rails path helpers, for instance).","lines":[" \"\"\""," ","-from . import cli, fastapi, nextjs, rails","+import sys"," ","-ADAPTERS = {\"fastapi\": fastapi.entries, \"rails\": rails.entries, \"nextjs\": nextjs.entries, \"cli\": cli.entries}","+from . import cli, fastapi, listed, nextjs, pattern, rails","+","+ADAPTERS = {\"fastapi\": fastapi.entries, \"rails\": rails.entries, \"nextjs\": nextjs.entries, \"cli\": cli.entries,","+            \"pattern\": pattern.entries, \"list\": listed.entries}"," "," "],"symbols":[]},{"file":"flowmap/adapters/__init__.py","old":19,"new":22,"ctx":"def entries(cfg, read):","lines":["     for spec in cfg[\"entry\"]:","         out.extend(ADAPTERS[spec[\"adapter\"]](spec, read))","-    seen, unique = set(), []","+    first = {}","     for e in sorted(out, key=lambda e: (e[\"endpoint\"].split(\" \", 1)[-1], e[\"endpoint\"])):","-        if e[\"endpoint\"] not in seen:","-            seen.add(e[\"endpoint\"])","-            unique.append(e)","-    return unique","+        kept = first.setdefault(e[\"endpoint\"], e)","+        if kept[\"handler\"] != e[\"handler\"]:  # two apps both serving GET /health: say which one the map uses","+            print(f\"flowmap: {e['endpoint']} is handled by both {kept['handler']} and {e['handler']}; \"","+                  f\"keeping {kept['handler']}\", file=sys.stderr)","+    return list(first.values())"],"symbols":["flowmap/adapters/__init__.py:entries"]},{"file":"flowmap/adapters/listed.py","old":0,"new":1,"ctx":"","lines":["+\"\"\"Any stack, by hand: entry points no rule can find (dispatch tables, string registries).","+","+    [[entry]]","+    adapter = \"list\"","+    entries = [{endpoint = \"JOB nightly-sync\", handler = \"app/jobs.py:sync\"}]","+","+`flowmap callgraph check` says whether each handler is a real graph node.","+\"\"\"","+","+","+def entries(spec, read):","+    import lens  # late: lens imports the adapters","+    out = []","+    for e in spec[\"entries\"]:","+        rel, _, sym = e[\"handler\"].partition(\":\")","+        line = next((s[0] for s in lens.defs(rel, read(rel)) if s[2] == sym), 1)","+        out.append({\"endpoint\": e[\"endpoint\"], \"handler\": e[\"handler\"], \"line\": line})","+    return out"],"symbols":["flowmap/adapters/listed.py:entries"]},{"file":"flowmap/adapters/pattern.py","old":0,"new":1,"ctx":"","lines":["+\"\"\"Any stack: entry points are the matches of a regex the setup session writes for this repo.","+","+    [[entry]]","+    adapter = \"pattern\"","+    files = [\"svc/*.py\"]                       # fnmatch globs on repo paths; `*` crosses directories","+    match = '''@\\\\w+\\\\.(?P<verb>get|post)\\\\(\\\\s*[\"'](?P<path>[^\"']*)'''","+    endpoint = \"{VERB} {path}\"                 # {group}; {GROUP} upper-cases it; {a|b} first non-empty","+","+The handler is the definition the match sits in (a def starts at its first decorator, so a","+decorator match names the def it decorates), or, when the regex has a `handler` group, the","+definition of that name in the same file (`app.get(\"/x\", show)`). `{def}` is the handler's","+own name, for tools named after their function. Symbols come from the call-graph builder,","+else lens's regex outline, so handlers are spelled the way the graph spells nodes.","+\"\"\"","+","+import re","+import subprocess","+import sys","+from fnmatch import fnmatch","+","+","+def _files(globs, ref=None):","+    from config import root","+    cmd = [\"git\", \"ls-tree\", \"-r\", \"--name-only\", ref] if ref else [\"git\", \"ls-files\"]","+    ls = subprocess.run(cmd, cwd=root(), capture_output=True, text=True).stdout.splitlines()","+    return [f for f in ls if any(fnmatch(f, g) for g in globs)]","+","+","+def _fill(template, groups):","+    def one(m):","+        for key in m[1].split(\"|\"):","+            val = groups.get(key) or (groups.get(key.lower()) or \"\").upper()","+            if val:","+                return val","+        return \"\"","+    return re.sub(r\"\\{([^}]+)\\}\", one, template)","+","+","+def _handler(syms, line, name):","+    \"\"\"The innermost definition holding `line`, or the last one called `name` (by its own name).\"\"\"","+    if name:","+        named = [s for s in syms if s[2].rsplit(\".\", 1)[-1] == name]","+        before = [s for s in named if s[0] <= line]","+        return before[-1] if before else next(iter(named), None)","+    return max((s for s in syms if s[0] <= line <= s[1]), key=lambda s: s[0], default=None)","+","+","+def entries(spec, read):","+    import lens  # late: lens imports the adapters","+    rule = re.compile(spec[\"match\"], re.M)","+    out = []","+    for rel in _files(spec[\"files\"], getattr(read, \"ref\", None)):","+        text = read(rel)","+        if not text:","+            continue","+        syms = lens.defs(rel, text)","+        for m in rule.finditer(text):","+            line = text.count(\"\\n\", 0, m.start()) + 1","+            groups = {k: v for k, v in m.groupdict().items() if v}","+            sym = _handler(syms, line, groups.get(\"handler\"))","+            if sym is None:  # a match outside any definition names nothing the graph can walk","+                print(f\"flowmap: {rel}:{line} matches {spec['match']!r} but sits in no definition; skipped\",","+                      file=sys.stderr)","+                continue","+            groups[\"def\"] = sym[2].rsplit(\".\", 1)[-1]","+            out.append({\"endpoint\": _fill(spec[\"endpoint\"], groups), \"handler\": f\"{rel}:{sym[2]}\", \"line\": line})","+    return out"],"symbols":["flowmap/adapters/pattern.py:_files","flowmap/adapters/pattern.py:_fill.one","flowmap/adapters/pattern.py:_handler","flowmap/adapters/pattern.py:entries"]},{"file":"flowmap/brief.py","old":52,"new":52,"ctx":"order commands are run. Argument parsing is the \"UI\" \u2014 leave `ui` empty unless","lines":[" something a person interacts with (an HTML page it writes counts: cite its generator). `writes`"," are the files the command produces (`<path>` for a file it creates or overwrites).\"\"\",","+    \"pattern\": \"\"\"**Rule-matched entry points** (`{files}` matching `{match}`): each entry's handler is the","+definition the registration sits on or names: a route, a CLI command, a tool an AI client calls, a","+job. Its kind is the endpoint's first word. Read the decorator or registration call for what calls it","+(an HTTP client, a person at a shell, a model) and pick `ui` and the top-down starting point to match.","+Shared checks (auth, entitlement) usually run in a helper every handler calls first: name it, don't","+make it a step.\"\"\",","+    \"list\": \"\"\"**Hand-listed entry points** (see flowmap.toml): dispatch tables and registries no rule can","+find. Treat each like any other entry point; its handler is the function the registry calls.\"\"\","," }"," "],"symbols":[]},{"file":"flowmap/brief.py","old":71,"new":79,"ctx":"def main(run_id, method):","lines":["     stack = \"\\n\\n\".join(STACK[e[\"adapter\"]].format(main=e.get(\"main\", \"\"), root=e.get(\"root\", \".\"),","                                                     commands=e.get(\"commands\", \"\"),","+                                                    files=\", \".join(e.get(\"files\", [])), match=e.get(\"match\", \"\"),","                                                     main_note=f\", script `{e['main']}`\" if e.get(\"main\") else \"\")","                         for e in cfg[\"entry\"]) or \"No adapter configured \u2014 see flowmap.toml.\""],"symbols":["flowmap/brief.py:main"]},{"file":"flowmap/config.py","old":10,"new":10,"ctx":"Every key is optional; a repo with no config gets discovery mode and auto-detect","lines":[" ","     [[entry]]                                  # one per app; see adapters/ for options","-    adapter = \"fastapi\"                        # fastapi | rails | nextjs | cli","+    adapter = \"fastapi\"                        # fastapi | rails | nextjs | cli | pattern | list","     main = \"backend/app/main.py\""," ","+    [[entry]]                                  # any other stack: a regex for its registrations","+    adapter = \"pattern\"","+    files = [\"svc/mcp/*.py\"]","+    match = '''@\\\\w+\\\\.tool\\\\b'''              # TOML '''...''': backslashes and quotes stay literal","+    endpoint = \"MCP {def}\"","+","     [code]","     graph = [\"backend/app\", \"web/src\"]         # call-graph sources (deterministic reach); `python` is the old name"],"symbols":[]},{"file":"flowmap/config.py","old":27,"new":33,"ctx":"Every key is optional; a repo with no config gets discovery mode and auto-detect","lines":[" "," import os","+import re"," import subprocess"," import tomllib"],"symbols":[]},{"file":"flowmap/config.py","old":140,"new":147,"ctx":"def app_dirs():","lines":["             dirs += [e[\"commands\"].strip(\"/\")] if e.get(\"commands\") else []","             dirs += [str(Path(e[\"main\"]).parent)] if e.get(\"main\") else []","+        elif e[\"adapter\"] == \"pattern\":  # a glob's directory part, up to its first wildcard","+            dirs += [str(Path(re.split(r\"[*?[]\", g)[0] + \"x\").parent) for g in e[\"files\"]]","+        elif e[\"adapter\"] == \"list\":","+            dirs += [str(Path(x[\"handler\"].split(\":\", 1)[0]).parent) for x in e[\"entries\"]]","     return sorted(set(dirs))"," "],"symbols":["flowmap/config.py:app_dirs"]},{"file":"flowmap/graphs/python.py","old":38,"new":38,"ctx":"def _start(node):","lines":[" "," ","+def _scope(node, skip=None):","+    \"\"\"Defs and classes in node's own scope, found through if/with/try/for/match blocks, which","+    add no name segment: a def inside an `if` inside `outer` is `outer.inner`.\"\"\"","+    for child in ast.iter_child_nodes(node):","+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):","+            yield child","+        elif child is not skip and isinstance(child, (ast.stmt, ast.excepthandler, ast.match_case)):","+            yield from _scope(child)","+","+"," def symbols(text):","     \"\"\"[(start, end, 'Class.method' or 'fn')] innermost-last.\"\"\"","     out = []"," ","-    def walk(node, prefix):","-        for child in ast.iter_child_nodes(node):","-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):","-                name = f\"{prefix}{child.name}\"","-                out.append((_start(child), child.end_lineno, name))","-                walk(child, f\"{name}.\")","+    def walk(node, prefix, skip=None):","+        for child in _scope(node, skip):","+            name = f\"{prefix}{child.name}\"","+            out.append((_start(child), child.end_lineno, name))","+            walk(child, f\"{name}.\")","     try:","         tree = ast.parse(text)","     except SyntaxError:","         return out","-    walk(tree, \"\")","     guard = main_guard(tree)","+    walk(tree, \"\", guard)  # defs in the __main__ block are not module-level symbols","     if guard:","         out.append((guard.lineno, guard.end_lineno, \"__main__\"))"],"symbols":["flowmap/graphs/python.py:_scope","flowmap/graphs/python.py:symbols.walk"]},{"file":"flowmap/graphs/python.py","old":65,"new":74,"ctx":"def signature(text, sym):","lines":["     except SyntaxError:","         return None","-    parts = sym.split(\".\")","-    nodes = tree.body","-    for i, p in enumerate(parts):","-        hit = next((n for n in nodes if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))","-                    and n.name == p), None)","-        if hit is None:","-            return None","-        if i == len(parts) - 1:","-            return ast.unparse(hit.args) if not isinstance(hit, ast.ClassDef) else None","-        nodes = hit.body","-    return None","+    hit = _find(tree, sym)","+    return ast.unparse(hit.args) if hit is not None and not isinstance(hit, ast.ClassDef) else None"," "," "],"symbols":["flowmap/graphs/python.py:signature"]},{"file":"flowmap/graphs/python.py","old":107,"new":107,"ctx":"def _find(tree, sym):","lines":["     node = tree","     for part in sym.split(\".\"):","-        node = next((c for c in ast.iter_child_nodes(node)","-                     if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and c.name == part), None)","+        node = next((c for c in _scope(node) if c.name == part), None)","         if node is None:","             return None"],"symbols":["flowmap/graphs/python.py:_find"]},{"file":"flowmap/graphs/python.py","old":168,"new":167,"ctx":"class _Builder:","lines":["         mod = config.module_name(rel)"," ","-        def walk(node, prefix, in_class):","-            for child in ast.iter_child_nodes(node):","-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):","-                    qual = f\"{prefix}{child.name}\"","-                    nid = f\"{rel}:{qual}\"","-                    self.defs[nid] = (_start(child), child.end_lineno)","-                    if not prefix:","-                        self.by_module[mod][child.name] = nid","-                    if isinstance(child, ast.ClassDef):","-                        self.bases[nid] = {b.attr if isinstance(b, ast.Attribute) else getattr(b, \"id\", \"\")","-                                           for b in child.bases}","-                    if in_class and not isinstance(child, ast.ClassDef):","-                        self.methods[child.name].add(nid)","-                    walk(child, f\"{qual}.\", isinstance(child, ast.ClassDef))","-        walk(tree, \"\", False)","+        def walk(node, prefix, in_class, skip=None):","+            for child in _scope(node, skip):","+                qual = f\"{prefix}{child.name}\"","+                nid = f\"{rel}:{qual}\"","+                self.defs[nid] = (_start(child), child.end_lineno)","+                if not prefix:","+                    self.by_module[mod][child.name] = nid","+                if isinstance(child, ast.ClassDef):","+                    self.bases[nid] = {b.attr if isinstance(b, ast.Attribute) else getattr(b, \"id\", \"\")","+                                       for b in child.bases}","+                if in_class and not isinstance(child, ast.ClassDef):","+                    self.methods[child.name].add(nid)","+                walk(child, f\"{qual}.\", isinstance(child, ast.ClassDef))","         guard = main_guard(tree)","+        walk(tree, \"\", False, guard)","         if guard:","             self.defs[f\"{rel}:__main__\"] = (guard.lineno, guard.end_lineno)"],"symbols":["flowmap/graphs/python.py:_Builder._collect.walk"]},{"file":"flowmap/reconcile.py","old":89,"new":89,"ctx":"TEST_EXT = {\".py\", \".rb\", \".ts\", \".tsx\", \".js\", \".jsx\", \".mjs\"}","lines":[" "," ","-def tested_endpoints(inventory):","+def tested_endpoints(inventory, text=None):","     \"\"\"Entry points a test names: their concrete path, or an alias such as a Rails path","     helper (cheap, honest proxy). Test dirs come from flowmap.toml [code].tests.\"\"\"","-    text = \"\\n\".join(p.read_text(errors=\"replace\") for d in config.load()[\"code\"][\"tests\"]","+    text = text if text is not None else \"\\n\".join(p.read_text(errors=\"replace\") for d in config.load()[\"code\"][\"tests\"]","                      for p in (ROOT / d).rglob(\"*\") if p.suffix in TEST_EXT and p.is_file())","     hits = set()"],"symbols":["flowmap/reconcile.py:tested_endpoints"]},{"file":"flowmap/reconcile.py","old":103,"new":103,"ctx":"def tested_endpoints(inventory):","lines":["         elif kind == \"ACTION\":","             target_hit = re.search(rf\"\\b{re.escape(target.rsplit('#', 1)[1])}\\b\", text)","+        elif not target.startswith(\"/\"):  # a named entry (MCP tool, job): tests quote its name","+            target_hit = re.search(rf\"['\\\"]{re.escape(target)}['\\\"]\", text)","         else:","             target_hit = path_regex(re.sub(r\"\\{(\\w+):\\w+\\}\", r\"{\\1}\", target)).search(text)"],"symbols":["flowmap/reconcile.py:tested_endpoints"]},{"file":"skills/flowmap-build/SKILL.md","old":17,"new":17,"ctx":"Run everything from the root of the repo being mapped.","lines":["    (`bin/rails routes > tmp/routes.txt`, then `routes_file` in `flowmap.toml`). Write a","    minimal `flowmap.toml` with `[code] tests = [...]` and `graph = [...]` (the app's source dirs the call graph is built from; Python today).","-2. **Inventory.** `flowmap inventory`. Sanity-check the count and a few handlers against","-   the code before spending anything on passes.","+2. **Inventory.** `flowmap inventory` finds entry points from code, never from you, so they","+   stay a stable join key on every later run. Your job is to make the rules complete:","+   - Read the code yourself and list every way it can be entered: HTTP routes, CLI commands,","+     tools an AI client calls, jobs, webhooks, queue consumers. Note how each kind is","+     registered (`@app.get(\"/x\")`, `@server.tool(...)`, `app.get(\"/x\", show)`).","+   - Each kind a named adapter doesn't cover gets a `pattern` entry in `flowmap.toml`: `files`","+     globs, a `match` regex whose named groups fill `endpoint` (`\"{VERB} {path}\"`,","+     `\"MCP {name|def}\"`), and a `handler` group when the registration names its function","+     instead of decorating it. Write `match` as a TOML `'''...'''` string. Registries no regex","+     can find (dispatch tables) go in one `list` entry, endpoint and handler by hand.","+   - Run `flowmap inventory` again and compare with your list until they agree. Show the user","+     what is still missing and why. Then `flowmap callgraph check` must report 0 broken."," 3. **Briefs.** `flowmap brief bu-1 bottom-up`, `bu-2 bottom-up`, `td-1 top-down`,","    `td-2 top-down`. No flow vocabulary in `flowmap.toml` = discovery mode, handled by the brief."],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":155,"new":155,"ctx":"","lines":["  ],","  \"symbols\": [","+  {","+   \"id\": \"flowmap/callgraph.py:Graph.edge_set\",","+   \"file\": \"flowmap/callgraph.py\",","+   \"sym\": \"Graph.edge_set\",","+   \"status\": \"new\",","+   \"contract\": false,","+   \"signature\": [","+    null,","+    \"self\"","+   ],","+   \"steps\": [","+    \"new:review-change-on-map/lens-place-change\"","+   ],","+   \"witness\": {","+    \"new:review-change-on-map/lens-place-change\": [","+     \"flowmap/lens.py:__main__\",","+     \"flowmap/lens.py:main\",","+     \"flowmap/lens.py:reach_diff\",","+     \"flowmap/callgraph.py:Graph.edge_set\"","+    ]","+   },","+   \"callers\": [","+    {","+     \"id\": \"flowmap/change.py:facts\",","+     \"edited\": false","+    },","+    {","+     \"id\": \"flowmap/lens.py:reach_diff\",","+     \"edited\": true","+    }","+   ]","+  },","   {","    \"id\": \"flowmap/callgraph.py:Graph._closure\","],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":331,"new":363,"ctx":"","lines":["     {","      \"id\": \"flowmap/lens.py:main\",","-     \"edited\": true","-    },","-    {","-     \"id\": \"flowmap/lens.py:reach_diff\",","-     \"edited\": true","-    }","-   ]","-  },","-  {","-   \"id\": \"flowmap/callgraph.py:Graph.edge_set\",","-   \"file\": \"flowmap/callgraph.py\",","-   \"sym\": \"Graph.edge_set\",","-   \"status\": \"new\",","-   \"contract\": false,","-   \"signature\": [","-    null,","-    \"self\"","-   ],","-   \"steps\": [","-    \"new:review-change-on-map/lens-place-change\"","-   ],","-   \"witness\": {","-    \"new:review-change-on-map/lens-place-change\": [","-     \"flowmap/lens.py:__main__\",","-     \"flowmap/lens.py:main\",","-     \"flowmap/lens.py:reach_diff\",","-     \"flowmap/callgraph.py:Graph.edge_set\"","-    ]","-   },","-   \"callers\": [","-    {","-     \"id\": \"flowmap/change.py:facts\",","      \"edited\": false","     },"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":371,"new":371,"ctx":"","lines":["    ]","   },","-  {","-   \"id\": \"flowmap/change.py:facts.module\",","-   \"file\": \"flowmap/change.py\",","-   \"sym\": \"facts.module\",","-   \"status\": \"new\",","-   \"contract\": false,","-   \"signature\": [","-    null,","-    \"nid\"","-   ],","-   \"steps\": [],","-   \"witness\": {},","-   \"callers\": [","-    {","-     \"id\": \"flowmap/change.py:facts\",","-     \"edited\": false","-    }","-   ]","-  },","-  {","-   \"id\": \"flowmap/change.py:__main__\",","-   \"file\": \"flowmap/change.py\",","-   \"sym\": \"__main__\",","-   \"status\": \"new\",","-   \"contract\": false,","-   \"signature\": null,","-   \"steps\": [],","-   \"witness\": {},","-   \"callers\": []","-  },","   {","    \"id\": \"flowmap/change.py:signature\","],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":421,"new":391,"ctx":"","lines":["   },","   {","-   \"id\": \"flowmap/change.py:facts.node_for\",","+   \"id\": \"flowmap/change.py:file_kind\",","    \"file\": \"flowmap/change.py\",","-   \"sym\": \"facts.node_for\",","+   \"sym\": \"file_kind\",","    \"status\": \"new\",","    \"contract\": false,","    \"signature\": [","     null,","-    \"sid\"","+    \"rel\"","    ],","    \"steps\": [],"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":458,"new":428,"ctx":"","lines":["    ]","   },","+  {","+   \"id\": \"flowmap/change.py:__main__\",","+   \"file\": \"flowmap/change.py\",","+   \"sym\": \"__main__\",","+   \"status\": \"new\",","+   \"contract\": false,","+   \"signature\": null,","+   \"steps\": [],","+   \"witness\": {},","+   \"callers\": []","+  },","   {","    \"id\": \"flowmap/change.py:merge\","],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":478,"new":459,"ctx":"","lines":["   },","   {","-   \"id\": \"flowmap/change.py:main\",","+   \"id\": \"flowmap/change.py:facts.module\",","    \"file\": \"flowmap/change.py\",","-   \"sym\": \"main\",","+   \"sym\": \"facts.module\",","    \"status\": \"new\",","    \"contract\": false,","    \"signature\": [","     null,","-    \"\"","+    \"nid\"","    ],","    \"steps\": [],"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":491,"new":472,"ctx":"","lines":["    \"callers\": [","     {","-     \"id\": \"flowmap/change.py:__main__\",","-     \"edited\": true","+     \"id\": \"flowmap/change.py:facts\",","+     \"edited\": false","     }","    ]","   },","   {","-   \"id\": \"flowmap/change.py:file_kind\",","+   \"id\": \"flowmap/change.py:facts.node_for\",","    \"file\": \"flowmap/change.py\",","-   \"sym\": \"file_kind\",","+   \"sym\": \"facts.node_for\",","    \"status\": \"new\",","    \"contract\": false,","    \"signature\": [","     null,","-    \"rel\"","+    \"sid\"","    ],","    \"steps\": [],"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":535,"new":516,"ctx":"","lines":["   },","   {","-   \"id\": \"flowmap/lens.py:reach_diff\",","+   \"id\": \"flowmap/change.py:main\",","+   \"file\": \"flowmap/change.py\",","+   \"sym\": \"main\",","+   \"status\": \"new\",","+   \"contract\": false,","+   \"signature\": [","+    null,","+    \"\"","+   ],","+   \"steps\": [],","+   \"witness\": {},","+   \"callers\": [","+    {","+     \"id\": \"flowmap/change.py:__main__\",","+     \"edited\": true","+    }","+   ]","+  },","+  {","+   \"id\": \"flowmap/lens.py:graph_at\",","    \"file\": \"flowmap/lens.py\",","-   \"sym\": \"reach_diff\",","+   \"sym\": \"graph_at\",","    \"status\": \"new\",","    \"contract\": false,","    \"signature\": [","     null,","-    \"old, new, old_eps, new_eps\"","+    \"ref\"","    ],","    \"steps\": ["],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":551,"new":551,"ctx":"","lines":["      \"flowmap/lens.py:__main__\",","      \"flowmap/lens.py:main\",","-     \"flowmap/lens.py:reach_diff\"","+     \"flowmap/lens.py:graph_at\"","     ]","    },"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":561,"new":561,"ctx":"","lines":["     {","      \"id\": \"flowmap/lens.py:main\",","-     \"edited\": true","+     \"edited\": false","     }","    ]","   },","   {","-   \"id\": \"flowmap/lens.py:main\",","+   \"id\": \"flowmap/lens.py:reach_diff\",","    \"file\": \"flowmap/lens.py\",","-   \"sym\": \"main\",","-   \"status\": \"modified\",","+   \"sym\": \"reach_diff\",","+   \"status\": \"new\",","    \"contract\": false,","-   \"signature\": null,","+   \"signature\": [","+    null,","+    \"old, new, old_eps, new_eps\"","+   ],","    \"steps\": [","     \"new:review-change-on-map/lens-place-change\""],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":578,"new":581,"ctx":"","lines":["     \"new:review-change-on-map/lens-place-change\": [","      \"flowmap/lens.py:__main__\",","-     \"flowmap/lens.py:main\"","+     \"flowmap/lens.py:main\",","+     \"flowmap/lens.py:reach_diff\"","     ]","    },","    \"callers\": [","     {","-     \"id\": \"flowmap/lens.py:__main__\",","+     \"id\": \"flowmap/change.py:facts\",","+     \"edited\": false","+    },","+    {","+     \"id\": \"flowmap/lens.py:main\",","      \"edited\": false","     }"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":589,"new":597,"ctx":"","lines":["   },","   {","-   \"id\": \"flowmap/lens.py:graph_at\",","+   \"id\": \"flowmap/lens.py:main.listing\",","    \"file\": \"flowmap/lens.py\",","-   \"sym\": \"graph_at\",","+   \"sym\": \"main.listing\",","    \"status\": \"new\",","    \"contract\": false,","    \"signature\": [","     null,","-    \"ref\"","+    \"title, syms\"","    ],","    \"steps\": ["],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":605,"new":613,"ctx":"","lines":["      \"flowmap/lens.py:__main__\",","      \"flowmap/lens.py:main\",","-     \"flowmap/lens.py:graph_at\"","+     \"flowmap/lens.py:main.listing\"","     ]","    },","    \"callers\": [","-    {","-     \"id\": \"flowmap/change.py:facts\",","-     \"edited\": false","-    },","     {","      \"id\": \"flowmap/lens.py:main\",","-     \"edited\": true","+     \"edited\": false","     }","    ]"],"symbols":[]},{"file":"tests/golden/change-facts-6d9eaff-770f1a7.json","old":760,"new":764,"ctx":"","lines":["     \"flowmap/lens.py:graph_at\"","    ],","+   [","+    \"flowmap/lens.py:main\",","+    \"flowmap/lens.py:main.listing\"","+   ],","    [","     \"flowmap/lens.py:main\","],"symbols":[]},{"file":"tests/golden/graph-770f1a7.json","old":365,"new":365,"ctx":"","lines":["    223","   ],","+  \"flowmap/lens.py:main.listing\": [","+   334,","+   346","+  ],","   \"flowmap/lens.py:py_symbols\": [","    47,"],"symbols":[]},{"file":"tests/golden/graph-770f1a7.json","old":1099,"new":1103,"ctx":"","lines":["    \"flowmap/lens.py:main.hits\"","   ],","+  [","+   \"flowmap/lens.py:main\",","+   \"flowmap/lens.py:main.listing\"","+  ],","   [","    \"flowmap/lens.py:main\","],"symbols":[]},{"file":"tests/golden/lens-6d9eaff-770f1a7.md","old":8,"new":8,"ctx":"","lines":[" - files outside the analysed code: `bin/flowmap`, `flowmap/atlas.template.html`, `flowmap/change.template.html`"," ","-11 files changed (3 app code, 0 tests, 8 other) \u00b7 20 code symbols changed \u00b7 4 map steps touched across 1 flows","+11 files changed (3 app code, 0 tests, 8 other) \u00b7 21 code symbols changed \u00b7 4 map steps touched across 1 flows"," "," ## Endpoint changes"],"symbols":[]},{"file":"tests/golden/lens-6d9eaff-770f1a7.md","old":35,"new":35,"ctx":"Widest-reaching **modified** code (new code only inherits its caller's reach):","lines":[" ## Reach diff (call graph, base \u2192 head)"," ","-36 call edges added, 2 removed. Existing code newly reachable from some endpoint: **0**; no longer reachable from some endpoint: **0**.","+37 call edges added, 2 removed. Existing code newly reachable from some endpoint: **0**; no longer reachable from some endpoint: **0**."," ","-Edges added: `callgraph.Graph.callees` \u2192 `callgraph.Graph._closure`, `callgraph.Graph.callers` \u2192 `callgraph.Graph._closure`, `change.__main__` \u2192 `change.main`, `change.facts` \u2192 `atlas.step_keys`, `change.facts` \u2192 `callgraph.Graph.callees`, `change.facts` \u2192 `callgraph.Graph.edge_set`, `change.facts` \u2192 `callgraph.Graph.reaches`, `change.facts` \u2192 `change.facts.module`, \u2026 28 more","+Edges added: `callgraph.Graph.callees` \u2192 `callgraph.Graph._closure`, `callgraph.Graph.callers` \u2192 `callgraph.Graph._closure`, `change.__main__` \u2192 `change.main`, `change.facts` \u2192 `atlas.step_keys`, `change.facts` \u2192 `callgraph.Graph.callees`, `change.facts` \u2192 `callgraph.Graph.edge_set`, `change.facts` \u2192 `callgraph.Graph.reaches`, `change.facts` \u2192 `change.facts.module`, \u2026 29 more"," Edges removed: `lens.main` \u2192 `callgraph.Graph`, `lens.main` \u2192 `lens.git`"," "],"symbols":[]},{"file":"tests/golden/lens-6d9eaff-770f1a7.md","old":52,"new":52,"ctx":"New code, or a gap in the map. Either way: where does it sit in a flow?","lines":[" - `flowmap/callgraph.py`: `Graph._closure`, `Graph.callees`, `Graph.edge_set`"," - `flowmap/change.py`: `__main__`, `auto_chapters`, `facts`, `facts.module`, `facts.node_for`, `file_kind`, `hunks`, `main`, `merge`, `signature`","-- `flowmap/lens.py`: `graph_at`, `reach_diff`","+- `flowmap/lens.py`: `graph_at`, `main.listing`, `reach_diff`"," "," ## Shape"," ","-- Steps touched: 4 \u00b7 symbols changed: 20 \u00b7 ratio 5.0 symbols per step","+- Steps touched: 4 \u00b7 symbols changed: 21 \u00b7 ratio 5.2 symbols per step"," - Tests changed: 0 \u2014 **no tests changed**"," "],"symbols":[]},{"file":"tests/test_graphs.py","old":21,"new":21,"ctx":"class RegistryTest(unittest.TestCase):","lines":["         self.assertIsNone(graphs.python.signature(text, \"A\"))"," ","+    def test_defs_inside_blocks_keep_their_scope_name(self):","+        text = (\"try:\\n    def fast():\\n        pass\\nexcept ImportError:\\n    pass\\n\"","+                \"def outer(x):\\n    if x:\\n        def inner(y=2):\\n            pass\\n\"","+                \"    with x:\\n        class C:\\n            pass\\n\")","+        self.assertEqual(graphs.python.symbols(text),","+                         [(2, 3, \"fast\"), (6, 12, \"outer\"), (8, 9, \"outer.inner\"), (11, 12, \"outer.C\")])","+        self.assertEqual(graphs.python.signature(text, \"outer.inner\"), \"y=2\")","+        self.assertTrue(graphs.python.same(text, text.replace(\"pass\", \"pass  # same\"), \"outer.inner\"))","+"," "," class PythonBuilderTest(unittest.TestCase):"],"symbols":[]},{"file":"tests/test_pattern.py","old":0,"new":1,"ctx":"","lines":["+import contextlib","+import io","+import json","+import sys","+import unittest","+","+from tests.helpers import REPO, fixture_repo, flowmap","+","+sys.path.insert(0, str(REPO / \"flowmap\"))","+import adapters  # noqa: E402","+import reconcile  # noqa: E402","+","+# the rules a setup session writes into flowmap.toml after reading the code","+RULES = \"\"\"","+[[entry]]","+adapter = \"pattern\"","+files = [\"svc/*.py\"]","+match = '''@\\\\w+\\\\.(?P<verb>get|post|put|patch|delete)\\\\(\\\\s*[\"'](?P<path>[^\"']*)'''","+endpoint = \"{VERB} {path}\"","+","+[[entry]]","+adapter = \"pattern\"","+files = [\"svc/*.py\"]","+match = '''\\\\.add_api_route\\\\(\\\\s*[\"'](?P<path>[^\"']*)[\"']\\\\s*,\\\\s*(?P<handler>\\\\w+)'''","+endpoint = \"GET {path}\"","+","+[[entry]]","+adapter = \"pattern\"","+files = [\"svc/mcp/*.py\"]","+match = '''@\\\\w+\\\\.tool\\\\b(?:\\\\([^)]*?\\\\bname\\\\s*=\\\\s*[\"'](?P<name>[^\"']+))?'''","+endpoint = \"MCP {name|def}\"","+","+[code]","+graph = [\"svc\"]","+\"\"\"","+","+APP = {","+    \"flowmap.toml\": RULES,","+    \"docs/flowmap/map.json\": '{\"flows\": [], \"runs\": []}\\n',","+    # routes on a module-level app, plus one registered by call","+    \"svc/app.py\": '''","+        from typing import TYPE_CHECKING","+","+        from fastapi import FastAPI","+","+        app = FastAPI(title=\"kg\")","+","+        if TYPE_CHECKING:","+            def typed_only():","+                pass","+","+","+        @app.get(\"/health\")","+        async def health():","+            return ok()","+","+","+        @app.post(\"/search\", response_model=dict)","+        async def search(request):","+            return ok()","+","+","+        def ping():","+            return ok()","+","+","+        def ok():","+            return {}","+","+","+        app.router.add_api_route(\"/ping\", ping)","+    ''',","+    # routes on an app built in a factory, one of them inside an `if`","+    \"svc/correct.py\": '''","+        from fastapi import FastAPI","+","+","+        def build_app(static):","+            app = FastAPI()","+","+            @app.exception_handler(KeyError)","+            def not_found(request, error):","+                return None","+","+            @app.get(\"/api/vocabulary\")","+            def vocabulary():","+                return []","+","+            if static.exists():","+                app.mount(\"/static\", static)","+","+                @app.get(\"/page/{standard_id}/{page_num}\")","+                def deep_link_page(standard_id: str, page_num: int):","+                    return vocabulary()","+","+            return app","+    ''',","+    # a helper that receives the app","+    \"svc/sign_in.py\": '''","+        def add_sign_in_routes(app, *, signer):","+            @app.post(\"/api/login\")","+            async def login(body, response):","+                return signer(body)","+    ''',","+    \"svc/mcp/server.py\": '''","+        def build_server(service):","+            server = MCPServer(\"standards\")","+","+            @server.tool(description=\"Search the standards\")","+            async def search(ctx, query: str):","+                return service.search(query)","+","+            @server.tool(name=\"clause\", description=\"One clause (by id)\")","+            async def get_clause(ctx, clause: str):","+                return service.clause(clause)","+","+            return server","+    ''',","+}","+","+","+class PatternAdapterTest(unittest.TestCase):","+    def setUp(self):","+        self.root, self.base = fixture_repo(self, APP)","+","+    def test_rules_find_every_route_and_tool_with_its_graph_handler(self):","+        flowmap(\"inventory\", root=self.root)","+        eps = json.loads((self.root / \"docs/flowmap/inventory.json\").read_text())[\"endpoints\"]","+        self.assertEqual({e[\"endpoint\"]: e[\"handler\"] for e in eps}, {","+            \"GET /health\": \"svc/app.py:health\",","+            \"POST /search\": \"svc/app.py:search\",","+            \"GET /ping\": \"svc/app.py:ping\",","+            \"GET /api/vocabulary\": \"svc/correct.py:build_app.vocabulary\",","+            \"GET /page/{standard_id}/{page_num}\": \"svc/correct.py:build_app.deep_link_page\",","+            \"POST /api/login\": \"svc/sign_in.py:add_sign_in_routes.login\",","+            \"MCP search\": \"svc/mcp/server.py:build_server.search\",","+            \"MCP clause\": \"svc/mcp/server.py:build_server.get_clause\",","+        })","+        self.assertEqual(next(e[\"line\"] for e in eps if e[\"endpoint\"] == \"GET /health\"), 12)","+","+    def test_every_handler_is_a_graph_node(self):","+        out = flowmap(\"callgraph\", \"check\", root=self.root)","+        self.assertIn(\"8 entry points: 8 handlers are graph nodes, 0 not graphed, 0 broken\", out)","+","+","+class HandlerGroupTest(unittest.TestCase):","+    def test_a_named_handler_is_the_nearest_definition_before_the_match(self):","+        from adapters.pattern import _handler","+        syms = [(1, 3, \"a\"), (2, 3, \"a.show\"), (5, 7, \"b\"), (6, 7, \"b.show\")]","+        self.assertEqual([_handler(syms, line, \"show\")[2] for line in (0, 4, 8)], [\"a.show\", \"a.show\", \"b.show\"])","+","+","+class ListAdapterTest(unittest.TestCase):","+    def test_listed_entries_take_their_line_from_the_handler(self):","+        text = {\"jobs.py\": \"import x\\n\\n\\ndef sync():\\n    pass\\n\"}","+        cfg = {\"entry\": [{\"adapter\": \"list\", \"entries\": [","+            {\"endpoint\": \"JOB nightly-sync\", \"handler\": \"jobs.py:sync\"},","+            {\"endpoint\": \"JOB gone\", \"handler\": \"missing.py:f\"}]}]}","+        self.assertEqual(adapters.entries(cfg, text.get), [","+            {\"endpoint\": \"JOB gone\", \"handler\": \"missing.py:f\", \"line\": 1},","+            {\"endpoint\": \"JOB nightly-sync\", \"handler\": \"jobs.py:sync\", \"line\": 4}])","+","+","+class DuplicateEndpointTest(unittest.TestCase):","+    def entries(self, *listed):","+        cfg = {\"entry\": [{\"adapter\": \"list\", \"entries\": [{\"endpoint\": e, \"handler\": h}] } for e, h in listed]}","+        err = io.StringIO()","+        with contextlib.redirect_stderr(err):","+            got = adapters.entries(cfg, lambda rel: None)","+        return [(e[\"endpoint\"], e[\"handler\"]) for e in got], err.getvalue()","+","+    def test_two_handlers_for_one_endpoint_keep_the_first_and_say_so(self):","+        got, err = self.entries((\"GET /health\", \"a.py:health\"), (\"GET /health\", \"b.py:health\"))","+        self.assertEqual(got, [(\"GET /health\", \"a.py:health\")])","+        self.assertEqual(err, \"flowmap: GET /health is handled by both a.py:health and b.py:health; \"","+                              \"keeping a.py:health\\n\")","+","+    def test_the_same_handler_found_twice_is_quietly_one(self):","+        got, err = self.entries((\"GET /health\", \"a.py:health\"), (\"GET /health\", \"a.py:health\"))","+        self.assertEqual((got, err), ([(\"GET /health\", \"a.py:health\")], \"\"))","+","+","+class TestedEndpointsTest(unittest.TestCase):","+    def test_a_named_entry_is_tested_when_a_test_quotes_its_name(self):","+        inv = [{\"endpoint\": \"MCP search\", \"handler\": \"s.py:search\"},","+               {\"endpoint\": \"MCP clause\", \"handler\": \"s.py:get_clause\"}]","+        text = \"# search the standards first\\nclient.call_tool('clause', {})\\n\"","+        self.assertEqual(reconcile.tested_endpoints(inv, text), {\"MCP clause\"})","+","+","+if __name__ == \"__main__\":","+    unittest.main()"],"symbols":[]}]},"story":{"title":"Entry points for any stack come from rules the setup session writes","pr":"PR #8","url":"https://github.com/NelisVerhoef/Flowmap/pull/8","intent":"Stop writing an adapter per framework: let the model read an unknown codebase once and write rules, and keep inventory deterministic by applying those rules from code on every run.","delta":"The discover-entry-points flow gains two adapters, `pattern` (regex rules in flowmap.toml) and `list` (entries by hand), and its setup step now loops until the rules agree with what the model sees in the code. The Python call graph now has nodes for defs nested in if/with/try blocks, which moves the review-change-on-map steps by one node in this repo's own goldens. The existing fastapi, rails, nextjs and cli adapters are unchanged, and nothing is auto-detected differently."},"chapters":[{"title":"A regex rule in flowmap.toml turns any stack's registrations into entry points","role":"core","kind":"new capability","symbols":["flowmap/adapters/pattern.py:entries","flowmap/adapters/pattern.py:_files","flowmap/adapters/pattern.py:_fill.one","flowmap/adapters/pattern.py:_handler","flowmap/adapters/listed.py:entries","flowmap/config.py:app_dirs"],"files":["README.md","flowmap/config.py"],"before":"Inventory knew FastAPI routers mounted with include_router, Rails routes, Next.js files and `__main__` scripts. Anything else, such as routes declared on the app object, routes in an app factory, MCP tools or a click CLI, needed a new adapter written in Python, or was invisible.","after":"A `pattern` entry names `files` globs, a `match` regex and an `endpoint` template filled from the regex's named groups. The handler is the innermost definition the match sits in, taken from the call-graph builder's symbols (else lens's regex outline), or the nearest definition named by a `handler` group. A match outside any definition is skipped with a line on stderr. A `list` entry names endpoints and handlers by hand.","claim":"A new stack is a few lines of TOML, not a new adapter.","why":"Every downstream step (pass briefs, reconcile, lens reach) joins on these endpoint strings, so a rule that matches too much or too little shifts the whole map, and only the setup loop checks it.","questions":[{"q":"`_handler` picks the innermost definition holding the match line. For a module-level `app.add_api_route(\"/ping\", ping)` without a `handler` group, the match sits in no definition and is skipped. Is a stderr line enough, or should `flowmap inventory` count skipped matches in its summary?","why":"Decides whether a half-written rule is visible to someone who only reads the inventory count.","kind":"ask"},{"q":"`_files` uses fnmatch, where `*` crosses directories, so `svc/*.py` matches every .py below svc. Is that the rule we want to teach, or should globs follow pathlib's `**` semantics?","why":"Rule authors (the model) will write globs from habit; a mismatch silently widens or narrows the inventory.","kind":"ask"},{"q":"Run the PatternAdapterTest fixture's rules and confirm `GET /page/{standard_id}/{page_num}` maps to `svc/correct.py:build_app.deep_link_page`, the route inside an `if` in a factory.","why":"That route depends on both this chapter and the nested-def graph fix.","kind":"check"}]},{"title":"Setup has the model list every way in, then write rules until inventory agrees","role":"core","kind":"agent instructions","symbols":[],"files":["skills/flowmap-build/SKILL.md"],"before":"Step 2 said: run `flowmap inventory` and sanity-check the count and a few handlers.","after":"Step 2 has the model read the code and list routes, CLI commands, AI tools, jobs, webhooks and consumers, write a `pattern` entry per kind no named adapter covers (or a `list` entry for registries), and rerun inventory until it agrees with the list. It shows the user what is still missing, and `flowmap callgraph check` must report 0 broken.","claim":"The model is the generic adapter at setup; flowmap stays deterministic afterwards.","why":"This is the only place the rules are checked against reality. If the model's own list is incomplete, the rules inherit its blind spots.","questions":[{"q":"The loop compares inventory with the model's own reading of the code. Should a second, independent pass list the entry points, the way the mapping passes are independent?","why":"Agreement with yourself is weak evidence; the rest of flowmap is built on agreement between different methods.","kind":"ask"},{"q":"Should the rules the setup writes be shown to the user as a flowmap.toml diff before passes start?","why":"The user owns flowmap.toml; a silent rule is a silent scope decision.","kind":"ask"}]},{"title":"Defs nested in if/with/try blocks are call-graph nodes","role":"supporting","kind":"bug fix","symbols":["flowmap/graphs/python.py:_scope","flowmap/graphs/python.py:symbols.walk","flowmap/graphs/python.py:signature","flowmap/graphs/python.py:_find","flowmap/graphs/python.py:_Builder._collect.walk"],"files":["tests/golden/graph-770f1a7.json","tests/golden/lens-6d9eaff-770f1a7.md","tests/golden/change-facts-6d9eaff-770f1a7.json"],"before":"`symbols`, `_collect`, `signature` and `_find` only looked at direct def and class children, so a def inside an `if` inside a function, or inside `try:` at module level, was not a node, and a handler declared there read as broken.","after":"`_scope` walks through compound statements (only statements, so deep expressions can't hit the recursion limit) without adding a name segment: a def in an `if` in `outer` is `outer.inner`. Defs inside the `__main__` block stay out, as before. The goldens move by one node, `lens.main.listing`, its edge, and its place among the changed symbols.","claim":"The graph and the adapters agree on how nested handlers are spelled.","why":"Every reach number for an entry point whose handler is not a node is silently zero.","questions":[{"q":"In the change-facts golden, `lens.main` dropped out of the changed symbols because its nested `listing` is now reported, and change.facts deletes any symbol reported alongside its own nested symbols. That rule was written for classes. Should it apply to functions?","why":"Lens and change facts now disagree about whether lens.main changed in 770f1a7.","kind":"ask"},{"q":"Two defs of the same name in `try:` / `except ImportError:` branches now map to one node id, and the later one's lines win. Acceptable?","why":"Decides whether line ranges for fallback imports point at the right branch.","kind":"check"}]},{"title":"Duplicate endpoints warn, and named entries need a quoted name to count as tested","role":"supporting","kind":"behaviour change","symbols":["flowmap/adapters/__init__.py:entries","flowmap/reconcile.py:tested_endpoints"],"files":[],"before":"A second entry with the same endpoint string was dropped silently, even with a different handler. An endpoint like `MCP search` was matched with the path regex, so any bare word `search` in a test marked it tested.","after":"Different handlers for one endpoint print a warning naming both and keep the first; the same handler twice is still merged silently. An endpoint whose target does not start with `/` is tested only when a test quotes it (`'search'` or `\"search\"`).","claim":"Fewer silent drops, fewer false 'tested' marks.","why":"Two FastAPI apps in one repo both serve `GET /health`; before this, one of them vanished from the map with no trace.","questions":[{"q":"Short tool names (`search`, `embed`) still match unrelated quoted strings in tests. Is a quoted-name match good enough for MCP tools, or should it require a nearby `call_tool`?","why":"Decides how much the evidence level of an MCP step can be trusted.","kind":"ask"},{"q":"`tested_endpoints` gained a `text` parameter only so tests can call it in-process. Is that acceptable?","why":"A test seam in production code; the alternative is a fixture repo per case.","kind":"check"}]},{"title":"Briefs explain rule-matched and hand-listed entry points","role":"supporting","kind":"agent instructions","symbols":["flowmap/brief.py:main"],"files":[".claude-plugin/plugin.json"],"before":"STACK had guidance for fastapi, rails, nextjs and cli only, so a brief for a `pattern` entry would raise KeyError.","after":"STACK has `pattern` (the rule and its files, what calls each kind, shared auth helpers named but not made steps) and `list`. The plugin version is 0.2.0 so installs refresh.","claim":"Mapping passes know how to read an entry point found by a rule.","why":"A pass that misreads what calls an entry point picks the wrong `ui` and top-down starting point.","questions":[{"q":"The brief prints the raw regex. Would the endpoint template alone (`MCP {name|def}`) tell a pass more?","why":"The regex is for flowmap; the pass needs to know what kind of entry point it is.","kind":"ask"}]},{"title":"Changed outside the map","kind":"outside","files":["tests/test_graphs.py","tests/test_pattern.py"]}],"folded":[]};
+const PAYLOAD = /^#v1\.([\w-]+)$/.exec(location.hash);
+// another link pasted into this tab changes only the fragment, which does not reload the page
+addEventListener("hashchange", () => { if (location.hash.startsWith("#v1.")) location.reload(); });
+
+async function inflate(b64) {
+  const bytes = Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+
+function fromFile(error) {
+  const box = document.createElement("section");
+  box.className = "drop";
+  box.innerHTML = `<h1>Open a flowmap change</h1>
+    <p>Drop a change page (<code>docs/flowmap/changes/&lt;name&gt;.html</code>) or its data as JSON here.
+    It is read in this tab and sent nowhere.</p>
+    <p><input type="file" accept=".html,.json"></p><p class="err" hidden></p>`;
+  const err = box.querySelector(".err");
+  if (error) { err.hidden = false; err.textContent = error; }
+  document.querySelector(".wrap").replaceChildren(box);
+  return new Promise((resolve) => {
+    const read = async (f) => {
+      try {
+        const text = await f.text();
+        const m = /const EMBEDDED = (\{.*?\});\n/s.exec(text) || /const DATA = (\{.*?\});\n/s.exec(text);
+        const data = JSON.parse(m ? m[1] : text);
+        if (!data.facts || !data.chapters) throw new Error("not flowmap change data");
+        resolve(data);
+      } catch (e) { err.hidden = false; err.textContent = `Could not read ${f.name}: ${e.message}`; }
+    };
+    box.querySelector("input").addEventListener("change", (e) => e.target.files[0] && read(e.target.files[0]));
+    addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("over"); });
+    addEventListener("dragleave", () => box.classList.remove("over"));
+    addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("over"); e.dataTransfer.files[0] && read(e.dataTransfer.files[0]); });
+  });
+}
+
+async function load() {
+  if (EMBEDDED) return EMBEDDED;
+  if (PAYLOAD) {
+    try { return await inflate(PAYLOAD[1]); }
+    catch (e) { return fromFile("The link's data is cut off or damaged. Was the whole link copied?"); }
+  }
+  return fromFile();
+}
+
+const WRAP = document.querySelector(".wrap").cloneNode(true);
+const DATA = await load();
+document.querySelector(".wrap").replaceWith(WRAP);
+if (DATA.story.title) document.title = DATA.story.title;
+// the fragment holds the data, so in-page links scroll instead of replacing it
+if (PAYLOAD) document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  const to = a && document.getElementById(a.getAttribute("href").slice(1));
+  if (!to) return;
+  e.preventDefault();
+  document.querySelectorAll(".targeted").forEach((n) => n.classList.remove("targeted"));
+  to.classList.add("targeted");
+  to.scrollIntoView();
+});
+const F = DATA.facts, S = DATA.story;
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k === "html") n.innerHTML = v; else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+};
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const md = (s) => esc(s || "").replace(/`([^`]+)`/g, "<code>$1</code>");
+const sym = (id) => id.split(":").pop();
+const file = (id) => id.split(":")[0].split("/").pop();
+const flowName = (id) => id.replace(/^new:/, "").replace(/-/g, " ");
+const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Outside the map",
+  unassigned: "Not in the story", "off-map": "Off the map" };
+
+const steps = new Map();
+F.map.forEach((f, fi) => f.steps.forEach((s, si) => steps.set(s.key, { ...s, flow: f.id, fi, si })));
+const symById = new Map(F.symbols.map(s => [s.id, s]));
+
+// chapter facts
+const chapters = DATA.chapters.map((c, i) => {
+  const syms = (c.symbols || []).map(id => symById.get(id)).filter(Boolean);
+  const keys = new Set(syms.flatMap(s => s.steps));
+  const ids = new Set(c.symbols || []);
+  const mine = (n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
+  const edgesIn = (list) => list.filter(([a, b]) => mine(a) || mine(b));
+  const callers = new Map();
+  syms.filter(s => s.status === "modified").forEach(s => s.callers.forEach(c => { if (!ids.has(c.id)) callers.set(c.id, c.edited); }));
+  const hunks = F.hunks.filter(h => h.symbols.some(x => ids.has(x)) || (c.files || []).includes(h.file));
+  const role = c.role || (c.kind === "outside" ? "outside" : c.kind === "unassigned" ? "unassigned" : c.kind === "off-map" ? "off-map" : i === 0 ? "core" : "supporting");
+  return { ...c, n: i + 1, id: "ch" + (i + 1), syms, keys, role, callers,
+    added: edgesIn(F.edges.added), removed: edgesIn(F.edges.removed), hunks };
+});
+
+// header
+const range = el("div", { class: "range" });
+range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", S.pr ? " · " : "",
+  el("span", { class: "mono", text: `${F.base_sha} → ${F.head_sha}` }), ` · ${F.name}`);
+$("#top").append(range, el("h1", { text: S.title || `${F.base}..${F.head}` }));
+if (S.delta) $("#top").append(el("p", { class: "delta", html: md(S.delta) }));
+if (S.intent) $("#top").append(el("p", { class: "intent", html: "<b>Author's intent:</b> " + md(S.intent) }));
+
+// system numbers, each with its drivers
+const touchedFlows = new Set(F.symbols.flatMap(s => s.steps.map(k => k.split("/")[0])));
+const gained = Object.keys(F.reach.gained), lost = Object.keys(F.reach.lost);
+const outside = F.files.filter(f => f.kind === "outside" || f.kind === "doc");
+const tiles = [
+  [`${touchedFlows.size} of ${F.map.length}`, "flows run changed code",
+    touchedFlows.size ? [...touchedFlows].map(flowName).join(", ") + (F.flow_entropy === 0 ? " · one flow, no spread" : ` · spread ${F.flow_entropy} bits`) : "none"],
+  [`+${F.endpoints.added.length} −${F.endpoints.removed.length}`, "entry points",
+    [...F.endpoints.added.map(e => "+ " + e), ...F.endpoints.removed.map(e => "− " + e)].join(", ") || "no capability added or removed"],
+  [`+${gained.length} −${lost.length}`, "existing code reached",
+    [...gained.slice(0, 2).map(s => "+ " + sym(s)), ...lost.slice(0, 2).map(s => "− " + sym(s))].join(", ") || "no entry point gains or loses existing code"],
+  [`+${F.modules.added.length} −${F.modules.removed.length}`, "module dependencies",
+    [...F.modules.added.map(([a, b]) => `${a.split("/").pop()} → ${b.split("/").pop()}`)].join(", ") || "no new links between modules"],
+  [`+${F.edges.added.length} −${F.edges.removed.length}`, "calls", `${F.symbols.filter(s => s.status === "new").length} new functions, ${F.symbols.filter(s => s.status === "modified").length} changed`],
+  [`${outside.length}`, "files outside the map", outside.map(f => f.path).join(", ") || "none"],
+  [F.tests.changed.length ? `${F.tests.changed.length}` : "0", "tests changed", F.tests.configured ? (F.tests.changed.join(", ") || "none changed") : "no test suite configured"],
+];
+for (const [v, k, d] of tiles) {
+  const zero = /^(\+0 −0|0|0 of \d+)$/.test(v);
+  $("#tiles").append(el("div", { class: "tile" + (zero ? " zero" : "") }, el("span", { class: "label", text: k }), el("b", { text: v }), el("small", { text: d })));
+}
+
+// the map: positions fixed by map.json, refs say which chapters run where
+$("#lines").style.setProperty("--flows", F.map.length);
+for (const f of F.map) {
+  const ol = el("ol", { class: "stations" });
+  let any = false;
+  for (const s of f.steps) {
+    const hits = chapters.filter(c => c.keys.has(s.key));
+    any = any || hits.length > 0;
+    const refs = el("span", { class: "refs" }, ...hits.map(c => el("a", { class: "ref", href: "#" + c.id, text: String(c.n),
+      style: `--role: var(--${c.role === "core" ? "core" : c.role === "supporting" ? "support" : c.role === "refactor" ? "refactor" : "outside"})`,
+      title: c.title })));
+    ol.append(el("li", { class: "st" + (hits.length ? " hit" : " quiet") }, el("span", { class: "pin", "aria-hidden": "true" }),
+      el("span", {}, s.name, hits.length ? refs : null)));
+  }
+  $("#lines").append(el("section", { class: "flow" + (any ? "" : " quiet") }, el("h3", { text: flowName(f.id) }), ol));
+}
+const offChapters = chapters.filter(c => !c.keys.size);
+if (offChapters.length) {
+  const box = $("#offmap");
+  box.hidden = false;
+  box.append("Not on any flow:", ...offChapters.map(c => el("a", { class: "ref", href: "#" + c.id, text: `${c.n} · ${c.title}`, style: "--role: var(--outside)" })));
+}
+
+// minimap: same positions as the big map, dots only
+function minimap(c) {
+  const cols = F.map.length, rows = Math.max(...F.map.map(f => f.steps.length));
+  const W = 240, colW = W / cols, rowH = 16, top = 22, H = top + rows * rowH + 4;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `System map, ${c.keys.size} of ${steps.size} steps highlighted`);
+  F.map.forEach((f, fi) => {
+    const x = colW * fi + colW / 2;
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", x); t.setAttribute("y", 11); t.setAttribute("text-anchor", "middle");
+    const nm = flowName(f.id);
+    t.textContent = nm.length > 18 ? nm.slice(0, 17) + "…" : nm;
+    svg.append(t);
+    if (f.steps.length > 1) {
+      const l = document.createElementNS(ns, "line");
+      Object.entries({ x1: x, x2: x, y1: top, y2: top + (f.steps.length - 1) * rowH, class: "rail" }).forEach(([k, v]) => l.setAttribute(k, v));
+      svg.append(l);
+    }
+    f.steps.forEach((s, si) => {
+      const d = document.createElementNS(ns, "circle");
+      Object.entries({ cx: x, cy: top + si * rowH, r: 5, class: "dot" + (c.keys.has(s.key) ? " on" : "") }).forEach(([k, v]) => d.setAttribute(k, v));
+      const tip = document.createElementNS(ns, "title"); tip.textContent = s.name; d.append(tip);
+      svg.append(d);
+    });
+  });
+  return el("div", { class: "minimap" }, svg);
+}
+
+function pathEl(p) {
+  const box = el("div", { class: "path" });
+  p.forEach((n, i) => {
+    if (i) box.append(el("i", { text: "›" }));
+    box.append(el("span", { class: i === p.length - 1 ? "end" : "", title: n, text: i === 0 ? file(n) : sym(n) }));
+  });
+  return box;
+}
+
+const picked = new Set();
+function renderNote() {
+  const lines = [];
+  for (const c of chapters) {
+    const qs = (c._qs || []).filter(q => picked.has(q.id));
+    if (!qs.length) continue;
+    lines.push(`${c.n}. ${c.title}`);
+    qs.forEach(q => lines.push(`   - ${q.q}`));
+  }
+  $("#note").value = lines.join("\n") || "";
+}
+
+for (const c of chapters) {
+  const card = el("article", { class: `chapter ${c.role}`, id: c.id });
+  card.append(el("div", { class: "ch-head" },
+    el("div", { class: "ch-tags" }, el("span", { class: "num", text: String(c.n) }), el("span", { class: "tag", text: ROLE[c.role] || c.role }),
+      c.kind && c.kind !== c.role ? el("span", { class: "kind", text: c.kind }) : null),
+    el("h2", { text: c.title }),
+    c.claim ? el("p", { class: "claim", html: md(c.claim) }) : null));
+
+  // where + before/after
+  const crumbs = el("ul", { class: "crumbs" });
+  const keys = [...c.keys].sort((a, b) => (steps.get(a).fi - steps.get(b).fi) || (steps.get(a).si - steps.get(b).si));
+  for (const k of keys) {
+    const s = steps.get(k);
+    crumbs.append(el("li", {}, el("span", { class: "flow-name", text: flowName(s.flow) }), el("span", { text: s.name })));
+  }
+  if (!keys.length) crumbs.append(el("li", {}, el("span", { class: "flow-name", text: "No flow runs this" }),
+    el("span", { text: (c.files || []).join(", ") || c.syms.map(s => s.id).join(", ") })));
+  const here = el("div", { class: "here" }, el("span", { class: "label", text: "You are here" }), minimap(c), crumbs);
+  const morph = el("dl", { class: "morph" });
+  if (c.before) morph.append(el("div", {}, el("dt", { text: "Before" }), el("dd", { html: md(c.before) })));
+  if (c.after) morph.append(el("div", { class: "after" }, el("dt", { text: "After" }), el("dd", { html: md(c.after) })));
+  const right = el("div", { class: "here" }, el("span", { class: "label", text: "How the system changes" }), morph);
+  if (c.why) right.append(el("div", { class: "why" }, el("span", { class: "label", text: "Why it matters" }), el("p", { html: md(c.why) })));
+  if (!c.before && !c.after && !c.why) right.append(el("p", { class: "note", text: "No story for this chapter: the graph facts below are all flowmap knows. Add it to the story file to say what changes and why." }));
+  card.append(el("div", { class: "where" }, here, right));
+
+  // evidence from the graph
+  const ev = el("div", { class: "evidence" });
+  const graphQs = [];
+  const witnesses = new Map();
+  c.syms.forEach(s => Object.entries(s.witness).forEach(([k, p]) => { if (!witnesses.has(k) || witnesses.get(k).length > p.length) witnesses.set(k, p); }));
+  if (witnesses.size) {
+    const ul = el("ul", { class: "paths" });
+    for (const [k, p] of witnesses) ul.append(el("li", {}, el("div", { class: "note", text: steps.get(k).endpoints.join(", ") }), pathEl(p)));
+    const unproved = keys.filter(k => !witnesses.has(k));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Runs under (call path as proof)" }), ul,
+      unproved.length ? el("p", { class: "note", text: `Also on the map's own anchors for: ${unproved.map(k => steps.get(k).name).join("; ")} (no call path found).` }) : null));
+  }
+  if (c.callers.size) {
+    const ul = el("ul", { class: "callers" });
+    [...c.callers].sort((a, b) => a[1] - b[1]).forEach(([id, edited]) =>
+      ul.append(el("li", {}, el("span", { class: "mark " + (edited ? "yes" : "no"), text: edited ? "edited" : "not edited" }), el("span", { title: id, text: `${file(id)} · ${sym(id)}` }))));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Callers of what changed" }), ul));
+  }
+  if (c.added.length || c.removed.length) {
+    const ul = el("ul", { class: "edges" });
+    c.added.slice(0, 8).forEach(([a, b]) => ul.append(el("li", {}, el("span", { class: "mark add", text: "+ call" }), el("span", { text: `${sym(a)} → ${sym(b)}` }))));
+    c.removed.slice(0, 8).forEach(([a, b]) => ul.append(el("li", {}, el("span", { class: "mark rem", text: "− call" }), el("span", { text: `${sym(a)} → ${sym(b)}` }))));
+    ev.append(el("div", {}, el("span", { class: "label", text: "Calls added and removed" }), ul));
+  }
+  // reach that moved under this chapter's steps, though the code reached may be untouched
+  const myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
+  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
+  const gainedHere = moved(F.reach.gained), lostHere = moved(F.reach.lost);
+  if (gainedHere.length || lostHere.length) {
+    const ul = el("ul", { class: "edges" });
+    lostHere.forEach(([s, eps]) => ul.append(el("li", {}, el("span", { class: "mark rem", text: "no longer" }), el("span", { title: s, text: `${file(s)} · ${sym(s)} from ${eps.join(", ")}` }))));
+    gainedHere.forEach(([s, eps]) => ul.append(el("li", {}, el("span", { class: "mark add", text: "now reaches" }), el("span", { title: s, text: `${file(s)} · ${sym(s)} from ${eps.join(", ")}` }))));
+    ev.prepend(el("div", {}, el("span", { class: "label", text: "Reach that moved (unedited code)" }), ul));
+    lostHere.forEach(([s, eps], i) => graphQs.push({ id: `${c.id}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
+    gainedHere.forEach(([s, eps], i) => graphQs.push({ id: `${c.id}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
+  }
+  if (ev.children.length) card.append(ev);
+
+  // questions: the story's, then what the graph raises on its own
+  const qs = [...graphQs, ...(c.questions || []).map((q, i) => ({ ...q, id: `${c.id}q${i}` }))];
+  c.syms.filter(s => s.contract).forEach((s, i) => {
+    const still = s.callers.filter(x => !x.edited).map(x => sym(x.id));
+    if (still.length) qs.push({ id: `${c.id}g${i}`, kind: "graph", q: `${sym(s.id)} changed its arguments (${s.signature[0]} → ${s.signature[1]}) but ${still.length} caller(s) were not edited: ${still.join(", ")}. Are they still correct?`, why: "Signature changed, callers did not." });
+  });
+  c.syms.filter(s => s.status === "new" && !s.steps.length).forEach((s, i) =>
+    qs.push({ id: `${c.id}o${i}`, kind: "graph", q: `New ${sym(s.id)} is not run by any flow on the map. Which step is it for?`, why: "New code no flow reaches is either a map gap or dead." }));
+  c._qs = qs;
+  if (qs.length) {
+    const ol = el("ol", { class: "qs" });
+    for (const q of qs) {
+      const box = el("input", { type: "checkbox", id: q.id });
+      if (q.kind === "ask" || q.kind === "graph") { box.checked = true; picked.add(q.id); }
+      box.addEventListener("change", () => { box.checked ? picked.add(q.id) : picked.delete(q.id); renderNote(); });
+      const kind = { ask: "Ask the author", check: "Check yourself", graph: "From the graph" }[q.kind] || q.kind;
+      ol.append(el("li", { class: "q" }, box, el("label", { for: q.id },
+        el("span", { class: "qtext", html: `<span class="qkind ${esc(q.kind)}">${esc(kind)}</span>` + md(q.q) }),
+        q.why ? el("span", { class: "qwhy", html: md(q.why) }) : null)));
+    }
+    card.append(el("div", { class: "here" }, el("span", { class: "label", text: "Questions, most decisive first" }), ol));
+  }
+
+  // code last
+  if (c.hunks.length) {
+    const d = el("details", { class: "code" }, el("summary", { text: `Code: ${c.hunks.length} hunk${c.hunks.length === 1 ? "" : "s"} in ${[...new Set(c.hunks.map(h => h.file))].join(", ")}` }));
+    for (const h of c.hunks) {
+      const pre = el("pre");
+      h.lines.forEach(l => pre.append(el("span", { class: l[0] === "+" ? "a" : l[0] === "-" ? "r" : "", text: l })));
+      d.append(el("div", { class: "hunk" }, el("div", { class: "hh", text: `${h.file} @ ${h.new}${h.ctx ? " · " + h.ctx : ""}` }), pre));
+    }
+    card.append(d);
+  }
+  $("#chapters").append(card);
+}
+renderNote();
+if (DATA.folded.length) $("#folded").textContent = "Folded, not shown: " + DATA.folded.join(", ");
+
+$("#copy").addEventListener("click", async () => {
+  const t = $("#note");
+  try { await navigator.clipboard.writeText(t.value); $("#status").textContent = "Copied"; }
+  catch (e) { t.focus(); t.select(); $("#status").textContent = "Selected: press Ctrl+C or Cmd+C to copy"; }
+});
+</script>

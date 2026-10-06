@@ -1,0 +1,153 @@
+{
+  "title": "Entry points for any stack come from rules the setup session writes",
+  "pr": "PR #8",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/8",
+  "intent": "Stop writing an adapter per framework: let the model read an unknown codebase once and write rules, and keep inventory deterministic by applying those rules from code on every run.",
+  "delta": "The discover-entry-points flow gains two adapters, `pattern` (regex rules in flowmap.toml) and `list` (entries by hand), and its setup step now loops until the rules agree with what the model sees in the code. The Python call graph now has nodes for defs nested in if/with/try blocks, which moves the review-change-on-map steps by one node in this repo's own goldens. The existing fastapi, rails, nextjs and cli adapters are unchanged, and nothing is auto-detected differently.",
+  "chapters": [
+    {
+      "title": "A regex rule in flowmap.toml turns any stack's registrations into entry points",
+      "role": "core",
+      "kind": "new capability",
+      "symbols": [
+        "flowmap/adapters/pattern.py:entries",
+        "flowmap/adapters/pattern.py:_files",
+        "flowmap/adapters/pattern.py:_fill.one",
+        "flowmap/adapters/pattern.py:_handler",
+        "flowmap/adapters/listed.py:entries",
+        "flowmap/config.py:app_dirs"
+      ],
+      "files": [
+        "README.md",
+        "flowmap/config.py"
+      ],
+      "before": "Inventory knew FastAPI routers mounted with include_router, Rails routes, Next.js files and `__main__` scripts. Anything else, such as routes declared on the app object, routes in an app factory, MCP tools or a click CLI, needed a new adapter written in Python, or was invisible.",
+      "after": "A `pattern` entry names `files` globs, a `match` regex and an `endpoint` template filled from the regex's named groups. The handler is the innermost definition the match sits in, taken from the call-graph builder's symbols (else lens's regex outline), or the nearest definition named by a `handler` group. A match outside any definition is skipped with a line on stderr. A `list` entry names endpoints and handlers by hand.",
+      "claim": "A new stack is a few lines of TOML, not a new adapter.",
+      "why": "Every downstream step (pass briefs, reconcile, lens reach) joins on these endpoint strings, so a rule that matches too much or too little shifts the whole map, and only the setup loop checks it.",
+      "questions": [
+        {
+          "q": "`_handler` picks the innermost definition holding the match line. For a module-level `app.add_api_route(\"/ping\", ping)` without a `handler` group, the match sits in no definition and is skipped. Is a stderr line enough, or should `flowmap inventory` count skipped matches in its summary?",
+          "why": "Decides whether a half-written rule is visible to someone who only reads the inventory count.",
+          "kind": "ask"
+        },
+        {
+          "q": "`_files` uses fnmatch, where `*` crosses directories, so `svc/*.py` matches every .py below svc. Is that the rule we want to teach, or should globs follow pathlib's `**` semantics?",
+          "why": "Rule authors (the model) will write globs from habit; a mismatch silently widens or narrows the inventory.",
+          "kind": "ask"
+        },
+        {
+          "q": "Run the PatternAdapterTest fixture's rules and confirm `GET /page/{standard_id}/{page_num}` maps to `svc/correct.py:build_app.deep_link_page`, the route inside an `if` in a factory.",
+          "why": "That route depends on both this chapter and the nested-def graph fix.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "Setup has the model list every way in, then write rules until inventory agrees",
+      "role": "core",
+      "kind": "agent instructions",
+      "symbols": [],
+      "files": [
+        "skills/flowmap-build/SKILL.md"
+      ],
+      "before": "Step 2 said: run `flowmap inventory` and sanity-check the count and a few handlers.",
+      "after": "Step 2 has the model read the code and list routes, CLI commands, AI tools, jobs, webhooks and consumers, write a `pattern` entry per kind no named adapter covers (or a `list` entry for registries), and rerun inventory until it agrees with the list. It shows the user what is still missing, and `flowmap callgraph check` must report 0 broken.",
+      "claim": "The model is the generic adapter at setup; flowmap stays deterministic afterwards.",
+      "why": "This is the only place the rules are checked against reality. If the model's own list is incomplete, the rules inherit its blind spots.",
+      "questions": [
+        {
+          "q": "The loop compares inventory with the model's own reading of the code. Should a second, independent pass list the entry points, the way the mapping passes are independent?",
+          "why": "Agreement with yourself is weak evidence; the rest of flowmap is built on agreement between different methods.",
+          "kind": "ask"
+        },
+        {
+          "q": "Should the rules the setup writes be shown to the user as a flowmap.toml diff before passes start?",
+          "why": "The user owns flowmap.toml; a silent rule is a silent scope decision.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "Defs nested in if/with/try blocks are call-graph nodes",
+      "role": "supporting",
+      "kind": "bug fix",
+      "symbols": [
+        "flowmap/graphs/python.py:_scope",
+        "flowmap/graphs/python.py:symbols.walk",
+        "flowmap/graphs/python.py:signature",
+        "flowmap/graphs/python.py:_find",
+        "flowmap/graphs/python.py:_Builder._collect.walk"
+      ],
+      "files": [
+        "tests/golden/graph-770f1a7.json",
+        "tests/golden/lens-6d9eaff-770f1a7.md",
+        "tests/golden/change-facts-6d9eaff-770f1a7.json"
+      ],
+      "before": "`symbols`, `_collect`, `signature` and `_find` only looked at direct def and class children, so a def inside an `if` inside a function, or inside `try:` at module level, was not a node, and a handler declared there read as broken.",
+      "after": "`_scope` walks through compound statements (only statements, so deep expressions can't hit the recursion limit) without adding a name segment: a def in an `if` in `outer` is `outer.inner`. Defs inside the `__main__` block stay out, as before. The goldens move by one node, `lens.main.listing`, its edge, and its place among the changed symbols.",
+      "claim": "The graph and the adapters agree on how nested handlers are spelled.",
+      "why": "Every reach number for an entry point whose handler is not a node is silently zero.",
+      "questions": [
+        {
+          "q": "In the change-facts golden, `lens.main` dropped out of the changed symbols because its nested `listing` is now reported, and change.facts deletes any symbol reported alongside its own nested symbols. That rule was written for classes. Should it apply to functions?",
+          "why": "Lens and change facts now disagree about whether lens.main changed in 770f1a7.",
+          "kind": "ask"
+        },
+        {
+          "q": "Two defs of the same name in `try:` / `except ImportError:` branches now map to one node id, and the later one's lines win. Acceptable?",
+          "why": "Decides whether line ranges for fallback imports point at the right branch.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "Duplicate endpoints warn, and named entries need a quoted name to count as tested",
+      "role": "supporting",
+      "kind": "behaviour change",
+      "symbols": [
+        "flowmap/adapters/__init__.py:entries",
+        "flowmap/reconcile.py:tested_endpoints"
+      ],
+      "files": [],
+      "before": "A second entry with the same endpoint string was dropped silently, even with a different handler. An endpoint like `MCP search` was matched with the path regex, so any bare word `search` in a test marked it tested.",
+      "after": "Different handlers for one endpoint print a warning naming both and keep the first; the same handler twice is still merged silently. An endpoint whose target does not start with `/` is tested only when a test quotes it (`'search'` or `\"search\"`).",
+      "claim": "Fewer silent drops, fewer false 'tested' marks.",
+      "why": "Two FastAPI apps in one repo both serve `GET /health`; before this, one of them vanished from the map with no trace.",
+      "questions": [
+        {
+          "q": "Short tool names (`search`, `embed`) still match unrelated quoted strings in tests. Is a quoted-name match good enough for MCP tools, or should it require a nearby `call_tool`?",
+          "why": "Decides how much the evidence level of an MCP step can be trusted.",
+          "kind": "ask"
+        },
+        {
+          "q": "`tested_endpoints` gained a `text` parameter only so tests can call it in-process. Is that acceptable?",
+          "why": "A test seam in production code; the alternative is a fixture repo per case.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "Briefs explain rule-matched and hand-listed entry points",
+      "role": "supporting",
+      "kind": "agent instructions",
+      "symbols": [
+        "flowmap/brief.py:main"
+      ],
+      "files": [
+        ".claude-plugin/plugin.json"
+      ],
+      "before": "STACK had guidance for fastapi, rails, nextjs and cli only, so a brief for a `pattern` entry would raise KeyError.",
+      "after": "STACK has `pattern` (the rule and its files, what calls each kind, shared auth helpers named but not made steps) and `list`. The plugin version is 0.2.0 so installs refresh.",
+      "claim": "Mapping passes know how to read an entry point found by a rule.",
+      "why": "A pass that misreads what calls an entry point picks the wrong `ui` and top-down starting point.",
+      "questions": [
+        {
+          "q": "The brief prints the raw regex. Would the endpoint template alone (`MCP {name|def}`) tell a pass more?",
+          "why": "The regex is for flowmap; the pass needs to know what kind of entry point it is.",
+          "kind": "ask"
+        }
+      ]
+    }
+  ]
+}
