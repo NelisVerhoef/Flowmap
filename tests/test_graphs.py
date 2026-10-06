@@ -20,6 +20,15 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(graphs.python.signature(text, "A.m"), "self, x=1")
         self.assertIsNone(graphs.python.signature(text, "A"))
 
+    def test_defs_inside_blocks_keep_their_scope_name(self):
+        text = ("try:\n    def fast():\n        pass\nexcept ImportError:\n    pass\n"
+                "def outer(x):\n    if x:\n        def inner(y=2):\n            pass\n"
+                "    with x:\n        class C:\n            pass\n")
+        self.assertEqual(graphs.python.symbols(text),
+                         [(2, 3, "fast"), (6, 12, "outer"), (8, 9, "outer.inner"), (11, 12, "outer.C")])
+        self.assertEqual(graphs.python.signature(text, "outer.inner"), "y=2")
+        self.assertTrue(graphs.python.same(text, text.replace("pass", "pass  # same"), "outer.inner"))
+
 
 class PythonBuilderTest(unittest.TestCase):
     def test_unparseable_file_is_skipped(self):

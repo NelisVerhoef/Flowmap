@@ -51,6 +51,14 @@ help text, README and usage docstrings, which say what a user is trying to get d
 order commands are run. Argument parsing is the "UI" — leave `ui` empty unless the tool renders
 something a person interacts with (an HTML page it writes counts: cite its generator). `writes`
 are the files the command produces (`<path>` for a file it creates or overwrites).""",
+    "pattern": """**Rule-matched entry points** (`{files}` matching `{match}`): each entry's handler is the
+definition the registration sits on or names: a route, a CLI command, a tool an AI client calls, a
+job. Its kind is the endpoint's first word. Read the decorator or registration call for what calls it
+(an HTTP client, a person at a shell, a model) and pick `ui` and the top-down starting point to match.
+Shared checks (auth, entitlement) usually run in a helper every handler calls first: name it, don't
+make it a step.""",
+    "list": """**Hand-listed entry points** (see flowmap.toml): dispatch tables and registries no rule can
+find. Treat each like any other entry point; its handler is the function the registry calls.""",
 }
 
 
@@ -70,6 +78,7 @@ def main(run_id, method):
     out_rel = cfg["out"]
     stack = "\n\n".join(STACK[e["adapter"]].format(main=e.get("main", ""), root=e.get("root", "."),
                                                     commands=e.get("commands", ""),
+                                                    files=", ".join(e.get("files", [])), match=e.get("match", ""),
                                                     main_note=f", script `{e['main']}`" if e.get("main") else "")
                         for e in cfg["entry"]) or "No adapter configured — see flowmap.toml."
     output = f"{out_rel}/runs/{run_id}.json"

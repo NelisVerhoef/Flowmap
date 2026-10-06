@@ -364,6 +364,10 @@
    220,
    223
   ],
+  "flowmap/lens.py:main.listing": [
+   334,
+   346
+  ],
   "flowmap/lens.py:py_symbols": [
    47,
    65
@@ -1097,6 +1101,10 @@
   [
    "flowmap/lens.py:main",
    "flowmap/lens.py:main.hits"
+  ],
+  [
+   "flowmap/lens.py:main",
+   "flowmap/lens.py:main.listing"
   ],
   [
    "flowmap/lens.py:main",

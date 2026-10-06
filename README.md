@@ -15,6 +15,7 @@ Python 3.11+, no dependencies.
 | Rails | `bin/rails routes` (or a saved dump), actions resolved through concerns and parent controllers | not yet: the map and anchor matching work, reach doesn't |
 | Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `"use server"` actions | not yet |
 | React SPA | its backend's entry points; top-down passes start from its router | via the backend |
+| anything else | `pattern`: a regex for its registrations (`@app.get(...)`, `@server.tool`, `app.get("/x", show)`), written into `flowmap.toml` at setup; the handler is the definition it sits on. `list` for registries no regex finds | yes for Python, including defs built in factory functions |
 | Python CLI | `if __name__ == "__main__"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |
 
 ## On a new machine
@@ -142,6 +143,11 @@ the slow-moving top layer of the map), `plumbing` (components hidden from the sy
 and `engine` (an optional hub to fold into one node).
 
 ## Adding a stack
+
+Most stacks need no code: a `pattern` entry in `flowmap.toml` (see `flowmap/adapters/pattern.py`)
+turns a regex over the files that register entry points into endpoints, and the `flowmap-build`
+skill writes those rules when it sets a repo up. Write an adapter only for what a regex can't
+express: prefixes composed across files, names a framework derives.
 
 Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{"endpoint", "handler", "line",
 "aliases"?}]`, register it in `adapters/__init__.py`, and add its guidance to `STACK` in

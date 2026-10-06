@@ -9,18 +9,22 @@ and derived from code, never from a model. `aliases` are other spellings tests m
 hit it (Rails path helpers, for instance).
 """
 
-from . import cli, fastapi, nextjs, rails
+import sys
 
-ADAPTERS = {"fastapi": fastapi.entries, "rails": rails.entries, "nextjs": nextjs.entries, "cli": cli.entries}
+from . import cli, fastapi, listed, nextjs, pattern, rails
+
+ADAPTERS = {"fastapi": fastapi.entries, "rails": rails.entries, "nextjs": nextjs.entries, "cli": cli.entries,
+            "pattern": pattern.entries, "list": listed.entries}
 
 
 def entries(cfg, read):
     out = []
     for spec in cfg["entry"]:
         out.extend(ADAPTERS[spec["adapter"]](spec, read))
-    seen, unique = set(), []
+    first = {}
     for e in sorted(out, key=lambda e: (e["endpoint"].split(" ", 1)[-1], e["endpoint"])):
-        if e["endpoint"] not in seen:
-            seen.add(e["endpoint"])
-            unique.append(e)
-    return unique
+        kept = first.setdefault(e["endpoint"], e)
+        if kept["handler"] != e["handler"]:  # two apps both serving GET /health: say which one the map uses
+            print(f"flowmap: {e['endpoint']} is handled by both {kept['handler']} and {e['handler']}; "
+                  f"keeping {kept['handler']}", file=sys.stderr)
+    return list(first.values())

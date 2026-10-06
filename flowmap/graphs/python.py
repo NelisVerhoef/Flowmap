@@ -37,22 +37,31 @@ def _start(node):
     return min([d.lineno for d in node.decorator_list] + [node.lineno])
 
 
+def _scope(node, skip=None):
+    """Defs and classes in node's own scope, found through if/with/try/for/match blocks, which
+    add no name segment: a def inside an `if` inside `outer` is `outer.inner`."""
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            yield child
+        elif child is not skip and isinstance(child, (ast.stmt, ast.excepthandler, ast.match_case)):
+            yield from _scope(child)
+
+
 def symbols(text):
     """[(start, end, 'Class.method' or 'fn')] innermost-last."""
     out = []
 
-    def walk(node, prefix):
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                name = f"{prefix}{child.name}"
-                out.append((_start(child), child.end_lineno, name))
-                walk(child, f"{name}.")
+    def walk(node, prefix, skip=None):
+        for child in _scope(node, skip):
+            name = f"{prefix}{child.name}"
+            out.append((_start(child), child.end_lineno, name))
+            walk(child, f"{name}.")
     try:
         tree = ast.parse(text)
     except SyntaxError:
         return out
-    walk(tree, "")
     guard = main_guard(tree)
+    walk(tree, "", guard)  # defs in the __main__ block are not module-level symbols
     if guard:
         out.append((guard.lineno, guard.end_lineno, "__main__"))
     return out
@@ -64,17 +73,8 @@ def signature(text, sym):
         tree = ast.parse(text or "")
     except SyntaxError:
         return None
-    parts = sym.split(".")
-    nodes = tree.body
-    for i, p in enumerate(parts):
-        hit = next((n for n in nodes if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                    and n.name == p), None)
-        if hit is None:
-            return None
-        if i == len(parts) - 1:
-            return ast.unparse(hit.args) if not isinstance(hit, ast.ClassDef) else None
-        nodes = hit.body
-    return None
+    hit = _find(tree, sym)
+    return ast.unparse(hit.args) if hit is not None and not isinstance(hit, ast.ClassDef) else None
 
 
 def live(text):
@@ -106,8 +106,7 @@ def same(base_text, head_text, sym):
 def _find(tree, sym):
     node = tree
     for part in sym.split("."):
-        node = next((c for c in ast.iter_child_nodes(node)
-                     if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and c.name == part), None)
+        node = next((c for c in _scope(node) if c.name == part), None)
         if node is None:
             return None
     return node
@@ -167,22 +166,21 @@ class _Builder:
     def _collect(self, rel, tree):
         mod = config.module_name(rel)
 
-        def walk(node, prefix, in_class):
-            for child in ast.iter_child_nodes(node):
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    qual = f"{prefix}{child.name}"
-                    nid = f"{rel}:{qual}"
-                    self.defs[nid] = (_start(child), child.end_lineno)
-                    if not prefix:
-                        self.by_module[mod][child.name] = nid
-                    if isinstance(child, ast.ClassDef):
-                        self.bases[nid] = {b.attr if isinstance(b, ast.Attribute) else getattr(b, "id", "")
-                                           for b in child.bases}
-                    if in_class and not isinstance(child, ast.ClassDef):
-                        self.methods[child.name].add(nid)
-                    walk(child, f"{qual}.", isinstance(child, ast.ClassDef))
-        walk(tree, "", False)
+        def walk(node, prefix, in_class, skip=None):
+            for child in _scope(node, skip):
+                qual = f"{prefix}{child.name}"
+                nid = f"{rel}:{qual}"
+                self.defs[nid] = (_start(child), child.end_lineno)
+                if not prefix:
+                    self.by_module[mod][child.name] = nid
+                if isinstance(child, ast.ClassDef):
+                    self.bases[nid] = {b.attr if isinstance(b, ast.Attribute) else getattr(b, "id", "")
+                                       for b in child.bases}
+                if in_class and not isinstance(child, ast.ClassDef):
+                    self.methods[child.name].add(nid)
+                walk(child, f"{qual}.", isinstance(child, ast.ClassDef))
         guard = main_guard(tree)
+        walk(tree, "", False, guard)
         if guard:
             self.defs[f"{rel}:__main__"] = (guard.lineno, guard.end_lineno)
         for node in tree.body:
