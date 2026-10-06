@@ -1,0 +1,112 @@
+{
+ "title": "A change page opens on an overview and the verdict, and shows one part at a time",
+ "pr": "PR #9",
+ "url": "https://github.com/NelisVerhoef/Flowmap/pull/9",
+ "intent": "The change page was too dense to get to understanding: everything expanded at once, a map that lit the ripple instead of the change, and no click-through.",
+ "delta": "Reading a change page now starts with the lens verdict and an overview (what moves, the non-zero numbers, and a lane map whose part numbers click through), then walks one part at a time: before/after, why, and questions, with call paths, ripple and code folded until asked for. `flowmap change` now runs the lens analysis too, so its facts carry the verdict. Nothing about how parts, steps or questions are computed changed, and the story format is the same, so old pages and links still open.",
+ "chapters": [
+  {
+   "title": "The page shows the overview, then one part at a time, with evidence folded",
+   "role": "core",
+   "kind": "reading experience",
+   "symbols": [],
+   "files": [
+    "flowmap/change.template.html"
+   ],
+   "before": "One long page: seven number tiles (mostly zero), a three-column map, then every chapter expanded with a minimap, before/after, why, call paths, callers, edges, reach, questions and code. PR #8 rendered 7000px tall; its core chapter was an off-map chip while refactor chapters lit most of the map. Map refs were in-page anchors only.",
+   "after": "A left rail lists the parts (core first, the order rule stated) and a map of the touched flows that lights the selected part's steps; clicking a lit step selects the part that runs it. The pane shows an overview (delta, non-zero numbers as pills, intent, a lane per touched flow with clickable part numbers, and a `No flow runs this` lane) or one part (claim, flows it runs in, before/after side by side, why, questions). Call paths, ripple and code are folded; code filters by symbol. Next/previous and arrow or j/k keys walk the parts; ticked questions sit in a bottom tray. Graph questions about new unmapped functions merge into one per part.",
+   "claim": "About 1100 to 1400px per view on PR #8 instead of one 7000px scroll.",
+   "why": "Every reviewer who opens a PR's link reads through this page; if it doesn't lead them to the change's point in the first screen, they go back to the diff and the map's work is wasted.",
+   "questions": [
+    {
+     "q": "Selection lives in memory, not the URL, because the viewer's fragment holds the data. Do you need deep links to a part (e.g. `#v1.…&part=3`) for review comments?",
+     "why": "Decides whether the fragment format needs a second field.",
+     "kind": "ask"
+    },
+    {
+     "q": "Graph questions about new functions no flow runs are now one question per part instead of one per function. Is a single question with the names listed enough to act on?",
+     "why": "Fewer default-ticked questions in the review note, at the cost of one line per function.",
+     "kind": "ask"
+    },
+    {
+     "q": "Open docs/flowmap/changes/pr-8.html, walk the parts with the arrow keys, click a lit step in the rail, and filter the code of part 1 by `_handler`.",
+     "why": "The click-through is the point of the change and has no automated test.",
+     "kind": "check"
+    }
+   ]
+  },
+  {
+   "title": "Change facts carry the lens verdict, and the page opens with it",
+   "role": "supporting",
+   "kind": "new fact",
+   "symbols": [
+    "flowmap/change.py:facts",
+    "flowmap/lens.py:analyse",
+    "flowmap/lens.py:main",
+    "flowmap/lens.py:graph_at"
+   ],
+   "files": [
+    "tests/golden/change-facts-6d9eaff-770f1a7.json"
+   ],
+   "before": "`flowmap lens` decided contained, spreads or blind inside `main`, which printed it. `flowmap change` built its facts without it, so the page could not say whether the change was safe to read at the flow level.",
+   "after": "`lens.analyse` returns the facts and report lines; `main` prints them. `change.facts` calls it and adds `verdict` (verdict, blind spots, entry points it spreads to). The page shows it under the title, its reasons one click away; pages without it skip the line. `graph_at` is cached per ref, since change and lens both build the base and head graphs.",
+   "claim": "The first thing on the page is whether the call graph can vouch for the change.",
+   "why": "A blind verdict means the reviewer must read the diff for what the graph can't see; leading with it stops a tidy page from reading as contained.",
+   "questions": [
+    {
+     "q": "`graph_at` is now `lru_cache`d for the life of the process, so every caller shares one `Graph` per ref. No caller mutates one today; should `Graph` freeze its edges and `unparsed` so none can later?",
+     "why": "A cached graph changed by one caller is silently wrong for the next.",
+     "kind": "ask"
+    },
+    {
+     "q": "`flowmap change` now also runs the whole lens analysis (inventory at both refs, cosmetic checks, importer greps). Is the extra time acceptable on a large Rails repo?",
+     "why": "Change pages are built on every PR.",
+     "kind": "ask"
+    },
+    {
+     "q": "Confirm the golden diff is the `verdict` key only: `python3 -m unittest tests.test_golden`.",
+     "why": "The rest of the change facts must not move.",
+     "kind": "check"
+    }
+   ]
+  },
+  {
+   "title": "A change link carries only the hunks a chapter shows",
+   "role": "supporting",
+   "kind": "smaller link",
+   "symbols": [
+    "flowmap/change.py:merge"
+   ],
+   "files": [],
+   "before": "Every hunk of the diff rode in the page data, including regenerated pages and goldens no chapter ever displays. This PR's link came out at 197 KB, over the 60 KB a PR body holds.",
+   "after": "`merge` keeps a hunk only if it has changed symbols or its file belongs to a chapter, the same rule the page uses to show it. This PR's link is about 27 KB.",
+   "claim": "What the page can't show no longer weighs on the link.",
+   "why": "Any PR that regenerates map files or goldens would otherwise lose its link in the PR body.",
+   "questions": [
+    {
+     "q": "A hunk in a test file no chapter claims is now dropped from the data, though the old page didn't show it either. Should the folded list say that its code isn't in the link?",
+     "why": "A reader opening the JSON might expect the full diff.",
+     "kind": "ask"
+    }
+   ]
+  },
+  {
+   "title": "Committed change pages re-rendered with their recorded data",
+   "role": "refactor",
+   "kind": "regenerated",
+   "symbols": [],
+   "files": [],
+   "before": "Each page embedded the old template.",
+   "after": "`docs/flowmap/changes/pr-{1,3,5,6,7,8}.html` each embed the new template around the exact data it was built with, not facts recomputed against today's map, so what each PR showed is preserved. They have no verdict line, since their facts predate it.",
+   "claim": "Same data, new reading.",
+   "why": "Recomputing old PRs against today's map would silently rewrite history.",
+   "questions": [
+    {
+     "q": "Should old pages be recomputed instead, to gain the verdict, accepting that their placement may shift with today's map?",
+     "why": "Trades fidelity to what was reviewed for consistency.",
+     "kind": "ask"
+    }
+   ]
+  }
+ ]
+}

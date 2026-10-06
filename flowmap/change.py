@@ -165,6 +165,7 @@ def facts(base, head):
                               {k for i in ids if i not in symbols for k in symbols if k.startswith(i + ".")})
 
     tests_cfg = config.load().get("code", {}).get("tests", [])
+    lf, _ = lens.analyse(base, head)
     return {
         "base": base, "head": head,
         "base_sha": lens.git("rev-parse", "--short", base).strip(),
@@ -180,6 +181,7 @@ def facts(base, head):
                   "lost": {k: sorted(v[1]) for k, v in moved.items() if v[1]}},
         "edges": {"added": sorted(map(list, added_edges)), "removed": sorted(map(list, removed_edges))},
         "modules": {"added": sorted(map(list, mod_head - mod_base)), "removed": sorted(map(list, mod_base - mod_head))},
+        "verdict": {"verdict": lf["verdict"], "blind": lf["blind"], "spreads_to": lf["spreads_to"]},
         "flow_share": dict(share), "flow_entropy": round(entropy, 2),
         "tests": {"configured": bool(tests_cfg),
                   "changed": [f["path"] for f in files if f["kind"] == "test"]},
@@ -221,6 +223,10 @@ def merge(fx, story):
         print("story names symbols this diff does not change: " + ", ".join(unknown), file=sys.stderr)
     folded = [f for f in fx["files"] if f["kind"] in ("generated", "test") or
               (f["kind"] in ("doc", "outside") and f["path"] not in claimed_files and not story.get("chapters"))]
+    # the page shows a hunk only under a chapter that owns its symbols or its file; drop the rest
+    # (regenerated pages, goldens) so the link stays small
+    shown = {f for c in chapters for f in c.get("files", [])}
+    fx = {**fx, "hunks": [h for h in fx["hunks"] if h["symbols"] or h["file"] in shown]}
     return {"facts": fx, "story": {k: v for k, v in story.items() if k != "chapters"},
             "chapters": chapters, "folded": [f["path"] for f in folded if f["path"] not in loose]}
 
