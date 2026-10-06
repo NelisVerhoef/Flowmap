@@ -7,7 +7,7 @@
 - module-level code changed (constants, config, router registration): `flowmap/change.py`
 - files outside the analysed code: `bin/flowmap`, `flowmap/atlas.template.html`, `flowmap/change.template.html`
 
-11 files changed (3 app code, 0 tests, 8 other) · 20 code symbols changed · 4 map steps touched across 1 flows
+11 files changed (3 app code, 0 tests, 8 other) · 21 code symbols changed · 4 map steps touched across 1 flows
 
 ## Endpoint changes
 
@@ -34,9 +34,9 @@ Widest-reaching **modified** code (new code only inherits its caller's reach):
 
 ## Reach diff (call graph, base → head)
 
-36 call edges added, 2 removed. Existing code newly reachable from some endpoint: **0**; no longer reachable from some endpoint: **0**.
+37 call edges added, 2 removed. Existing code newly reachable from some endpoint: **0**; no longer reachable from some endpoint: **0**.
 
-Edges added: `callgraph.Graph.callees` → `callgraph.Graph._closure`, `callgraph.Graph.callers` → `callgraph.Graph._closure`, `change.__main__` → `change.main`, `change.facts` → `atlas.step_keys`, `change.facts` → `callgraph.Graph.callees`, `change.facts` → `callgraph.Graph.edge_set`, `change.facts` → `callgraph.Graph.reaches`, `change.facts` → `change.facts.module`, … 28 more
+Edges added: `callgraph.Graph.callees` → `callgraph.Graph._closure`, `callgraph.Graph.callers` → `callgraph.Graph._closure`, `change.__main__` → `change.main`, `change.facts` → `atlas.step_keys`, `change.facts` → `callgraph.Graph.callees`, `change.facts` → `callgraph.Graph.edge_set`, `change.facts` → `callgraph.Graph.reaches`, `change.facts` → `change.facts.module`, … 29 more
 Edges removed: `lens.main` → `callgraph.Graph`, `lens.main` → `lens.git`
 
 ## Off-map changes (code the map doesn't know)
@@ -51,10 +51,10 @@ New code, or a gap in the map. Either way: where does it sit in a flow?
 
 - `flowmap/callgraph.py`: `Graph._closure`, `Graph.callees`, `Graph.edge_set`
 - `flowmap/change.py`: `__main__`, `auto_chapters`, `facts`, `facts.module`, `facts.node_for`, `file_kind`, `hunks`, `main`, `merge`, `signature`
-- `flowmap/lens.py`: `graph_at`, `reach_diff`
+- `flowmap/lens.py`: `graph_at`, `main.listing`, `reach_diff`
 
 ## Shape
 
-- Steps touched: 4 · symbols changed: 20 · ratio 5.0 symbols per step
+- Steps touched: 4 · symbols changed: 21 · ratio 5.2 symbols per step
 - Tests changed: 0 — **no tests changed**
 
