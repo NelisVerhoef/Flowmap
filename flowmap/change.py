@@ -165,6 +165,7 @@ def facts(base, head):
                               {k for i in ids if i not in symbols for k in symbols if k.startswith(i + ".")})
 
     tests_cfg = config.load().get("code", {}).get("tests", [])
+    lf, _ = lens.analyse(base, head)
     return {
         "base": base, "head": head,
         "base_sha": lens.git("rev-parse", "--short", base).strip(),
@@ -180,6 +181,7 @@ def facts(base, head):
                   "lost": {k: sorted(v[1]) for k, v in moved.items() if v[1]}},
         "edges": {"added": sorted(map(list, added_edges)), "removed": sorted(map(list, removed_edges))},
         "modules": {"added": sorted(map(list, mod_head - mod_base)), "removed": sorted(map(list, mod_base - mod_head))},
+        "verdict": {"verdict": lf["verdict"], "blind": lf["blind"], "spreads_to": lf["spreads_to"]},
         "flow_share": dict(share), "flow_entropy": round(entropy, 2),
         "tests": {"configured": bool(tests_cfg),
                   "changed": [f["path"] for f in files if f["kind"] == "test"]},

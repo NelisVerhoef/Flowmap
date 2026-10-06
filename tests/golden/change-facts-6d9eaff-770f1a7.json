@@ -816,6 +816,20 @@
   ],
   "removed": []
  },
+ "verdict": {
+  "verdict": "blind",
+  "blind": [
+   "module-level code changed (constants, config, router registration): `flowmap/change.py`",
+   "files outside the analysed code: `bin/flowmap`, `flowmap/atlas.template.html`, `flowmap/change.template.html`"
+  ],
+  "spreads_to": [
+   "CLI flowmap atlas",
+   "CLI flowmap callgraph",
+   "CLI flowmap change",
+   "CLI flowmap diagrams",
+   "CLI flowmap lens"
+  ]
+ },
  "flow_share": {
   "new:review-change-on-map": 8,
   "(off-map)": 9

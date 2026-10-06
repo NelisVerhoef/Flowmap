@@ -12,6 +12,7 @@ It opens with a verdict: contained (no existing entry point runs changed code), 
 the entry points it reaches) or blind (the change holds something the call graph can't see).
 """
 
+import functools
 import json
 import re
 import subprocess
@@ -161,6 +162,7 @@ def endpoint_set(ref):
         return {}
 
 
+@functools.lru_cache(maxsize=None)  # lens and change both ask for the same refs
 def graph_at(ref):
     """The static call graph of the graph roots as they are at `ref`."""
     return Graph(read=lambda rel: show(ref, rel) or "", files=config.graph_files(ref))
@@ -244,7 +246,8 @@ def blind_spots(files, code, tests, changed, new_symbols, reach_of, graphs_at, b
     return blind
 
 
-def main(base, head="HEAD", as_json=False):
+def analyse(base, head="HEAD"):
+    """(facts, report lines) for base..head: the verdict, placement, reach and blind spots."""
     the_map = json.loads(MAP.read_text())
     changes = changed_lines(base, head)
     files = sorted(changes)
@@ -464,6 +467,11 @@ def main(base, head="HEAD", as_json=False):
             f"ratio {len(changed) / max(1, len(touched)):.1f} symbols per step",
             f"- Tests changed: {len(tests)}" + (" — **no tests changed**" if code and not tests else ""),
             ""]
+    return facts, out
+
+
+def main(base, head="HEAD", as_json=False):
+    facts, out = analyse(base, head)
     print(json.dumps(facts, indent=1) if as_json else "\n".join(out))
 
 
