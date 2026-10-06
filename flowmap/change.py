@@ -223,6 +223,10 @@ def merge(fx, story):
         print("story names symbols this diff does not change: " + ", ".join(unknown), file=sys.stderr)
     folded = [f for f in fx["files"] if f["kind"] in ("generated", "test") or
               (f["kind"] in ("doc", "outside") and f["path"] not in claimed_files and not story.get("chapters"))]
+    # the page shows a hunk only under a chapter that owns its symbols or its file; drop the rest
+    # (regenerated pages, goldens) so the link stays small
+    shown = {f for c in chapters for f in c.get("files", [])}
+    fx = {**fx, "hunks": [h for h in fx["hunks"] if h["symbols"] or h["file"] in shown]}
     return {"facts": fx, "story": {k: v for k, v in story.items() if k != "chapters"},
             "chapters": chapters, "folded": [f["path"] for f in folded if f["path"] not in loose]}
 
