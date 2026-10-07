@@ -6,8 +6,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a transit map. Flows are vertical lines in a fixed order, steps are stations,
-   shared components sit in a core band below; a detail rail shows one station's code flow. */
+/* Layout: a transit map. Flows are vertical lines in a fixed order, steps are stations; where
+   steps of different flows run the same code, wires leave them and meet at an interchange below.
+   A detail rail shows one station's code flow, or which stations feed one interchange. */
 :root {
   --paper: #eef1f4;
   --surface: #ffffff;
@@ -69,6 +70,7 @@ input[type="search"] { width: 220px; max-width: 100%; }
 
 .overlay-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; background: var(--accent-soft);
   border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+.overlay-bar[hidden] { display: none; }
 .overlay-bar b { font-family: var(--display); font-stretch: 80%; font-size: 15px; }
 .overlay-bar .mono { color: var(--muted); }
 
@@ -77,7 +79,21 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al
 
 .map { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; min-width: 0; }
 .lines { overflow-x: auto; padding: 16px 12px 8px; }
-.lines-inner { display: grid; grid-auto-flow: column; grid-auto-columns: 158px; gap: 8px; width: max-content; }
+.lines-inner { position: relative; width: max-content; padding-left: 24px; }
+.cols { position: relative; z-index: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 158px; gap: 28px; }
+#wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#wires path { fill: none; stroke: var(--line); stroke-width: 1.5; opacity: .6; transition: opacity .15s; }
+#wires path.on { stroke: var(--accent); stroke-width: 2.5; opacity: 1; }
+#wires path.dim { opacity: .12; }
+.merges { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 16px; margin-top: 64px; padding-bottom: 6px; }
+.merge { display: grid; justify-items: center; font: 600 12px var(--mono); color: var(--ink); background: var(--surface);
+  border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 14px; cursor: pointer; transition: opacity .15s; }
+.merge small { font: 10.5px var(--body); color: var(--muted); }
+.merge:hover { background: var(--accent-soft); }
+.merge[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.merge[aria-pressed="true"] small { color: inherit; }
+.merge.ov { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); }
+.merge.dim { opacity: .22; }
 .flow h2 { font: 700 13.5px/1.15 var(--display); font-stretch: 78%; letter-spacing: .02em; margin: 0 0 2px; padding-left: 6px; min-height: 31px; }
 .flow .fsum { font-size: 11px; color: var(--muted); padding-left: 6px; margin: 0 0 10px; }
 .stations { list-style: none; margin: 0; padding: 0; position: relative; }
@@ -101,10 +117,10 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al
 .core h3, .rail h3 { font: 700 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font: 12px var(--mono); background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px;
-  padding: 3px 10px; cursor: pointer; }
+  padding: 3px 10px; }
+button.chip { cursor: pointer; text-align: left; }
+button.chip:hover { border-color: var(--accent); }
 .chip small { color: var(--muted); font-family: var(--body); margin-left: 4px; }
-.chip[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
-.chip[aria-pressed="true"] small { color: inherit; }
 .core p { margin: 0; font-size: 12px; color: var(--muted); max-width: 90ch; }
 
 .rail { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
@@ -130,8 +146,16 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al
 .code .n.ov rect { stroke: var(--accent); stroke-width: 2; }
 .code path { fill: none; stroke: var(--line); stroke-width: 1.2; }
 .small { font-size: 12px; color: var(--muted); margin: 0; }
+.fns { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.fns li { padding-left: calc(var(--depth) * 14px); border-left: 2px solid transparent; }
+.fns li.ov { border-color: var(--accent); }
+.fns .fn { font: 600 12.5px var(--mono); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.fns a.fn:hover { color: var(--accent); text-decoration: underline; }
+.fns .sig { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.fns .loc { display: block; font-size: 11px; color: var(--muted); }
+.fns p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .empty { color: var(--muted); font-size: 13px; }
-@media (prefers-reduced-motion: reduce) { .station { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .station, .merge, #wires path { transition: none; } }
 </style>
 
 <div class="wrap">
@@ -163,10 +187,9 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al
 
   <main>
     <section class="map" aria-label="System map">
-      <div class="lines"><div class="lines-inner" id="lines"></div></div>
+      <div class="lines"><div class="lines-inner"><svg id="wires" aria-hidden="true"></svg><div class="cols" id="lines"></div><div class="merges" id="merges"></div></div></div>
       <div class="core">
-        <h3>Core: components two or more flows run through</h3>
-        <div class="chips" id="chips"></div>
+        <h3>Where flows meet</h3>
         <p id="corenote"></p>
       </div>
     </section>
@@ -200,7 +223,7 @@ const el = (tag, attrs = {}, ...kids) => {
 const steps = new Map();
 DATA.flows.forEach(f => f.steps.forEach((s, i) => steps.set(s.key, { ...s, flow: f.id, index: i + 1 })));
 const stationEls = new Map();
-let state = { step: store.get("atlas.step"), comp: null, overlay: store.get("atlas.overlay") || "", q: "" };
+let state = { step: store.get("atlas.step"), merge: null, overlay: store.get("atlas.overlay") || "", q: "" };
 if (!steps.has(state.step)) state.step = "review-queue/release-held-run";
 if (!steps.has(state.step)) state.step = DATA.flows.find(f => f.id === "review-queue")?.steps[1]?.key || [...steps.keys()][0];
 if (!DATA.overlays.some(o => o.id === state.overlay)) state.overlay = "";
@@ -234,32 +257,63 @@ function renderLines() {
       ul.append(el("li", {}, btn));
     }
     const name = f.id.replace(/^new:/, "");
-    host.append(el("section", { class: "flow", "aria-label": name },
+    const sec = el("section", { class: "flow", "aria-label": name },
       el("h2", { text: name + (f.id.startsWith("new:") ? " ✦" : "") }),
-      el("p", { class: "fsum", text: `${f.steps.length} steps` }), ul));
+      el("p", { class: "fsum", text: `${f.steps.length} steps` }), ul);
+    flowEls.set(f.id, sec);
+    host.append(sec);
   }
 }
 
-function renderCore() {
-  const host = $("#chips");
-  for (const c of DATA.components) {
-    const b = el("button", { class: "chip", type: "button", "aria-pressed": "false" },
-      c.id, el("small", { text: `${c.flows} flows` }));
-    const on = () => { state.comp = c.id; paint(); };
-    b.addEventListener("mouseenter", on);
-    b.addEventListener("focus", on);
-    b.addEventListener("mouseleave", () => { if (state.comp === c.id && !b.dataset.locked) { state.comp = null; paint(); } });
-    b.addEventListener("click", () => {
-      const locked = !b.dataset.locked;
-      host.querySelectorAll(".chip").forEach(x => delete x.dataset.locked);
-      if (locked) { b.dataset.locked = "1"; state.comp = c.id; } else state.comp = null;
-      paint();
-    });
+const mergeEls = new Map(), flowEls = new Map(), wires = [];
+const mergesOf = (key) => DATA.merges.filter(m => m.steps.includes(key));
+
+function renderMerges() {
+  const host = $("#merges"), col = new Map(DATA.flows.map((f, i) => [f.id, i]));
+  const mid = (m) => m.steps.reduce((a, k) => a + col.get(steps.get(k).flow), 0) / m.steps.length;
+  for (const m of [...DATA.merges].sort((a, b) => mid(a) - mid(b))) {
+    const b = el("button", { class: "merge", type: "button", "aria-pressed": "false",
+      title: `${m.file}: ${m.at.join(", ")}` }, m.file,
+      el("small", { text: `${m.flows} flows · ${m.steps.length} steps` }));
+    b.addEventListener("click", () => selectMerge(m.id));
+    mergeEls.set(m.id, b);
     host.append(b);
   }
-  $("#corenote").textContent = `Hover or tap a component to light up every step that runs through it. ` +
-    `"workflow engine" is executor.run_workflow and everything only it reaches (${DATA.engine.join(", ")}). ` +
-    `Hidden as plumbing: ${DATA.plumbing.join(", ")}.`;
+  $("#corenote").textContent = DATA.merges.length
+    ? `Each interchange is a file whose code steps of two or more flows run: the wires show which steps. ` +
+      `Only the first place they meet is drawn; the code it calls is shared too. Click one to see who feeds it. ` +
+      `Hidden as plumbing: ${DATA.plumbing.join(", ")}, and code over half the entry points reach.`
+    : "No two flows run the same code beyond plumbing.";
+}
+
+function drawWires() {
+  const svg = $("#wires"), box = svg.getBoundingClientRect(), ns = "http://www.w3.org/2000/svg";
+  const at = (r) => ({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height });
+  const yb = at($("#lines").getBoundingClientRect()).y + at($("#lines").getBoundingClientRect()).h;
+  wires.length = 0;
+  svg.replaceChildren();
+  DATA.merges.forEach((m, mi) => {
+    const n = at(mergeEls.get(m.id).getBoundingClientRect()), nx = n.x + n.w / 2;
+    for (const key of m.steps) {
+      const p = at(stationEls.get(key).querySelector(".pin").getBoundingClientRect());
+      const x0 = p.x + p.w / 2, y0 = p.y + p.h / 2;
+      const gx = at(flowEls.get(steps.get(key).flow).getBoundingClientRect()).x - 8 - (mi % 5) * 3;
+      const y1 = yb + 8 + (mi % 5) * 3, k = (n.y - y1) / 2;
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", `M${x0},${y0} H${gx + 6} Q${gx},${y0} ${gx},${y0 + 6} V${y1} C${gx},${y1 + k} ${nx},${n.y - k} ${nx},${n.y}`);
+      svg.append(path);
+      wires.push({ path, merge: m.id, step: key });
+    }
+  });
+  paintWires();
+}
+
+function paintWires() {
+  for (const w of wires) {
+    const on = state.merge ? w.merge === state.merge : w.step === state.step;
+    w.path.classList.toggle("on", on);
+    w.path.classList.toggle("dim", !!state.merge && !on);
+  }
 }
 
 function currentOverlay() { return DATA.overlays.find(o => o.id === state.overlay); }
@@ -269,17 +323,22 @@ function paint() {
   const q = state.q.trim().toLowerCase();
   for (const [key, btn] of stationEls) {
     const s = steps.get(key);
-    btn.setAttribute("aria-pressed", key === state.step ? "true" : "false");
+    btn.setAttribute("aria-pressed", !state.merge && key === state.step ? "true" : "false");
     btn.classList.remove("ov-reach", "ov-direct", "ov-new", "dim");
     const hit = ov && ov.steps[key];
     if (hit) btn.classList.add("ov-" + hit.kind);
     let dim = false;
-    if (state.comp) dim = !s.components.includes(state.comp);
+    if (state.merge) dim = !DATA.merges.find(m => m.id === state.merge).steps.includes(key);
     else if (q) dim = !(s.name.toLowerCase().includes(q) || s.endpoints.some(e => e.toLowerCase().includes(q)) || key.includes(q));
     else if (ov) dim = !hit;
     btn.classList.toggle("dim", dim);
   }
-  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c.firstChild.textContent === state.comp ? "true" : "false"));
+  for (const [id, b] of mergeEls) {
+    b.setAttribute("aria-pressed", id === state.merge ? "true" : "false");
+    b.classList.toggle("ov", !!ov && (ov.merges || []).includes(id));
+    b.classList.toggle("dim", !state.merge && !!ov && !(ov.merges || []).includes(id));
+  }
+  paintWires();
   const bar = $("#ovbar");
   bar.hidden = !ov;
   if (ov) {
@@ -296,8 +355,28 @@ function paint() {
   renderRail();
 }
 
+function mergeRail(m) {
+  const ov = currentOverlay();
+  const stepBtn = (key) => {
+    const s = steps.get(key);
+    const b = el("button", { class: "chip", type: "button", style: "font-family: var(--body)" }, el("small", { text: `${s.flow.replace(/^new:/, "")} · ${s.index} ` }), s.name);
+    b.addEventListener("click", () => select(key));
+    return el("li", {}, b);
+  };
+  const kids = [
+    el("div", {}, el("div", { class: "eyebrow", text: `Where ${m.flows} flows meet` }), el("h2", { text: m.file })),
+    el("p", { class: "small", text: "Steps from different flows run this file's code. A change here lands in every one of them." }),
+    el("div", {}, el("h3", { text: "They meet at" }), el("ul", { class: "list" }, ...m.at.map(a => el("li", { text: a })))),
+    el("div", {}, el("h3", { text: `Steps that run it (${m.steps.length})` }), el("ul", { class: "list" }, ...[...steps.keys()].filter(k => m.steps.includes(k)).map(stepBtn)))
+  ];
+  if (ov && (ov.merges || []).includes(m.id))
+    kids.splice(2, 0, el("div", { class: "note ov" }, el("b", { text: ov.title + ": " }), "changes code at or below this interchange."));
+  $("#rail").replaceChildren(...kids);
+}
+
 function renderRail() {
   const rail = $("#rail");
+  if (state.merge) return mergeRail(DATA.merges.find(m => m.id === state.merge));
   const s = steps.get(state.step);
   if (!s) { rail.replaceChildren(el("p", { class: "empty", text: "Pick a station on the map." })); return; }
   const ov = currentOverlay();
@@ -320,10 +399,32 @@ function renderRail() {
   }
   if (s.endpoints.length) kids.push(el("div", {}, el("h3", { text: "Endpoints" }), el("ul", { class: "list" }, ...s.endpoints.map(e => el("li", { text: e })))));
   if (s.writes.length) kids.push(el("div", {}, el("h3", { text: "Writes" }), el("ul", { class: "list" }, ...s.writes.map(e => el("li", { text: e })))));
+  const meets = mergesOf(s.key);
+  if (meets.length) kids.push(el("div", {}, el("h3", { text: "Meets other flows at" }), el("div", { class: "chips" }, ...meets.map(m => {
+    const b = el("button", { class: "chip", type: "button" }, m.file, el("small", { text: `${m.flows} flows` }));
+    b.addEventListener("click", () => selectMerge(m.id));
+    return b;
+  }))));
   if (s.components.length) kids.push(el("div", {}, el("h3", { text: "Runs through" }), el("div", { class: "chips" }, ...s.components.map(c => el("span", { class: "chip", text: c })))));
   kids.push(el("div", {}, el("h3", { text: "Code flow" }), s.code ? codeFlow(s.code, hit) : el("p", { class: "small", text: "No endpoint: a background or UI-only step. See its anchors in map.json." })));
   if (s.code) kids.push(el("p", { class: "small", text: `Call graph from the handler (dark), depth ≤ 4, plumbing hidden${s.code.hidden ? `, ${s.code.hidden} more functions not drawn` : ""}. Columns are call depth.` }));
+  if (s.code) kids.push(el("div", {}, el("h3", { text: "What the code does" }), functionList(s.code, hit),
+    s.code.also.length ? el("p", { class: "small", text: `Also calls (shared by many entry points, not drawn): ${s.code.also.join(", ")}.` }) : null));
   rail.replaceChildren(...kids);
+}
+
+function functionList(code, hit) {
+  const via = new Set(hit ? hit.via : []);
+  return el("ol", { class: "fns" }, ...code.nodes.map(n => {
+    const info = DATA.functions[n.id] || {};
+    const name = info.url ? el("a", { class: "fn", href: info.url, target: "_blank", rel: "noopener", text: n.sym })
+                          : el("span", { class: "fn", text: n.sym });
+    const lines = info.lines ? `:${info.lines[0]} · ${info.lines[1] - info.lines[0] + 1} lines` : "";
+    const li = el("li", { class: via.has(n.sym) ? "ov" : "" }, name, info.sig != null ? el("span", { class: "sig", text: `(${info.sig})` }) : null,
+      el("span", { class: "loc", text: n.file + lines }), info.doc ? el("p", { title: info.doc, text: info.doc }) : null);
+    li.style.setProperty("--depth", n.depth);
+    return li;
+  }));
 }
 
 function codeFlow(code, hit) {
@@ -365,21 +466,26 @@ function codeFlow(code, hit) {
     f.setAttribute("x", p.x + 8); f.setAttribute("y", p.y + 27); f.setAttribute("class", "f");
     f.textContent = n.file.length > 30 ? "…" + n.file.slice(-29) : n.file;
     const tip = document.createElementNS(ns, "title");
-    tip.textContent = `${n.file}:${n.sym}`;
+    tip.textContent = `${n.file}:${n.sym}` + (DATA.functions[n.id]?.doc ? `\n${DATA.functions[n.id].doc}` : "");
     g.append(tip, r, t, f);
     svg.append(g);
   }
   return el("div", { class: "code" }, svg);
 }
 
+function selectMerge(id) {
+  state.merge = state.merge === id ? null : id; paint();
+}
 function select(key) {
-  state.step = key; store.set("atlas.step", key); paint();
+  state.step = key; state.merge = null; store.set("atlas.step", key); paint();
   if (window.matchMedia("(max-width: 1100px)").matches) $("#rail").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 $("#overlay").addEventListener("change", e => { state.overlay = e.target.value; store.set("atlas.overlay", state.overlay); paint(); });
 $("#q").addEventListener("input", e => { state.q = e.target.value; paint(); });
 
 renderLines();
-renderCore();
+renderMerges();
 paint();
+new ResizeObserver(drawWires).observe($(".lines-inner"));
+document.fonts.ready.then(drawWires);
 </script>
