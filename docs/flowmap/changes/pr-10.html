@@ -1,0 +1,602 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The atlas draws where flows meet, and says what each step's code does</title>
+<!--fonts--><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><!--/fonts-->
+<style>
+/* Layout: overview first, one part at a time, evidence on demand. The left rail is the whole
+   change (its parts, then the flows they land on); the pane shows one part: before -> after, why,
+   what to ask. Proof, ripple and code stay folded until asked for. */
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6676;
+  --rule: #cdd4dc;
+  --line: #9aa6b4;
+  --accent: #2e5bff;
+  --accent-soft: rgba(46, 91, 255, .12);
+  --core: #2e5bff;
+  --support: #0f7c86;
+  --refactor: #6b7686;
+  --outside: #b7791f;
+  --gain: #1e8a4c;
+  --loss: #c8423b;
+  --code-bg: #f6f8fa;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+    --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+    --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+    --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+  --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+  --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+  --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { padding: 24px 16px 96px; max-width: 1240px; margin: 0 auto; display: grid; gap: 22px; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+p code, li code, dd code, h2 code { background: var(--accent-soft); padding: 0 .3em; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { text-wrap: balance; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+.core { --role: var(--core); } .supporting { --role: var(--support); } .refactor { --role: var(--refactor); }
+.outside, .unassigned, .off-map { --role: var(--outside); }
+
+/* header: which change; the overview pane says what it does */
+header { display: grid; gap: 6px; max-width: 80ch; }
+header h1 { font: 800 clamp(24px, 3.4vw, 34px)/1.08 var(--display); font-stretch: 74%; margin: 0; }
+.range { color: var(--muted); font-size: 13px; }
+.range a { color: inherit; }
+.delta { font-size: 18px; line-height: 1.55; margin: 0; max-width: 68ch; }
+/* the lens verdict: the first thing to know, its reasons one click away */
+.verdict { justify-self: start; max-width: 80ch; font-size: 14px; }
+.verdict summary { cursor: pointer; }
+.verdict summary b { margin-right: 8px; }
+.verdict b { font: 700 11px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 2px 7px; color: var(--surface); }
+.verdict.contained b { background: var(--gain); } .verdict.spreads b { background: var(--outside); } .verdict.blind b { background: var(--loss); }
+.verdict ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.shape { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.shape li { background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; }
+.shape b { font-variant-numeric: tabular-nums; }
+
+/* rail + pane */
+.body { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .body { grid-template-columns: minmax(0, 1fr); } }
+.rail { display: grid; gap: 18px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-bottom: 8px; }
+@media (max-width: 900px) { .rail { position: static; max-height: none; } }
+.rail section { display: grid; gap: 8px; }
+
+/* the parts, as a table of contents */
+.toc { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.toc button { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 8px 10px;
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 2px 10px; cursor: pointer; }
+.toc button:hover { background: var(--surface); }
+.toc button[aria-current="true"] { background: var(--surface); border-color: var(--rule); box-shadow: inset 3px 0 0 var(--role); }
+.toc .n { grid-row: span 2; font: 700 12px/20px var(--mono); text-align: center; border-radius: 6px; height: 20px; color: var(--surface); background: var(--role); }
+.toc .t { font-weight: 500; font-size: 13.5px; line-height: 1.35; }
+.toc .w { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.toc .ov .n { background: var(--ink); }
+.toc .minor .t { font-weight: 400; color: var(--muted); }
+
+/* the map: flows as lines, the selected part's stops lit, the others faint */
+.flow { display: grid; gap: 2px; }
+.flow h3 { font: 700 12.5px/1.2 var(--display); font-stretch: 80%; margin: 6px 0 2px; letter-spacing: .02em; }
+.stops { list-style: none; margin: 0; padding: 0; position: relative; display: grid; }
+.stops::before { content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px; width: 2px; background: var(--line); }
+.stop { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: start; width: 100%;
+  text-align: left; background: none; border: 0; border-radius: 6px; padding: 3px 4px 3px 0; font-size: 12.5px; line-height: 1.3; color: var(--muted); }
+button.stop { cursor: pointer; }
+button.stop:hover { background: var(--surface); }
+.stop .dot { width: 12px; height: 12px; margin: 1px 2px; border-radius: 50%; background: var(--paper); border: 2px solid var(--line); position: relative; z-index: 1; }
+.stop.touched { color: var(--ink); }
+.stop.touched .dot { border-color: var(--role); }
+.stop.lit { font-weight: 600; }
+.stop.lit .dot { background: var(--sel, var(--role)); border-color: var(--sel, var(--role)); box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--sel, var(--role)); }
+.stop .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stop.lit .nm { -webkit-line-clamp: unset; }
+/* the overview's map: each touched flow as a line of stops, the parts that run each stop under it */
+.lanes { display: grid; gap: 14px; }
+.lane { display: grid; gap: 6px; }
+.lane h3 { font: 700 13px/1.2 var(--display); font-stretch: 80%; margin: 0; letter-spacing: .02em; }
+.lane ol { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(120px, 1fr); overflow-x: auto; }
+.lane li { position: relative; display: grid; gap: 6px; align-content: start; padding: 0 8px 4px 0; font-size: 12px; line-height: 1.3; color: var(--muted); }
+.lane li::before { content: ""; position: absolute; top: 6px; left: 0; right: 0; height: 2px; background: var(--line); }
+.lane li:first-child::before { left: 6px; } .lane li:last-child::before { right: calc(100% - 8px); }
+.lane .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line); position: relative; }
+.lane li.touched { color: var(--ink); }
+.lane li.touched .dot { background: var(--role); border-color: var(--role); }
+.lane .refs { display: flex; flex-wrap: wrap; gap: 4px; }
+.ref { font: 600 11px/1 var(--mono); border-radius: 999px; padding: 3px 7px; border: 1px solid var(--role); color: var(--role); background: var(--surface); cursor: pointer; }
+.ref:hover { background: var(--accent-soft); }
+.quiet-flows { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+.folded { font-size: 12px; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+
+/* the pane: one part */
+.pane { background: var(--surface); border: 1px solid var(--rule); border-top: 4px solid var(--role); border-radius: 12px;
+  padding: 22px 24px; display: grid; gap: 18px; min-width: 0; }
+.ch-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.num { font: 700 12px var(--mono); color: var(--surface); background: var(--role); border-radius: 6px; padding: 2px 8px; }
+.tag { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--role); }
+.kind { font-size: 12px; color: var(--muted); }
+.pane h2 { font: 750 clamp(21px, 2.6vw, 28px)/1.15 var(--display); font-stretch: 80%; margin: 4px 0 0; }
+.claim { margin: 0; font-size: 16px; color: var(--muted); max-width: 70ch; }
+.pane:focus { outline: none; }
+.runs { margin: 0; font-size: 13px; color: var(--muted); }
+.runs b { color: var(--ink); font-weight: 500; }
+
+.ba { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+@media (max-width: 720px) { .ba { grid-template-columns: minmax(0, 1fr); } }
+.ba > div { background: var(--surface); padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.ba .after { background: var(--paper); }
+.ba p { margin: 0; font-size: 14px; }
+.why { margin: 0; max-width: 72ch; padding-left: 12px; border-left: 3px solid var(--role); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+
+.qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.q { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.q input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+.q label { display: grid; gap: 3px; cursor: pointer; }
+.q .qtext { font-weight: 500; }
+.q .qwhy { color: var(--muted); font-size: 13px; }
+.qkind { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 1px 6px; margin-right: 6px; white-space: nowrap; }
+.qkind.ask { background: var(--accent-soft); color: var(--accent); }
+.qkind.check, .qkind.graph { background: var(--paper); color: var(--muted); border: 1px solid var(--rule); }
+.qkind.graph { color: var(--support); }
+
+/* evidence, folded */
+.more { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.more details { border-bottom: 1px solid var(--rule); }
+.more summary { cursor: pointer; padding: 10px 2px; font-size: 14px; font-weight: 500; display: flex; gap: 10px; align-items: baseline; }
+.more summary small { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.more details > div { padding: 2px 2px 14px; display: grid; gap: 10px; }
+.paths, .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 12.5px; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.path span { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
+.path span.end { border-color: var(--role); color: var(--role); }
+.path i { color: var(--muted); font-style: normal; }
+.rows li { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.mark { font-family: var(--body); font-size: 11px; font-weight: 600; flex: none; width: 80px; }
+.mark.add { color: var(--gain); } .mark.rem { color: var(--loss); } .mark.no { color: var(--outside); } .mark.yes { color: var(--gain); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 11.5px/1 var(--mono); border: 1px solid var(--rule); background: var(--paper); border-radius: 999px; padding: 4px 9px; cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--role); color: var(--role); background: var(--surface); }
+.chip i { font-style: normal; color: var(--muted); margin-left: 4px; }
+.hunk { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+[hidden] { display: none !important; }
+.hunk .hh { font: 11.5px var(--mono); color: var(--muted); padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.hunk pre { margin: 0; overflow-x: auto; background: var(--code-bg); font: 12px/1.5 var(--mono); padding: 6px 0; }
+.hunk pre span { display: block; padding: 0 10px; white-space: pre; min-width: max-content; }
+.hunk .a { background: rgba(30, 138, 76, .13); } .hunk .r { background: rgba(200, 66, 59, .13); }
+
+.step-nav { display: flex; justify-content: space-between; gap: 12px; }
+.step-nav button { background: none; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left;
+  display: grid; gap: 1px; max-width: 48%; font-size: 13px; }
+.step-nav button:hover { border-color: var(--accent); }
+.step-nav button[data-dir="1"] { text-align: right; margin-left: auto; }
+.step-nav small { color: var(--muted); font-size: 11.5px; }
+.keys { font-size: 12px; color: var(--muted); margin: 0; }
+kbd { font: 11px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--surface); }
+
+/* the review tray: ticked questions, ready to paste */
+.tray { position: fixed; inset: auto 0 0 0; background: var(--surface); border-top: 1px solid var(--rule); box-shadow: 0 -6px 18px rgba(0,0,0,.06); z-index: 5; }
+.tray-in { max-width: 1240px; margin: 0 auto; padding: 10px 16px; display: grid; gap: 10px; }
+.tray .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tray .count { font-weight: 600; }
+.tray textarea { width: 100%; min-height: 140px; font: 13px/1.5 var(--mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 8px; padding: 10px; resize: vertical; }
+button.primary { font: 600 14px var(--body); background: var(--accent); color: var(--surface); border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+button.ghost { background: none; border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); }
+
+/* viewer mode: no data in the page or the link, so ask for a file */
+.drop { background: var(--surface); border: 2px dashed var(--rule); border-radius: 12px; padding: 32px 20px; display: grid; gap: 10px; justify-items: start; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h1 { font: 800 28px/1.1 var(--display); font-stretch: 74%; margin: 0; }
+.drop p { margin: 0; max-width: 68ch; color: var(--muted); }
+.drop .err { color: var(--loss); }
+</style>
+
+<div class="wrap">
+  <header id="top"></header>
+  <div class="body">
+    <nav class="rail" aria-label="The change">
+      <section><h2 class="label" id="toc-h"></h2><p class="folded">Core first, then what it needs; refactors and files off the map last.</p><ol class="toc" id="toc"></ol></section>
+      <section id="rail-map"><h2 class="label">Where it lands</h2><div id="map"></div></section>
+      <p class="folded" id="folded"></p>
+    </nav>
+    <main class="pane" id="pane" tabindex="-1"></main>
+  </div>
+</div>
+<aside class="tray" aria-label="Review note">
+  <div class="tray-in">
+    <div class="row">
+      <span><span class="count" id="count"></span> <span class="status">ticked for the author</span></span>
+      <button class="ghost" id="peek" type="button" aria-expanded="false" aria-controls="note">Show</button>
+      <button class="primary" id="copy" type="button">Copy questions</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+    <textarea id="note" aria-label="Review note" readonly hidden></textarea>
+  </div>
+</aside>
+
+<script type="module">
+// The data is embedded by `flowmap change`, or, in the hosted viewer, carried in the link's fragment
+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server; failing both,
+// the reader drops a change page or its JSON. Either way it is read here and goes nowhere else.
+const EMBEDDED = {"facts":{"base":"4247d947924dd61fb1b32a9918123903a95b323e","head":"HEAD","base_sha":"4247d94","head_sha":"8012772","name":"flowmap","map":[{"id":"new:discover-entry-points","steps":[{"key":"new:discover-entry-points/list-entry-points","name":"Maintainer lists every entry point the repo exposes into inventory.json","endpoints":["CLI flowmap inventory"],"evidence":"agreed"}]},{"id":"new:review-change-on-map","steps":[{"key":"new:review-change-on-map/generate-diagrams","name":"Maintainer generates Mermaid diagrams at system, flow and step zoom","endpoints":["CLI flowmap diagrams"],"evidence":"agreed"},{"key":"new:review-change-on-map/lens-place-change","name":"Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)","endpoints":["CLI flowmap lens"],"evidence":"agreed"},{"key":"new:review-change-on-map/callgraph-impact","name":"Developer asks which entry points and flows can reach a file:symbol","endpoints":["CLI flowmap callgraph"],"evidence":"agreed"},{"key":"new:review-change-on-map/build-atlas","name":"Maintainer builds the interactive atlas page and browses flows, steps and components","endpoints":["CLI flowmap atlas"],"evidence":"agreed"}]},{"id":"new:run-mapping-passes","steps":[{"key":"new:run-mapping-passes/write-pass-brief","name":"Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)","endpoints":["CLI flowmap brief"],"evidence":"agreed"},{"key":"new:run-mapping-passes/reconcile-runs","name":"Maintainer votes the passes into one map with evidence levels and a list of open questions","endpoints":["CLI flowmap reconcile"],"evidence":"agreed"},{"key":"new:run-mapping-passes/verify-pass-citations","name":"Maintainer checks each pass's anchors exist and every entry point is placed","endpoints":["CLI flowmap verify"],"evidence":"agreed"}]}],"files":[{"path":"docs/flowmap/atlas.html","kind":"generated","added":144,"removed":38},{"path":"flowmap/atlas.py","kind":"code","added":77,"removed":10},{"path":"flowmap/atlas.template.html","kind":"outside","added":143,"removed":37},{"path":"flowmap/graphs/__init__.py","kind":"code","added":2,"removed":0},{"path":"flowmap/graphs/python.py","kind":"code","added":11,"removed":0},{"path":"tests/test_graphs.py","kind":"outside","added":6,"removed":0},{"path":"tests/test_merges.py","kind":"outside","added":46,"removed":0}],"symbols":[{"id":"flowmap/atlas.py:step_code","file":"flowmap/atlas.py","sym":"step_code","status":"modified","contract":false,"signature":null,"steps":["new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:step_code"]},"callers":[{"id":"flowmap/atlas.py:build","edited":true}]},{"id":"flowmap/atlas.py:overlay","file":"flowmap/atlas.py","sym":"overlay","status":"modified","contract":true,"signature":["d, spec","d, spec, ms"],"steps":["new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:overlay"]},"callers":[{"id":"flowmap/atlas.py:build","edited":true}]},{"id":"flowmap/atlas.py:functions","file":"flowmap/atlas.py","sym":"functions","status":"new","contract":false,"signature":[null,"d, ids"],"steps":["new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:functions"]},"callers":[{"id":"flowmap/atlas.py:build","edited":true}]},{"id":"flowmap/atlas.py:build","file":"flowmap/atlas.py","sym":"build","status":"modified","contract":false,"signature":null,"steps":["new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build"]},"callers":[{"id":"flowmap/atlas.py:__main__","edited":false}]},{"id":"flowmap/atlas.py:merges","file":"flowmap/atlas.py","sym":"merges","status":"new","contract":false,"signature":[null,"d, keys, limit=24"],"steps":["new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:merges"]},"callers":[{"id":"flowmap/atlas.py:build","edited":true}]},{"id":"flowmap/graphs/python.py:doc","file":"flowmap/graphs/python.py","sym":"doc","status":"new","contract":false,"signature":[null,"text, sym"],"steps":["new:review-change-on-map/build-atlas"],"witness":{"new:review-change-on-map/build-atlas":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:functions","flowmap/graphs/python.py:doc"]},"callers":[{"id":"flowmap/atlas.py:functions","edited":true}]}],"endpoints":{"added":[],"removed":[]},"reach":{"gained":{"flowmap/graphs/python.py:signature":["CLI flowmap atlas"],"flowmap/graphs/python.py:_find":["CLI flowmap atlas"],"flowmap/diagrams.py:Diagrams.component":["CLI flowmap atlas"]},"lost":{}},"edges":{"added":[["flowmap/atlas.py:build","flowmap/atlas.py:functions"],["flowmap/atlas.py:build","flowmap/atlas.py:merges"],["flowmap/atlas.py:functions","flowmap/graphs/__init__.py:builder_for"],["flowmap/atlas.py:functions","flowmap/graphs/python.py:doc"],["flowmap/atlas.py:functions","flowmap/graphs/python.py:signature"],["flowmap/atlas.py:functions","flowmap/lens.py:git"],["flowmap/atlas.py:merges","flowmap/diagrams.py:Diagrams.component"],["flowmap/atlas.py:merges","flowmap/diagrams.py:short"],["flowmap/atlas.py:merges","flowmap/reconcile.py:UnionFind.union"],["flowmap/atlas.py:overlay","flowmap/diagrams.py:Diagrams._forward"],["flowmap/graphs/python.py:doc","flowmap/graphs/python.py:_find"]],"removed":[]},"modules":{"added":[["flowmap/atlas.py","flowmap/graphs/__init__.py"],["flowmap/atlas.py","flowmap/graphs/python.py"]],"removed":[]},"verdict":{"verdict":"blind","blind":["files outside the analysed code: `flowmap/atlas.template.html`"],"spreads_to":["CLI flowmap atlas"]},"flow_share":{"new:review-change-on-map":6},"flow_entropy":0.0,"tests":{"configured":false,"changed":[]},"hunks":[{"file":"flowmap/atlas.py","old":37,"new":38,"ctx":"def step_code(d, step):","lines":["                 queue.append(n)","     kept = set(order)","+    # plumbing it calls directly: hidden from the drawing, still named so nothing vanishes silently","+    also = sorted({short(n)[1] for a in order for n in d.g.edges.get(a, ()) if n in d.noise and n not in d.g.bases})","     nodes = [{\"id\": n, \"file\": short(n)[0], \"sym\": short(n)[1], \"depth\": depth[n], \"root\": n in roots}","              for n in order]","     edges = [[a, b] for a in order for b in sorted(d.g.edges.get(a, ())) if b in kept and b != a]","-    return {\"nodes\": nodes, \"edges\": edges, \"hidden\": len(depth) - len(order)}","+    return {\"nodes\": nodes, \"edges\": edges, \"hidden\": len(depth) - len(order), \"also\": also}","+","+","+def functions(d, ids):","+    \"\"\"What each drawn function is: signature, first docstring paragraph, lines, and a link to","+    those lines at this commit when the repo is on GitHub.\"\"\"","+    try:","+        remote = lens.git(\"remote\", \"get-url\", \"origin\").strip()","+    except Exception:","+        remote = \"\"","+    m = re.match(r\"(?:git@github\\.com:|https://github\\.com/)(.+?)(?:\\.git)?$\", remote)","+    blob = f\"https://github.com/{m[1]}/blob/{lens.git('rev-parse', 'HEAD').strip()}/\" if m else None","+    out = {}","+    # ponytail: parses the file once per function; cache parsed trees if big repos get slow","+    for n in sorted(ids):","+        rel, sym = n.rsplit(\":\", 1)","+        builder, path = graphs.builder_for(rel), ROOT / rel","+        text = path.read_text(errors=\"replace\") if path.is_file() else None  # the tree the graph was built from","+        start, end = d.g.defs.get(n, (None, None))","+        info = {\"sig\": builder.signature(text, sym) if builder and sym != \"__main__\" else None,","+                \"doc\": builder.doc(text, sym) if hasattr(builder, \"doc\") else None,","+                \"lines\": [start, end] if start else None}","+        if blob and start:","+            info[\"url\"] = f\"{blob}{rel}#L{start}-L{end}\"","+        out[n] = {k: v for k, v in info.items() if v}","+    return out"," "," "],"symbols":["flowmap/atlas.py:functions","flowmap/atlas.py:step_code"]},{"file":"flowmap/atlas.py","old":56,"new":84,"ctx":"def step_keys(the_map):","lines":[" "," ","+def merges(d, keys, limit=24):","+    \"\"\"Where flows meet: code that steps of two or more flows run, one interchange per file.","+    Only the first meeting counts: a function whose caller is reached by exactly the same steps","+    sits below the merge, not at it (reach is transitive, so a caller's steps are a subset of its","+    callee's; equal means they met already). Code reached from over half the entry points is","+    plumbing (config, auth) and meets everything, so it is left out.\"\"\"","+    hits = {}","+    for r in d.reach.values():","+        for n in r:","+            hits[n] = hits.get(n, 0) + 1","+    skip = {n for n, c in hits.items() if c > len(d.reach) / 2} | set(d.g.bases)","+    by_node = {}","+    for f in d.map[\"flows\"]:","+        for i, s in enumerate(f[\"steps\"]):","+            hs = [d.handler[e] for e in s[\"endpoints\"] if e in d.handler]","+            for n in set().union(*(d.reach[h] for h in hs)) - skip if hs else ():","+                if d.component(n) not in d.plumbing:","+                    by_node.setdefault(n, set()).add(keys[(f[\"id\"], i)])","+    callers = {}","+    for a, bs in d.g.edges.items():","+        for b in bs:","+            if b != a:","+                callers.setdefault(b, set()).add(a)","+    by_file = {}","+    for n, ss in by_node.items():","+        if len({k.split(\"/\")[0] for k in ss}) < 2 or any(by_node.get(p) == ss for p in callers.get(n, ())):","+            continue","+        m = by_file.setdefault(short(n)[0], {\"file\": short(n)[0], \"at\": [], \"ids\": [], \"steps\": set()})","+        m[\"at\"].append(short(n)[1])","+        m[\"ids\"].append(n)","+        m[\"steps\"] |= ss","+    out = sorted(by_file.values(), key=lambda m: (-len({k.split(\"/\")[0] for k in m[\"steps\"]}), -len(m[\"steps\"]), m[\"file\"]))","+    # ponytail: widest `limit` only; a big repo may want a \"show all\" toggle","+    for i, m in enumerate(out[:limit]):","+        m.update(id=f\"m{i}\", at=sorted(m[\"at\"]), steps=sorted(m[\"steps\"]),","+                 flows=len({k.split(\"/\")[0] for k in m[\"steps\"]}))","+    return out[:limit]","+","+"," def split_votes():","     path = config.out() / \"QUESTIONS.md\""],"symbols":["flowmap/atlas.py:merges"]},{"file":"flowmap/atlas.py","old":65,"new":132,"ctx":"def split_votes():","lines":[" "," ","-def overlay(d, spec):","+def overlay(d, spec, ms):","     rng, _, title = spec.partition(\"=\")","     base, head = rng.split(\"..\")"],"symbols":["flowmap/atlas.py:overlay"]},{"file":"flowmap/atlas.py","old":105,"new":172,"ctx":"def overlay(d, spec):","lines":["     widest = sorted(((len({e for n in g.callers(c) | {c} for e in handlers.get(n, [])}), short(c)[1])","                      for c in changed if c in g.defs), reverse=True)[:6]","-    return {\"id\": re.sub(r\"\\W\", \"\", title.split()[0]) or \"pr\", \"title\": title or rng, \"range\": rng,","-            \"steps\": steps, \"changed\": len(changed), \"new\": len(new),","+    hit = [m[\"id\"] for m in ms if changed & set().union(*(d._forward(n) for n in m[\"ids\"]))]","+    return {\"id\": re.sub(r\"\\W\", \"\", title) or \"pr\", \"title\": title or rng, \"range\": rng,","+            \"steps\": steps, \"merges\": hit, \"changed\": len(changed), \"new\": len(new),","             \"widest\": [{\"sym\": s, \"endpoints\": n} for n, s in widest if n]}"," "],"symbols":["flowmap/atlas.py:overlay"]},{"file":"flowmap/atlas.py","old":113,"new":181,"ctx":"def build(prs):","lines":["     d = Diagrams()","     d.system()  # fills d.matrix","-    flows, comps, uses = d.matrix","+    flows, comps, _ = d.matrix","     splits, keys = split_votes(), step_keys(d.map)","-    data = {\"flows\": [], \"components\": [], \"overlays\": [overlay(d, p) for p in prs],","-            \"engine\": sorted({c for c in map(d.component, d.engine - d.noise) if c} - d.plumbing),","+    ms = merges(d, keys)","+    data = {\"flows\": [], \"merges\": ms, \"overlays\": [overlay(d, p, ms) for p in prs],","             \"plumbing\": sorted(d.plumbing), \"runs\": d.map[\"runs\"]}","     for f in flows:"],"symbols":["flowmap/atlas.py:build"]},{"file":"flowmap/atlas.py","old":137,"new":205,"ctx":"def build(prs):","lines":["             })","         data[\"flows\"].append({\"id\": f[\"id\"], \"summary\": f[\"summary\"], \"steps\": steps})","-    for c in sorted(comps, key=lambda c: (c != \"workflow engine\", -sum(1 for f in flows if uses[f[\"id\"]][c]), c)):","-        data[\"components\"].append({\"id\": c, \"flows\": sum(1 for f in flows if uses[f[\"id\"]][c])})","+    data[\"functions\"] = functions(d, {n[\"id\"] for f in data[\"flows\"] for s in f[\"steps\"] if s[\"code\"] for n in s[\"code\"][\"nodes\"]})","     commit = lens.git(\"rev-parse\", \"--short\", \"HEAD\").strip()","     data[\"commit\"] = commit"],"symbols":["flowmap/atlas.py:build"]},{"file":"flowmap/atlas.py","old":145,"new":212,"ctx":"def build(prs):","lines":["             .replace(\"/*__ATLAS_DATA__*/null\", json.dumps(data, separators=(\",\", \":\"))))","     OUT.write_text(html)","-    print(f\"wrote {OUT.relative_to(ROOT)} ({len(html) // 1024} KB, {len(data['overlays'])} overlays)\")","+    print(f\"wrote {OUT.relative_to(ROOT)} ({len(html) // 1024} KB, {len(ms)} merges, {len(data['overlays'])} overlays)\")"," "," "],"symbols":["flowmap/atlas.py:build"]},{"file":"flowmap/atlas.template.html","old":7,"new":7,"ctx":"","lines":[" <link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap\">"," <style>","-/* Layout: a transit map. Flows are vertical lines in a fixed order, steps are stations,","-   shared components sit in a core band below; a detail rail shows one station's code flow. */","+/* Layout: a transit map. Flows are vertical lines in a fixed order, steps are stations; where","+   steps of different flows run the same code, wires leave them and meet at an interchange below.","+   A detail rail shows one station's code flow, or which stations feed one interchange. */"," :root {","   --paper: #eef1f4;"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":70,"new":71,"ctx":"input[type=\"search\"] { width: 220px; max-width: 100%; }","lines":[" .overlay-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; background: var(--accent-soft);","   border-radius: 8px; padding: 10px 14px; font-size: 13px; }","+.overlay-bar[hidden] { display: none; }"," .overlay-bar b { font-family: var(--display); font-stretch: 80%; font-size: 15px; }"," .overlay-bar .mono { color: var(--muted); }"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":78,"new":80,"ctx":"main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al","lines":[" .map { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; min-width: 0; }"," .lines { overflow-x: auto; padding: 16px 12px 8px; }","-.lines-inner { display: grid; grid-auto-flow: column; grid-auto-columns: 158px; gap: 8px; width: max-content; }","+.lines-inner { position: relative; width: max-content; padding-left: 24px; }","+.cols { position: relative; z-index: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 158px; gap: 28px; }","+#wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }","+#wires path { fill: none; stroke: var(--line); stroke-width: 1.5; opacity: .6; transition: opacity .15s; }","+#wires path.on { stroke: var(--accent); stroke-width: 2.5; opacity: 1; }","+#wires path.dim { opacity: .12; }","+.merges { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 16px; margin-top: 64px; padding-bottom: 6px; }","+.merge { display: grid; justify-items: center; font: 600 12px var(--mono); color: var(--ink); background: var(--surface);","+  border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 14px; cursor: pointer; transition: opacity .15s; }","+.merge small { font: 10.5px var(--body); color: var(--muted); }","+.merge:hover { background: var(--accent-soft); }","+.merge[aria-pressed=\"true\"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }","+.merge[aria-pressed=\"true\"] small { color: inherit; }","+.merge.ov { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); }","+.merge.dim { opacity: .22; }"," .flow h2 { font: 700 13.5px/1.15 var(--display); font-stretch: 78%; letter-spacing: .02em; margin: 0 0 2px; padding-left: 6px; min-height: 31px; }"," .flow .fsum { font-size: 11px; color: var(--muted); padding-left: 6px; margin: 0 0 10px; }"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":102,"new":118,"ctx":"main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al","lines":[" .chips { display: flex; flex-wrap: wrap; gap: 6px; }"," .chip { font: 12px var(--mono); background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px;","-  padding: 3px 10px; cursor: pointer; }","+  padding: 3px 10px; }","+button.chip { cursor: pointer; text-align: left; }","+button.chip:hover { border-color: var(--accent); }"," .chip small { color: var(--muted); font-family: var(--body); margin-left: 4px; }","-.chip[aria-pressed=\"true\"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }","-.chip[aria-pressed=\"true\"] small { color: inherit; }"," .core p { margin: 0; font-size: 12px; color: var(--muted); max-width: 90ch; }"," "],"symbols":[]},{"file":"flowmap/atlas.template.html","old":131,"new":147,"ctx":"main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al","lines":[" .code path { fill: none; stroke: var(--line); stroke-width: 1.2; }"," .small { font-size: 12px; color: var(--muted); margin: 0; }","+.fns { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }","+.fns li { padding-left: calc(var(--depth) * 14px); border-left: 2px solid transparent; }","+.fns li.ov { border-color: var(--accent); }","+.fns .fn { font: 600 12.5px var(--mono); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }","+.fns a.fn:hover { color: var(--accent); text-decoration: underline; }","+.fns .sig { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }","+.fns .loc { display: block; font-size: 11px; color: var(--muted); }","+.fns p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }"," .empty { color: var(--muted); font-size: 13px; }","-@media (prefers-reduced-motion: reduce) { .station { transition: none; } }","+@media (prefers-reduced-motion: reduce) { .station, .merge, #wires path { transition: none; } }"," <\/style>"," "],"symbols":[]},{"file":"flowmap/atlas.template.html","old":164,"new":188,"ctx":"main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; al","lines":["   <main>","     <section class=\"map\" aria-label=\"System map\">","-      <div class=\"lines\"><div class=\"lines-inner\" id=\"lines\"><\/div><\/div>","+      <div class=\"lines\"><div class=\"lines-inner\"><svg id=\"wires\" aria-hidden=\"true\"><\/svg><div class=\"cols\" id=\"lines\"><\/div><div class=\"merges\" id=\"merges\"><\/div><\/div><\/div>","       <div class=\"core\">","-        <h3>Core: components two or more flows run through<\/h3>","-        <div class=\"chips\" id=\"chips\"><\/div>","+        <h3>Where flows meet<\/h3>","         <p id=\"corenote\"><\/p>","       <\/div>"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":201,"new":224,"ctx":"const steps = new Map();","lines":[" DATA.flows.forEach(f => f.steps.forEach((s, i) => steps.set(s.key, { ...s, flow: f.id, index: i + 1 })));"," const stationEls = new Map();","-let state = { step: store.get(\"atlas.step\"), comp: null, overlay: store.get(\"atlas.overlay\") || \"\", q: \"\" };","+let state = { step: store.get(\"atlas.step\"), merge: null, overlay: store.get(\"atlas.overlay\") || \"\", q: \"\" };"," if (!steps.has(state.step)) state.step = \"review-queue/release-held-run\";"," if (!steps.has(state.step)) state.step = DATA.flows.find(f => f.id === \"review-queue\")?.steps[1]?.key || [...steps.keys()][0];"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":235,"new":258,"ctx":"function renderLines() {","lines":["     }","     const name = f.id.replace(/^new:/, \"\");","-    host.append(el(\"section\", { class: \"flow\", \"aria-label\": name },","+    const sec = el(\"section\", { class: \"flow\", \"aria-label\": name },","       el(\"h2\", { text: name + (f.id.startsWith(\"new:\") ? \" \u2726\" : \"\") }),","-      el(\"p\", { class: \"fsum\", text: `${f.steps.length} steps` }), ul));","+      el(\"p\", { class: \"fsum\", text: `${f.steps.length} steps` }), ul);","+    flowEls.set(f.id, sec);","+    host.append(sec);","   }"," }"," ","-function renderCore() {","-  const host = $(\"#chips\");","-  for (const c of DATA.components) {","-    const b = el(\"button\", { class: \"chip\", type: \"button\", \"aria-pressed\": \"false\" },","-      c.id, el(\"small\", { text: `${c.flows} flows` }));","-    const on = () => { state.comp = c.id; paint(); };","-    b.addEventListener(\"mouseenter\", on);","-    b.addEventListener(\"focus\", on);","-    b.addEventListener(\"mouseleave\", () => { if (state.comp === c.id && !b.dataset.locked) { state.comp = null; paint(); } });","-    b.addEventListener(\"click\", () => {","-      const locked = !b.dataset.locked;","-      host.querySelectorAll(\".chip\").forEach(x => delete x.dataset.locked);","-      if (locked) { b.dataset.locked = \"1\"; state.comp = c.id; } else state.comp = null;","-      paint();","-    });","+const mergeEls = new Map(), flowEls = new Map(), wires = [];","+const mergesOf = (key) => DATA.merges.filter(m => m.steps.includes(key));","+","+function renderMerges() {","+  const host = $(\"#merges\"), col = new Map(DATA.flows.map((f, i) => [f.id, i]));","+  const mid = (m) => m.steps.reduce((a, k) => a + col.get(steps.get(k).flow), 0) / m.steps.length;","+  for (const m of [...DATA.merges].sort((a, b) => mid(a) - mid(b))) {","+    const b = el(\"button\", { class: \"merge\", type: \"button\", \"aria-pressed\": \"false\",","+      title: `${m.file}: ${m.at.join(\", \")}` }, m.file,","+      el(\"small\", { text: `${m.flows} flows \u00b7 ${m.steps.length} steps` }));","+    b.addEventListener(\"click\", () => selectMerge(m.id));","+    mergeEls.set(m.id, b);","     host.append(b);","   }","-  $(\"#corenote\").textContent = `Hover or tap a component to light up every step that runs through it. ` +","-    `\"workflow engine\" is executor.run_workflow and everything only it reaches (${DATA.engine.join(\", \")}). ` +","-    `Hidden as plumbing: ${DATA.plumbing.join(\", \")}.`;","+  $(\"#corenote\").textContent = DATA.merges.length","+    ? `Each interchange is a file whose code steps of two or more flows run: the wires show which steps. ` +","+      `Only the first place they meet is drawn; the code it calls is shared too. Click one to see who feeds it. ` +","+      `Hidden as plumbing: ${DATA.plumbing.join(\", \")}, and code over half the entry points reach.`","+    : \"No two flows run the same code beyond plumbing.\";","+}","+","+function drawWires() {","+  const svg = $(\"#wires\"), box = svg.getBoundingClientRect(), ns = \"http://www.w3.org/2000/svg\";","+  const at = (r) => ({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height });","+  const yb = at($(\"#lines\").getBoundingClientRect()).y + at($(\"#lines\").getBoundingClientRect()).h;","+  wires.length = 0;","+  svg.replaceChildren();","+  DATA.merges.forEach((m, mi) => {","+    const n = at(mergeEls.get(m.id).getBoundingClientRect()), nx = n.x + n.w / 2;","+    for (const key of m.steps) {","+      const p = at(stationEls.get(key).querySelector(\".pin\").getBoundingClientRect());","+      const x0 = p.x + p.w / 2, y0 = p.y + p.h / 2;","+      const gx = at(flowEls.get(steps.get(key).flow).getBoundingClientRect()).x - 8 - (mi % 5) * 3;","+      const y1 = yb + 8 + (mi % 5) * 3, k = (n.y - y1) / 2;","+      const path = document.createElementNS(ns, \"path\");","+      path.setAttribute(\"d\", `M${x0},${y0} H${gx + 6} Q${gx},${y0} ${gx},${y0 + 6} V${y1} C${gx},${y1 + k} ${nx},${n.y - k} ${nx},${n.y}`);","+      svg.append(path);","+      wires.push({ path, merge: m.id, step: key });","+    }","+  });","+  paintWires();","+}","+","+function paintWires() {","+  for (const w of wires) {","+    const on = state.merge ? w.merge === state.merge : w.step === state.step;","+    w.path.classList.toggle(\"on\", on);","+    w.path.classList.toggle(\"dim\", !!state.merge && !on);","+  }"," }"," "],"symbols":[]},{"file":"flowmap/atlas.template.html","old":270,"new":324,"ctx":"function paint() {","lines":["   for (const [key, btn] of stationEls) {","     const s = steps.get(key);","-    btn.setAttribute(\"aria-pressed\", key === state.step ? \"true\" : \"false\");","+    btn.setAttribute(\"aria-pressed\", !state.merge && key === state.step ? \"true\" : \"false\");","     btn.classList.remove(\"ov-reach\", \"ov-direct\", \"ov-new\", \"dim\");","     const hit = ov && ov.steps[key];","     if (hit) btn.classList.add(\"ov-\" + hit.kind);","     let dim = false;","-    if (state.comp) dim = !s.components.includes(state.comp);","+    if (state.merge) dim = !DATA.merges.find(m => m.id === state.merge).steps.includes(key);","     else if (q) dim = !(s.name.toLowerCase().includes(q) || s.endpoints.some(e => e.toLowerCase().includes(q)) || key.includes(q));","     else if (ov) dim = !hit;","     btn.classList.toggle(\"dim\", dim);","   }","-  document.querySelectorAll(\".chip\").forEach(c => c.setAttribute(\"aria-pressed\", c.firstChild.textContent === state.comp ? \"true\" : \"false\"));","+  for (const [id, b] of mergeEls) {","+    b.setAttribute(\"aria-pressed\", id === state.merge ? \"true\" : \"false\");","+    b.classList.toggle(\"ov\", !!ov && (ov.merges || []).includes(id));","+    b.classList.toggle(\"dim\", !state.merge && !!ov && !(ov.merges || []).includes(id));","+  }","+  paintWires();","   const bar = $(\"#ovbar\");","   bar.hidden = !ov;"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":297,"new":356,"ctx":"function paint() {","lines":[" }"," ","+function mergeRail(m) {","+  const ov = currentOverlay();","+  const stepBtn = (key) => {","+    const s = steps.get(key);","+    const b = el(\"button\", { class: \"chip\", type: \"button\", style: \"font-family: var(--body)\" }, el(\"small\", { text: `${s.flow.replace(/^new:/, \"\")} \u00b7 ${s.index} ` }), s.name);","+    b.addEventListener(\"click\", () => select(key));","+    return el(\"li\", {}, b);","+  };","+  const kids = [","+    el(\"div\", {}, el(\"div\", { class: \"eyebrow\", text: `Where ${m.flows} flows meet` }), el(\"h2\", { text: m.file })),","+    el(\"p\", { class: \"small\", text: \"Steps from different flows run this file's code. A change here lands in every one of them.\" }),","+    el(\"div\", {}, el(\"h3\", { text: \"They meet at\" }), el(\"ul\", { class: \"list\" }, ...m.at.map(a => el(\"li\", { text: a })))),","+    el(\"div\", {}, el(\"h3\", { text: `Steps that run it (${m.steps.length})` }), el(\"ul\", { class: \"list\" }, ...[...steps.keys()].filter(k => m.steps.includes(k)).map(stepBtn)))","+  ];","+  if (ov && (ov.merges || []).includes(m.id))","+    kids.splice(2, 0, el(\"div\", { class: \"note ov\" }, el(\"b\", { text: ov.title + \": \" }), \"changes code at or below this interchange.\"));","+  $(\"#rail\").replaceChildren(...kids);","+}","+"," function renderRail() {","   const rail = $(\"#rail\");","+  if (state.merge) return mergeRail(DATA.merges.find(m => m.id === state.merge));","   const s = steps.get(state.step);","   if (!s) { rail.replaceChildren(el(\"p\", { class: \"empty\", text: \"Pick a station on the map.\" })); return; }"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":321,"new":400,"ctx":"function renderRail() {","lines":["   if (s.endpoints.length) kids.push(el(\"div\", {}, el(\"h3\", { text: \"Endpoints\" }), el(\"ul\", { class: \"list\" }, ...s.endpoints.map(e => el(\"li\", { text: e })))));","   if (s.writes.length) kids.push(el(\"div\", {}, el(\"h3\", { text: \"Writes\" }), el(\"ul\", { class: \"list\" }, ...s.writes.map(e => el(\"li\", { text: e })))));","+  const meets = mergesOf(s.key);","+  if (meets.length) kids.push(el(\"div\", {}, el(\"h3\", { text: \"Meets other flows at\" }), el(\"div\", { class: \"chips\" }, ...meets.map(m => {","+    const b = el(\"button\", { class: \"chip\", type: \"button\" }, m.file, el(\"small\", { text: `${m.flows} flows` }));","+    b.addEventListener(\"click\", () => selectMerge(m.id));","+    return b;","+  }))));","   if (s.components.length) kids.push(el(\"div\", {}, el(\"h3\", { text: \"Runs through\" }), el(\"div\", { class: \"chips\" }, ...s.components.map(c => el(\"span\", { class: \"chip\", text: c })))));","   kids.push(el(\"div\", {}, el(\"h3\", { text: \"Code flow\" }), s.code ? codeFlow(s.code, hit) : el(\"p\", { class: \"small\", text: \"No endpoint: a background or UI-only step. See its anchors in map.json.\" })));","   if (s.code) kids.push(el(\"p\", { class: \"small\", text: `Call graph from the handler (dark), depth \u2264 4, plumbing hidden${s.code.hidden ? `, ${s.code.hidden} more functions not drawn` : \"\"}. Columns are call depth.` }));","+  if (s.code) kids.push(el(\"div\", {}, el(\"h3\", { text: \"What the code does\" }), functionList(s.code, hit),","+    s.code.also.length ? el(\"p\", { class: \"small\", text: `Also calls (shared by many entry points, not drawn): ${s.code.also.join(\", \")}.` }) : null));","   rail.replaceChildren(...kids);"," }"," ","+function functionList(code, hit) {","+  const via = new Set(hit ? hit.via : []);","+  return el(\"ol\", { class: \"fns\" }, ...code.nodes.map(n => {","+    const info = DATA.functions[n.id] || {};","+    const name = info.url ? el(\"a\", { class: \"fn\", href: info.url, target: \"_blank\", rel: \"noopener\", text: n.sym })","+                          : el(\"span\", { class: \"fn\", text: n.sym });","+    const lines = info.lines ? `:${info.lines[0]} \u00b7 ${info.lines[1] - info.lines[0] + 1} lines` : \"\";","+    const li = el(\"li\", { class: via.has(n.sym) ? \"ov\" : \"\" }, name, info.sig != null ? el(\"span\", { class: \"sig\", text: `(${info.sig})` }) : null,","+      el(\"span\", { class: \"loc\", text: n.file + lines }), info.doc ? el(\"p\", { title: info.doc, text: info.doc }) : null);","+    li.style.setProperty(\"--depth\", n.depth);","+    return li;","+  }));","+}","+"," function codeFlow(code, hit) {","   const W = 168, H = 34, GX = 34, GY = 10, PAD = 10;"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":366,"new":467,"ctx":"function codeFlow(code, hit) {","lines":["     f.textContent = n.file.length > 30 ? \"\u2026\" + n.file.slice(-29) : n.file;","     const tip = document.createElementNS(ns, \"title\");","-    tip.textContent = `${n.file}:${n.sym}`;","+    tip.textContent = `${n.file}:${n.sym}` + (DATA.functions[n.id]?.doc ? `\\n${DATA.functions[n.id].doc}` : \"\");","     g.append(tip, r, t, f);","     svg.append(g);"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":373,"new":474,"ctx":"function codeFlow(code, hit) {","lines":[" }"," ","+function selectMerge(id) {","+  state.merge = state.merge === id ? null : id; paint();","+}"," function select(key) {","-  state.step = key; store.set(\"atlas.step\", key); paint();","+  state.step = key; state.merge = null; store.set(\"atlas.step\", key); paint();","   if (window.matchMedia(\"(max-width: 1100px)\").matches) $(\"#rail\").scrollIntoView({ behavior: \"smooth\", block: \"start\" });"," }"],"symbols":[]},{"file":"flowmap/atlas.template.html","old":381,"new":485,"ctx":"$(\"#q\").addEventListener(\"input\", e => { state.q = e.target.value; paint(); });","lines":[" "," renderLines();","-renderCore();","+renderMerges();"," paint();","+new ResizeObserver(drawWires).observe($(\".lines-inner\"));","+document.fonts.ready.then(drawWires);"," <\/script>"],"symbols":[]},{"file":"flowmap/graphs/__init__.py","old":9,"new":9,"ctx":"and optionally, so lens can ignore edits that change nothing:","lines":["     live(text) -> {line numbers} | None             # module-level lines that run","     same(base_text, head_text, \"Qual.name\") -> bool # the def changed only in docs or formatting","+and, so the atlas can say what a function is for:","+    doc(text, \"Qual.name\") -> str | None            # the first paragraph of its docstring"," "," Node ids are \"repo/relative/file:Qual.name\", the spelling adapters use for handlers, so every"],"symbols":[]},{"file":"flowmap/graphs/python.py","old":78,"new":78,"ctx":"def signature(text, sym):","lines":[" "," ","+def doc(text, sym):","+    \"\"\"First paragraph of a def's or class's docstring: what the code says it does.\"\"\"","+    try:","+        tree = ast.parse(text or \"\")","+    except SyntaxError:","+        return None","+    hit = _find(tree, sym)","+    found = ast.get_docstring(hit) if hit is not None else None","+    return \" \".join(found.split(\"\\n\\n\")[0].split()) if found else None","+","+"," def live(text):","     \"\"\"Module-level lines that run: not blanks, comments, imports, docstrings or defs. None if"],"symbols":["flowmap/graphs/python.py:doc"]},{"file":"tests/test_graphs.py","old":21,"new":21,"ctx":"class RegistryTest(unittest.TestCase):","lines":["         self.assertIsNone(graphs.python.signature(text, \"A\"))"," ","+    def test_python_doc_is_the_first_paragraph(self):","+        text = 'def f():\\n    \"\"\"Does a thing,\\n    in two lines.\\n\\n    Details nobody reads.\"\"\"\\n\\ndef g():\\n    pass\\n'","+        self.assertEqual(graphs.python.doc(text, \"f\"), \"Does a thing, in two lines.\")","+        self.assertIsNone(graphs.python.doc(text, \"g\"))","+        self.assertIsNone(graphs.python.doc(text, \"missing\"))","+","     def test_defs_inside_blocks_keep_their_scope_name(self):","         text = (\"try:\\n    def fast():\\n        pass\\nexcept ImportError:\\n    pass\\n\""],"symbols":[]},{"file":"tests/test_merges.py","old":0,"new":1,"ctx":"","lines":["+\"\"\"Interchanges: the atlas draws where steps of different flows first run the same code.\"\"\"","+","+import sys","+import unittest","+from types import SimpleNamespace","+","+from tests.helpers import REPO","+","+sys.path.insert(0, str(REPO / \"flowmap\"))","+import atlas  # noqa: E402","+","+# a and b both call shared.py:meet, which calls shared.py:below; c, d and e only reach their own code.","+EDGES = {\"x.py:ha\": {\"shared.py:meet\"}, \"x.py:hb\": {\"shared.py:meet\"}, \"x.py:hc\": {\"x.py:own\"},","+         \"shared.py:meet\": {\"shared.py:below\"}}","+","+","+def fake(edges=EDGES, flows=(\"a\", \"b\", \"c\", \"d\", \"e\")):","+    handlers = {f\"E{f}\": f\"x.py:h{f}\" for f in flows}","+    reach = {}","+    for h in handlers.values():","+        seen, todo = {h}, [h]","+        while todo:","+            for n in edges.get(todo.pop(), ()):","+                if n not in seen:","+                    seen.add(n)","+                    todo.append(n)","+        reach[h] = seen","+    the_map = {\"flows\": [{\"id\": f, \"steps\": [{\"id\": \"s\", \"endpoints\": [f\"E{f}\"]}]} for f in flows]}","+    return SimpleNamespace(map=the_map, handler=handlers, reach=reach, plumbing=set(),","+                           g=SimpleNamespace(edges=edges, bases={}), component=lambda n: None)","+","+","+class MergesTest(unittest.TestCase):","+    def test_flows_meet_at_the_first_shared_function_only(self):","+        d = fake()","+        [m] = atlas.merges(d, atlas.step_keys(d.map))","+        self.assertEqual((m[\"file\"], m[\"at\"], m[\"steps\"], m[\"flows\"]), (\"shared.py\", [\"meet\"], [\"a/s\", \"b/s\"], 2))","+","+    def test_code_most_entry_points_reach_is_plumbing(self):","+        edges = {**EDGES, \"x.py:hc\": {\"shared.py:meet\"}}","+        d = fake(edges)  # 3 of 5 entry points","+        self.assertEqual(atlas.merges(d, atlas.step_keys(d.map)), [])","+","+","+if __name__ == \"__main__\":","+    unittest.main()"],"symbols":[]}]},"story":{"title":"The atlas draws where flows meet, and says what each step's code does","pr":"PR #10","url":"https://github.com/NelisVerhoef/Flowmap/pull/10","intent":"Getting into the flow of a new codebase was hard: the atlas drew flows as parallel lines that never touch, and a step's code flow was a few bare function names.","delta":"Browsing the atlas now shows overlap on the map itself: steps of different flows that run the same code send wires to an interchange below the lines, one per file, at the first function they share. The interchanges replace the shared-components chip band. A step's rail adds an outline of the functions it runs, with signature, docstring, size and a GitHub link to their lines, and names the shared calls the drawing hides. The map, the call graph, lens and the change page are unchanged; only `flowmap atlas` output moves."},"chapters":[{"title":"Steps of different flows that run the same code meet at an interchange","role":"core","kind":"new view","symbols":["flowmap/atlas.py:merges","flowmap/atlas.py:build","flowmap/atlas.py:overlay"],"files":["flowmap/atlas.template.html","tests/test_merges.py"],"before":"Flows were vertical lines that never touched. Shared code was a chip band under the map (components two or more flows reach, using the 25% plumbing rule); hovering a chip lit the steps. On this repo that rule hid everything shared, including `inventory.endpoints`.","after":"`merges` finds, for each function, the steps that reach it; a function is a meeting point when steps of two or more flows reach it and none of its callers is reached by exactly the same steps. Meeting points group into one interchange per file, widest first, at most 24. Code reached from over half the entry points is left out as plumbing. The page draws a wire from each step down its flow's gutter to the interchange; clicking one lights its wires and steps and lists them in the rail. A painted PR rings interchanges whose shared code it changes (`overlay` now returns `merges`).","claim":"On this repo, two interchanges: `inventory.py` (entry-point discovery meets lens, atlas and callgraph) and `reconcile.py` (`UnionFind`).","why":"Anyone learning a codebase from the atlas sees where flows depend on the same code, which is also where one change lands in several flows.","questions":[{"q":"Merges use their own plumbing cutoff (over half the entry points) while the rest of the atlas keeps 25%. Should `Diagrams` take one cutoff for both, e.g. 25% with a floor of a few entry points for small repos?","why":"Two thresholds mean a function can be an interchange and also hidden as plumbing in the same step's code flow.","kind":"ask"},{"q":"Interchanges group by file. In a repo with large service files, is one node per file too coarse, or is per-function too noisy?","why":"Decides the unit a reader navigates by on a big map.","kind":"ask"},{"q":"The page draws at most 24 interchanges, widest first. Does a big repo need a 'show all' toggle, or is the cap the point?","why":"The rest are silently dropped from the picture.","kind":"ask"},{"q":"Run `flowmap atlas --pr '0d82693..1e1e20d=PR #8'`, open the page, pick PR #8 and click `inventory.py`: its ring, four lit steps and the rail list should agree.","why":"The wire drawing and selection have no automated test.","kind":"check"}]},{"title":"A step's rail lists the functions it runs and what each is for","role":"supporting","kind":"more information","symbols":["flowmap/atlas.py:functions","flowmap/atlas.py:step_code","flowmap/graphs/python.py:doc"],"files":["flowmap/graphs/__init__.py","tests/test_graphs.py"],"before":"The code flow was a small SVG of function names; plumbing (`config.load`, `config.out`) vanished without a trace, so a 5-hop step drew as two boxes.","after":"Under the SVG, 'What the code does' lists every drawn function in call order, indented by depth: name and signature, file and first line, size in lines, the first docstring paragraph, and a link to those lines on GitHub at HEAD when `origin` is GitHub. Hidden direct calls are named in an 'Also calls' line. Functions a painted PR changed get a blue bar. Builders gain an optional `doc(text, sym)`; the Python one reads the docstring.","claim":"Every drawn function now carries what it is for, where it is and how big it is.","why":"A reader can follow a step's code without opening files, and jump to the exact lines when they do.","questions":[{"q":"Only 27 of 63 drawn functions here have a docstring. Should mapping passes write a one-line purpose per `code_path` hop, kept by reconcile when two passes agree?","why":"Decides whether this panel stays docstring-bound on codebases that don't document.","kind":"ask"},{"q":"Links point at HEAD's sha with line numbers from the working tree. Building the atlas from a dirty tree gives off-by-some links; should `functions` drop links when the tree is dirty?","why":"A wrong link costs more trust than no link.","kind":"ask"},{"q":"The call graph adds an edge `atlas.merges` \u2192 `reconcile.UnionFind.union` because `set().union(...)` resolves by method name. Confirm it is a name-match over-report, not a real import.","why":"Reach over-reports by design; this is where to see it.","kind":"check"}]},{"title":"Two atlas bugs fixed on the way","role":"supporting","kind":"fix","symbols":[],"files":["flowmap/atlas.template.html"],"before":"An empty blue overlay bar showed with no change painted (`display: flex` beat `hidden`). Overlay ids were the label's first word, so 'PR #9' and 'PR #8' both became `PR` and the picker could only select one.","after":"`[hidden]` hides the bar; overlay ids come from the whole label.","claim":"Painting several PRs works.","why":"Comparing PRs on the map is what overlays are for.","questions":[{"q":"Overlay ids changed from `PR` to `PR9`; a saved `atlas.overlay` in localStorage falls back to no overlay once. Fine?","why":"Only affects someone who had an overlay selected.","kind":"check"}]}],"folded":["docs/flowmap/atlas.html"]};
+const PAYLOAD = /^#v1\.([\w-]+)$/.exec(location.hash);
+// another link pasted into this tab changes only the fragment, which does not reload the page
+addEventListener("hashchange", () => { if (location.hash.startsWith("#v1.")) location.reload(); });
+
+async function inflate(b64) {
+  const bytes = Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+
+function fromFile(error) {
+  const box = document.createElement("section");
+  box.className = "drop";
+  box.innerHTML = `<h1>Open a flowmap change</h1>
+    <p>Drop a change page (<code>docs/flowmap/changes/&lt;name&gt;.html</code>) or its data as JSON here.
+    It is read in this tab and sent nowhere.</p>
+    <p><input type="file" accept=".html,.json"></p><p class="err" hidden></p>`;
+  const err = box.querySelector(".err");
+  if (error) { err.hidden = false; err.textContent = error; }
+  document.querySelector(".wrap").replaceChildren(box);
+  document.querySelector(".tray").hidden = true;
+  return new Promise((resolve) => {
+    const read = async (f) => {
+      try {
+        const text = await f.text();
+        const m = /const EMBEDDED = (\{.*?\});\n/s.exec(text) || /const DATA = (\{.*?\});\n/s.exec(text);
+        const data = JSON.parse(m ? m[1] : text);
+        if (!data.facts || !data.chapters) throw new Error("not flowmap change data");
+        resolve(data);
+      } catch (e) { err.hidden = false; err.textContent = `Could not read ${f.name}: ${e.message}`; }
+    };
+    box.querySelector("input").addEventListener("change", (e) => e.target.files[0] && read(e.target.files[0]));
+    addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("over"); });
+    addEventListener("dragleave", () => box.classList.remove("over"));
+    addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("over"); e.dataTransfer.files[0] && read(e.dataTransfer.files[0]); });
+  });
+}
+
+async function load() {
+  if (EMBEDDED) return EMBEDDED;
+  if (PAYLOAD) {
+    try { return await inflate(PAYLOAD[1]); }
+    catch (e) { return fromFile("The link's data is cut off or damaged. Was the whole link copied?"); }
+  }
+  return fromFile();
+}
+
+const WRAP = document.querySelector(".wrap").cloneNode(true);
+const DATA = await load();
+document.querySelector(".wrap").replaceWith(WRAP);
+document.querySelector(".tray").hidden = false;
+if (DATA.story.title) document.title = DATA.story.title;
+const F = DATA.facts, S = DATA.story;
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+};
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const md = (s) => esc(s || "").replace(/`([^`]+)`/g, "<code>$1</code>");
+const sym = (id) => id.split(":").pop();
+const file = (id) => id.split(":")[0].split("/").pop();
+const flowName = (id) => id.replace(/^new:/, "").replace(/-/g, " ");
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Outside the map",
+  unassigned: "Not in the story", "off-map": "Off the map" };
+
+const steps = new Map();
+F.map.forEach((f, fi) => f.steps.forEach((s, si) => steps.set(s.key, { ...s, flow: f.id, fi, si })));
+const symById = new Map(F.symbols.map(s => [s.id, s]));
+const byPlace = (a, b) => (steps.get(a).fi - steps.get(b).fi) || (steps.get(a).si - steps.get(b).si);
+
+// chapter facts
+const chapters = DATA.chapters.map((c, i) => {
+  const syms = (c.symbols || []).map(id => symById.get(id)).filter(Boolean);
+  const keys = [...new Set(syms.flatMap(s => s.steps))].sort(byPlace);
+  const ids = new Set(c.symbols || []);
+  const mine = (n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
+  const edgesIn = (list) => list.filter(([a, b]) => mine(a) || mine(b));
+  const callers = new Map();
+  syms.filter(s => s.status === "modified").forEach(s => s.callers.forEach(c => { if (!ids.has(c.id)) callers.set(c.id, c.edited); }));
+  const hunks = F.hunks.filter(h => h.symbols.some(x => ids.has(x)) || (c.files || []).includes(h.file));
+  const role = c.role || (c.kind === "outside" ? "outside" : c.kind === "unassigned" ? "unassigned" : c.kind === "off-map" ? "off-map" : i === 0 ? "core" : "supporting");
+  return { ...c, n: i + 1, syms, keys, role, callers, qs: questions(c, i + 1, syms, keys),
+    added: edgesIn(F.edges.added), removed: edgesIn(F.edges.removed), hunks };
+});
+
+// the story's questions, then what the graph raises on its own
+function questions(c, n, syms, keys) {
+  const qs = [];
+  const myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
+  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
+  moved(F.reach.lost).forEach(([s, eps], i) => qs.push({ id: `c${n}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
+  moved(F.reach.gained).forEach(([s, eps], i) => qs.push({ id: `c${n}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
+  (c.questions || []).forEach((q, i) => qs.push({ ...q, id: `c${n}q${i}` }));
+  syms.filter(s => s.contract).forEach((s, i) => {
+    const still = s.callers.filter(x => !x.edited).map(x => sym(x.id));
+    if (still.length) qs.push({ id: `c${n}g${i}`, kind: "graph", q: `${sym(s.id)} changed its arguments (${s.signature[0]} → ${s.signature[1]}) but ${still.length} caller(s) were not edited: ${still.join(", ")}. Are they still correct?`, why: "Signature changed, callers did not." });
+  });
+  const orphans = syms.filter(s => s.status === "new" && !s.steps.length).map(s => sym(s.id));
+  if (orphans.length) qs.push({ id: `c${n}o`, kind: "graph", why: "New code no flow reaches is either a map gap or dead.",
+    q: orphans.length === 1 ? `New ${orphans[0]} is not run by any flow on the map. Which step is it for?`
+      : `${orphans.length} new functions (${orphans.join(", ")}) are not run by any flow on the map. Which step are they for?` });
+  return qs;
+}
+const picked = new Set(chapters.flatMap(c => c.qs.filter(q => q.kind === "ask" || q.kind === "graph").map(q => q.id)));
+const minor = (c) => ["refactor", "outside", "unassigned"].includes(c.role);
+const where = (c) => c.keys.length
+  ? [...new Set(c.keys.map(k => flowName(steps.get(k).flow)))].join(", ") + ` · ${plural(c.keys.length, "step")}`
+  : (c.files || []).length ? "off the map · " + c.files.map(f => f.split("/").pop()).slice(0, 3).join(", ") + (c.files.length > 3 ? " …" : "")
+  : "off the map";
+
+// header: which change
+const range = el("div", { class: "range" });
+range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", S.pr ? " · " : "",
+  el("span", { class: "mono", text: `${F.base_sha} → ${F.head_sha}` }), ` · ${F.name}`);
+$("#top").append(range, el("h1", { text: S.title || `${F.base}..${F.head}` }));
+if (F.verdict) {
+  const V = F.verdict, flowsOf = new Set(F.map.filter(f => f.steps.some(s => s.endpoints.some(e => V.spreads_to.includes(e)))).map(f => flowName(f.id)));
+  const spread = V.spreads_to.length ? `reaches ${plural(V.spreads_to.length, "existing entry point")}` + (flowsOf.size ? ` in ${[...flowsOf].join(", ")}` : "") : "";
+  const line = { contained: "no existing entry point runs changed code; only new code changed",
+    spreads: spread, blind: `${plural(V.blind.length, "thing")} the call graph can't see` + (spread ? `; what it can see ${spread}` : "") }[V.verdict];
+  const items = [...V.blind.map(b => "Can't see: " + b), ...(V.spreads_to.length ? ["Entry points that run changed code: " + V.spreads_to.map(e => "`" + e + "`").join(", ")] : [])];
+  $("#top").append(el("details", { class: "verdict " + V.verdict }, el("summary", {}, el("b", { text: V.verdict }), line),
+    items.length ? el("ul", {}, ...items.map(i => el("li", { html: md(i) }))) : null));
+}
+
+// overview: how the system moves, and only the numbers that are not zero
+const touchedFlows = new Set(F.symbols.flatMap(s => s.steps.map(k => k.split("/")[0])));
+const nNew = F.symbols.filter(s => s.status === "new").length, nMod = F.symbols.filter(s => s.status === "modified").length;
+const shape = [
+  [`${touchedFlows.size} of ${F.map.length}`, "flows run changed code"],
+  F.endpoints.added.length && [`+${F.endpoints.added.length}`, "entry points", F.endpoints.added.join(", ")],
+  F.endpoints.removed.length && [`−${F.endpoints.removed.length}`, "entry points", F.endpoints.removed.join(", ")],
+  nNew && [nNew, "new functions"], nMod && [nMod, "changed functions"],
+  (Object.keys(F.reach.gained).length || Object.keys(F.reach.lost).length) &&
+    [`+${Object.keys(F.reach.gained).length} −${Object.keys(F.reach.lost).length}`, "existing code reached"],
+  F.modules.added.length && [`+${F.modules.added.length}`, "module links", F.modules.added.map(([a, b]) => `${a.split("/").pop()} → ${b.split("/").pop()}`).join(", ")],
+  [F.tests.changed.length || "no", F.tests.changed.length === 1 ? "test changed" : "tests changed", F.tests.changed.join(", ")],
+].filter(Boolean);
+function overview(pane) {
+  pane.className = "pane";
+  pane.append(el("div", {}, el("div", { class: "ch-tags" }, el("span", { class: "tag", text: "Overview" })),
+    el("h2", { text: `What this change does, in ${plural(chapters.length, "part")}` })));
+  if (S.delta) pane.append(el("p", { class: "delta", html: md(S.delta) }));
+  pane.append(el("ul", { class: "shape", "aria-label": "Shape of the change" },
+    ...shape.map(([v, k, t]) => el("li", { title: t || null }, el("b", { text: String(v) }), " " + k))));
+  if (S.intent) pane.append(el("p", { class: "note", html: "<b>Author's intent:</b> " + md(S.intent) }));
+  const ref = (c) => el("button", { type: "button", class: "ref " + c.role, title: c.title, onclick: () => show(c.n) }, String(c.n));
+  const lanes = el("div", { class: "lanes" });
+  for (const f of F.map) {
+    const at = (k) => chapters.filter(c => c.keys.includes(k));
+    if (!f.steps.some(s => at(s.key).length)) continue;
+    lanes.append(el("section", { class: "lane" }, el("h3", { text: flowName(f.id) }), el("ol", {}, ...f.steps.map(s => {
+      const hits = at(s.key);
+      return el("li", { class: hits.length ? "touched " + hits[0].role : null }, el("span", { class: "dot", "aria-hidden": "true" }),
+        el("span", { text: s.name }), hits.length ? el("span", { class: "refs" }, ...hits.map(ref)) : null);
+    }))));
+  }
+  const off = chapters.filter(c => !c.keys.length);
+  if (off.length) lanes.append(el("section", { class: "lane" }, el("h3", { text: "No flow runs this" }),
+    el("div", { class: "refs", style: "display:grid;gap:6px" }, ...off.map(c => el("span", { style: "display:flex;gap:8px;align-items:baseline;font-size:13px" }, ref(c), c.title)))));
+  if (lanes.children.length) pane.append(el("section", { style: "display:grid;gap:10px" }, el("h3", { class: "label", text: "Where it lands" }),
+    el("p", { class: "note", text: "Each line is a user flow, its stops in order. A filled stop runs changed code; the numbers under it are the parts that change it." }), lanes,
+    quiet.length ? el("p", { class: "quiet-flows", text: `Untouched flows: ${quiet.join(", ")}` }) : null));
+  if (!S.delta) pane.append(el("p", { class: "note", text: "No story for this change: each part below is grouped by the flow steps that run its code." }));
+}
+
+// rail: the parts
+$("#toc-h").textContent = `The change in ${plural(chapters.length, "part")}`;
+$("#toc").append(el("li", { class: "ov" }, el("button", { type: "button", "data-ch": 0, onclick: () => show(0) },
+  el("span", { class: "n", text: "◎" }), el("span", { class: "t", text: "Overview" }), el("span", { class: "w", text: "what moves, and how much" }))));
+for (const c of chapters) {
+  $("#toc").append(el("li", { class: minor(c) ? "minor" : null }, el("button", { type: "button", class: c.role, "data-ch": c.n, onclick: () => show(c.n) },
+    el("span", { class: "n", text: String(c.n) }), el("span", { class: "t", text: c.title }), el("span", { class: "w", text: where(c) }))));
+}
+
+// rail: the map, touched flows only; a stop says which parts run there
+const quiet = [];
+for (const f of F.map) {
+  const at = (k) => chapters.filter(c => c.keys.includes(k));
+  if (!f.steps.some(s => at(s.key).length)) { quiet.push(flowName(f.id)); continue; }
+  const ol = el("ol", { class: "stops" });
+  for (const s of f.steps) {
+    const hits = at(s.key);
+    ol.append(el("li", {}, el(hits.length ? "button" : "div", {
+      class: "stop" + (hits.length ? " touched " + hits[0].role : ""), "data-key": s.key, type: hits.length ? "button" : null,
+      title: hits.length ? `${s.name}\nParts: ${hits.map(c => c.n).join(", ")}` : `${s.name}\nNot touched`,
+      onclick: hits.length ? () => { const i = hits.findIndex(c => c.n === current); show(hits[(i + 1) % hits.length].n); } : null },
+      el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "nm", text: s.name }))));
+  }
+  $("#map").append(el("section", { class: "flow" }, el("h3", { text: flowName(f.id) }), ol));
+}
+const off = chapters.filter(c => !c.keys.length);
+if (off.length) {
+  const ol = el("ol", { class: "stops" });
+  off.forEach(c => ol.append(el("li", {}, el("button", { type: "button", class: "stop touched " + c.role, "data-off": c.n, title: c.title, onclick: () => show(c.n) },
+    el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "nm", text: `${c.n} · ${c.title}` })))));
+  $("#map").append(el("section", { class: "flow" }, el("h3", { text: "No flow runs this" }), ol));
+}
+if (quiet.length) $("#map").append(el("p", { class: "quiet-flows", text: `Untouched: ${quiet.join(", ")}` }));
+if (DATA.folded.length) $("#folded").textContent = `Not shown: ${plural(DATA.folded.length, "generated or test file")} (${DATA.folded.map(p => p.split("/").pop()).join(", ")})`;
+
+function pathEl(p) {
+  const box = el("div", { class: "path" });
+  p.forEach((n, i) => {
+    if (i) box.append(el("i", { text: "›" }));
+    box.append(el("span", { class: i === p.length - 1 ? "end" : "", title: n, text: i === 0 ? file(n) : sym(n) }));
+  });
+  return box;
+}
+const fold = (title, sub, ...body) => el("details", {}, el("summary", {}, title, sub ? el("small", { text: sub }) : null), el("div", {}, ...body));
+
+// pane: one part at a time
+let current = 0;
+function show(n, focus = true) {
+  const c = chapters[n - 1];
+  current = n;
+  document.querySelectorAll("#toc button").forEach(b => b.setAttribute("aria-current", String(+b.dataset.ch === n)));
+  // the overview lights every touched stop in its own part's colour; a part lights only its own
+  document.querySelectorAll("#map .stop").forEach(s => s.classList.toggle("lit", c ? c.keys.includes(s.dataset.key) || +s.dataset.off === n : s.classList.contains("touched")));
+  $("#map").style.removeProperty("--sel");
+  if (c) $("#map").style.setProperty("--sel", `var(--${{ core: "core", supporting: "support", refactor: "refactor" }[c.role] || "outside"})`);
+  $("#rail-map").hidden = !c;
+  const pane = $("#pane");
+  pane.replaceChildren();
+  if (!c) overview(pane);
+  else part(pane, c);
+
+  const nav = el("div", { class: "step-nav" });
+  for (const [dir, label] of [[-1, "Previous"], [1, n ? "Next" : "Start"]]) {
+    const o = n + dir === 0 ? { n: 0, title: "Overview" } : chapters[n - 1 + dir];
+    if (o) nav.append(el("button", { type: "button", "data-dir": String(dir), onclick: () => show(o.n) }, el("small", { text: o.n ? `${label} · ${o.n} of ${chapters.length}` : label }), o.title));
+  }
+  pane.append(nav, el("p", { class: "keys", html: "<kbd>←</kbd> <kbd>→</kbd> or <kbd>j</kbd> <kbd>k</kbd> to move between parts" }));
+  if (focus) { pane.focus({ preventScroll: true }); if (pane.getBoundingClientRect().top < 0) pane.scrollIntoView({ block: "start" }); }
+}
+
+function part(pane, c) {
+  pane.className = "pane " + c.role;
+
+  pane.append(el("div", {},
+    el("div", { class: "ch-tags" }, el("span", { class: "num", text: `${c.n} of ${chapters.length}` }), el("span", { class: "tag", text: ROLE[c.role] || c.role }),
+      c.kind && c.kind !== c.role ? el("span", { class: "kind", text: c.kind }) : null),
+    el("h2", { html: md(c.title) })));
+  if (c.claim) pane.append(el("p", { class: "claim", html: md(c.claim) }));
+  pane.append(el("p", { class: "runs", html: c.keys.length
+    ? "Runs in " + F.map.filter(f => c.keys.some(k => steps.get(k).flow === f.id)).map(f => {
+        const mine = f.steps.filter(s => c.keys.includes(s.key));
+        return `<b title="${esc(mine.map(s => s.name).join("\n"))}">${esc(flowName(f.id))}</b> (${mine.length === 1 ? esc(mine[0].name) : `${mine.length} of ${f.steps.length} steps`})`;
+      }).join(" · ")
+    : "No flow on the map runs this." }));
+
+  if (c.before || c.after) pane.append(el("div", { class: "ba" },
+    el("div", {}, el("p", { class: "label", text: "Before" }), el("p", { html: md(c.before || "—") })),
+    el("div", { class: "after" }, el("p", { class: "label", text: "After" }), el("p", { html: md(c.after || "—") }))));
+  if (c.why) pane.append(el("p", { class: "why", html: "<b>Why it matters.</b> " + md(c.why) }));
+  if (!c.before && !c.after && !c.why) pane.append(el("p", { class: "note", text: "No story for this part: the facts below are all flowmap knows. Add it to the story file to say what changes and why." }));
+
+  if (c.qs.length) {
+    const ol = el("ol", { class: "qs" });
+    for (const q of c.qs) {
+      const kind = { ask: "Ask the author", check: "Check yourself", graph: "From the graph" }[q.kind] || q.kind;
+      ol.append(el("li", { class: "q" },
+        el("input", { type: "checkbox", id: q.id, checked: picked.has(q.id) ? "" : null,
+          onchange: (e) => { e.target.checked ? picked.add(q.id) : picked.delete(q.id); renderNote(); } }),
+        el("label", { for: q.id }, el("span", { class: "qtext", html: `<span class="qkind ${esc(q.kind)}">${esc(kind)}</span>` + md(q.q) }),
+          q.why ? el("span", { class: "qwhy", html: md(q.why) }) : null)));
+    }
+    pane.append(el("section", { style: "display:grid;gap:10px" }, el("h3", { class: "label", text: "Questions, most decisive first" }), ol));
+  }
+
+  // evidence, on demand
+  const more = el("div", { class: "more" });
+  const witnesses = new Map();
+  c.syms.forEach(s => Object.entries(s.witness).forEach(([k, p]) => { if (!witnesses.has(k) || witnesses.get(k).length > p.length) witnesses.set(k, p); }));
+  if (witnesses.size) {
+    const unproved = c.keys.filter(k => !witnesses.has(k));
+    more.append(fold("How the flows reach this code", `${plural(witnesses.size, "call path")} from an entry point`,
+      el("ul", { class: "paths" }, ...[...witnesses].map(([k, p]) => el("li", {}, el("p", { class: "note", text: `${steps.get(k).name} · ${steps.get(k).endpoints.join(", ")}` }), pathEl(p)))),
+      unproved.length ? el("p", { class: "note", text: `Also on the map's own anchors for: ${unproved.map(k => steps.get(k).name).join("; ")} (no call path found).` }) : null));
+  }
+  const myEps = new Set(c.keys.flatMap(k => steps.get(k).endpoints));
+  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
+  const ripple = [
+    ...moved(F.reach.lost).map(([s, eps]) => ["rem", "no longer", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
+    ...moved(F.reach.gained).map(([s, eps]) => ["add", "now reaches", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
+    ...[...c.callers].sort((a, b) => a[1] - b[1]).map(([id, edited]) => [edited ? "yes" : "no", edited ? "caller, edited" : "caller, not edited", `${file(id)} · ${sym(id)}`]),
+    ...c.added.map(([a, b]) => ["add", "+ call", `${sym(a)} → ${sym(b)}`]),
+    ...c.removed.map(([a, b]) => ["rem", "− call", `${sym(a)} → ${sym(b)}`]),
+  ];
+  if (ripple.length) {
+    const notEdited = [...c.callers.values()].filter(e => !e).length;
+    more.append(fold("Ripple", [notEdited && `${notEdited} caller${notEdited === 1 ? "" : "s"} not edited`, (c.added.length || c.removed.length) && `+${c.added.length} −${c.removed.length} calls`].filter(Boolean).join(" · "),
+      el("ul", { class: "rows" }, ...ripple.map(([k, m, t]) => el("li", {}, el("span", { class: "mark " + k, text: m }), el("span", { text: t }))))));
+  }
+  if (c.hunks.length) {
+    const box = el("div", { style: "display:grid;gap:10px" });
+    const hunkEls = c.hunks.map(h => {
+      const pre = el("pre");
+      h.lines.forEach(l => pre.append(el("span", { class: l[0] === "+" ? "a" : l[0] === "-" ? "r" : "", text: l })));
+      const n = el("div", { class: "hunk" }, el("div", { class: "hh", text: `${h.file} @ ${h.new}${h.ctx ? " · " + h.ctx : ""}` }), pre);
+      n._syms = h.symbols; n._file = h.file;
+      return n;
+    });
+    // pick a symbol (or file) to see only its hunks
+    const keysOf = [...new Set([...c.syms.map(s => s.id), ...c.hunks.filter(h => !h.symbols.length).map(h => h.file)])];
+    const chips = el("div", { class: "chips" });
+    const filter = (key) => {
+      chips.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.k === key)));
+      hunkEls.forEach(n => { n.hidden = key != null && !(n._syms.includes(key) || (!n._syms.length && n._file === key)); });
+    };
+    if (keysOf.length > 1) keysOf.forEach(k => {
+      const s = symById.get(k);
+      chips.append(el("button", { type: "button", class: "chip", "data-k": k, "aria-pressed": "false", title: k,
+        onclick: (e) => filter(e.currentTarget.getAttribute("aria-pressed") === "true" ? null : k) },
+        s ? (c.syms.filter(o => sym(o.id) === sym(k)).length > 1 ? `${file(k)} · ${sym(k)}` : sym(k)) : k.split("/").pop(), s && s.status !== "modified" ? el("i", { text: s.status }) : null));
+    });
+    box.append(chips, ...hunkEls);
+    const files = [...new Set(c.hunks.map(h => h.file.split("/").pop()))];
+    more.append(fold("Code", `${plural(c.hunks.length, "hunk")} in ${files.slice(0, 4).join(", ")}${files.length > 4 ? ` and ${files.length - 4} more` : ""}`, box));
+  }
+  if (more.children.length) pane.append(more);
+}
+
+function renderNote() {
+  const lines = [];
+  for (const c of chapters) {
+    const qs = c.qs.filter(q => picked.has(q.id));
+    if (!qs.length) continue;
+    lines.push(`${c.n}. ${c.title}`);
+    qs.forEach(q => lines.push(`   - ${q.q}`));
+  }
+  $("#note").value = lines.join("\n");
+  $("#count").textContent = plural(picked.size, "question");
+}
+
+addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  const d = { ArrowRight: 1, j: 1, ArrowLeft: -1, k: -1 }[e.key];
+  if (d && current + d >= 0 && current + d <= chapters.length) { e.preventDefault(); show(current + d); }
+});
+$("#peek").addEventListener("click", (e) => {
+  const open = $("#note").hidden;
+  $("#note").hidden = !open;
+  e.target.setAttribute("aria-expanded", String(open));
+  e.target.textContent = open ? "Hide" : "Show";
+});
+$("#copy").addEventListener("click", async () => {
+  const t = $("#note");
+  try { await navigator.clipboard.writeText(t.value); $("#status").textContent = "Copied"; }
+  catch (e) { t.hidden = false; t.focus(); t.select(); $("#status").textContent = "Selected: press Ctrl+C or Cmd+C to copy"; }
+});
+renderNote();
+show(0, false);
+</script>
