@@ -1,0 +1,56 @@
+{
+  "title": "The atlas draws where flows meet, and says what each step's code does",
+  "pr": "PR #10",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/10",
+  "intent": "Getting into the flow of a new codebase was hard: the atlas drew flows as parallel lines that never touch, and a step's code flow was a few bare function names.",
+  "delta": "Browsing the atlas now shows overlap on the map itself: steps of different flows that run the same code send wires to an interchange below the lines, one per file, at the first function they share. The interchanges replace the shared-components chip band. A step's rail adds an outline of the functions it runs, with signature, docstring, size and a GitHub link to their lines, and names the shared calls the drawing hides. The map, the call graph, lens and the change page are unchanged; only `flowmap atlas` output moves.",
+  "chapters": [
+    {
+      "title": "Steps of different flows that run the same code meet at an interchange",
+      "role": "core",
+      "kind": "new view",
+      "symbols": ["flowmap/atlas.py:merges", "flowmap/atlas.py:build", "flowmap/atlas.py:overlay"],
+      "files": ["flowmap/atlas.template.html", "tests/test_merges.py"],
+      "before": "Flows were vertical lines that never touched. Shared code was a chip band under the map (components two or more flows reach, using the 25% plumbing rule); hovering a chip lit the steps. On this repo that rule hid everything shared, including `inventory.endpoints`.",
+      "after": "`merges` finds, for each function, the steps that reach it; a function is a meeting point when steps of two or more flows reach it and none of its callers is reached by exactly the same steps. Meeting points group into one interchange per file, widest first, at most 24. Code reached from over half the entry points is left out as plumbing. The page draws a wire from each step down its flow's gutter to the interchange; clicking one lights its wires and steps and lists them in the rail. A painted PR rings interchanges whose shared code it changes (`overlay` now returns `merges`).",
+      "claim": "On this repo, two interchanges: `inventory.py` (entry-point discovery meets lens, atlas and callgraph) and `reconcile.py` (`UnionFind`).",
+      "why": "Anyone learning a codebase from the atlas sees where flows depend on the same code, which is also where one change lands in several flows.",
+      "questions": [
+        {"q": "Merges use their own plumbing cutoff (over half the entry points) while the rest of the atlas keeps 25%. Should `Diagrams` take one cutoff for both, e.g. 25% with a floor of a few entry points for small repos?", "why": "Two thresholds mean a function can be an interchange and also hidden as plumbing in the same step's code flow.", "kind": "ask"},
+        {"q": "Interchanges group by file. In a repo with large service files, is one node per file too coarse, or is per-function too noisy?", "why": "Decides the unit a reader navigates by on a big map.", "kind": "ask"},
+        {"q": "The page draws at most 24 interchanges, widest first. Does a big repo need a 'show all' toggle, or is the cap the point?", "why": "The rest are silently dropped from the picture.", "kind": "ask"},
+        {"q": "Run `flowmap atlas --pr '0d82693..1e1e20d=PR #8'`, open the page, pick PR #8 and click `inventory.py`: its ring, four lit steps and the rail list should agree.", "why": "The wire drawing and selection have no automated test.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "A step's rail lists the functions it runs and what each is for",
+      "role": "supporting",
+      "kind": "more information",
+      "symbols": ["flowmap/atlas.py:functions", "flowmap/atlas.py:step_code", "flowmap/graphs/python.py:doc"],
+      "files": ["flowmap/graphs/__init__.py", "tests/test_graphs.py"],
+      "before": "The code flow was a small SVG of function names; plumbing (`config.load`, `config.out`) vanished without a trace, so a 5-hop step drew as two boxes.",
+      "after": "Under the SVG, 'What the code does' lists every drawn function in call order, indented by depth: name and signature, file and first line, size in lines, the first docstring paragraph, and a link to those lines on GitHub at HEAD when `origin` is GitHub. Hidden direct calls are named in an 'Also calls' line. Functions a painted PR changed get a blue bar. Builders gain an optional `doc(text, sym)`; the Python one reads the docstring.",
+      "claim": "Every drawn function now carries what it is for, where it is and how big it is.",
+      "why": "A reader can follow a step's code without opening files, and jump to the exact lines when they do.",
+      "questions": [
+        {"q": "Only 27 of 63 drawn functions here have a docstring. Should mapping passes write a one-line purpose per `code_path` hop, kept by reconcile when two passes agree?", "why": "Decides whether this panel stays docstring-bound on codebases that don't document.", "kind": "ask"},
+        {"q": "Links point at HEAD's sha with line numbers from the working tree. Building the atlas from a dirty tree gives off-by-some links; should `functions` drop links when the tree is dirty?", "why": "A wrong link costs more trust than no link.", "kind": "ask"},
+        {"q": "The call graph adds an edge `atlas.merges` → `reconcile.UnionFind.union` because `set().union(...)` resolves by method name. Confirm it is a name-match over-report, not a real import.", "why": "Reach over-reports by design; this is where to see it.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "Two atlas bugs fixed on the way",
+      "role": "supporting",
+      "kind": "fix",
+      "symbols": [],
+      "files": ["flowmap/atlas.template.html"],
+      "before": "An empty blue overlay bar showed with no change painted (`display: flex` beat `hidden`). Overlay ids were the label's first word, so 'PR #9' and 'PR #8' both became `PR` and the picker could only select one.",
+      "after": "`[hidden]` hides the bar; overlay ids come from the whole label.",
+      "claim": "Painting several PRs works.",
+      "why": "Comparing PRs on the map is what overlays are for.",
+      "questions": [
+        {"q": "Overlay ids changed from `PR` to `PR9`; a saved `atlas.overlay` in localStorage falls back to no overlay once. Fine?", "why": "Only affects someone who had an overlay selected.", "kind": "check"}
+      ]
+    }
+  ]
+}

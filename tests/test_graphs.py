@@ -20,6 +20,12 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(graphs.python.signature(text, "A.m"), "self, x=1")
         self.assertIsNone(graphs.python.signature(text, "A"))
 
+    def test_python_doc_is_the_first_paragraph(self):
+        text = 'def f():\n    """Does a thing,\n    in two lines.\n\n    Details nobody reads."""\n\ndef g():\n    pass\n'
+        self.assertEqual(graphs.python.doc(text, "f"), "Does a thing, in two lines.")
+        self.assertIsNone(graphs.python.doc(text, "g"))
+        self.assertIsNone(graphs.python.doc(text, "missing"))
+
     def test_defs_inside_blocks_keep_their_scope_name(self):
         text = ("try:\n    def fast():\n        pass\nexcept ImportError:\n    pass\n"
                 "def outer(x):\n    if x:\n        def inner(y=2):\n            pass\n"

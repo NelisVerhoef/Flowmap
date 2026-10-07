@@ -77,6 +77,17 @@ def signature(text, sym):
     return ast.unparse(hit.args) if hit is not None and not isinstance(hit, ast.ClassDef) else None
 
 
+def doc(text, sym):
+    """First paragraph of a def's or class's docstring: what the code says it does."""
+    try:
+        tree = ast.parse(text or "")
+    except SyntaxError:
+        return None
+    hit = _find(tree, sym)
+    found = ast.get_docstring(hit) if hit is not None else None
+    return " ".join(found.split("\n\n")[0].split()) if found else None
+
+
 def live(text):
     """Module-level lines that run: not blanks, comments, imports, docstrings or defs. None if
     the text doesn't parse, so every line counts."""
