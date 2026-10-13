@@ -155,15 +155,12 @@
  ],
  "symbols": [
   {
-   "id": "flowmap/callgraph.py:Graph._closure",
+   "id": "flowmap/callgraph.py:Graph.callers",
    "file": "flowmap/callgraph.py",
-   "sym": "Graph._closure",
-   "status": "new",
+   "sym": "Graph.callers",
+   "status": "modified",
    "contract": false,
-   "signature": [
-    null,
-    "adj, nid"
-   ],
+   "signature": null,
    "steps": [
     "new:review-change-on-map/lens-place-change",
     "new:review-change-on-map/callgraph-impact",
@@ -173,30 +170,24 @@
     "new:review-change-on-map/lens-place-change": [
      "flowmap/lens.py:__main__",
      "flowmap/lens.py:main",
-     "flowmap/callgraph.py:Graph.callers",
-     "flowmap/callgraph.py:Graph._closure"
-    ],
-    "new:review-change-on-map/callgraph-impact": [
-     "flowmap/callgraph.py:__main__",
-     "flowmap/callgraph.py:impact",
-     "flowmap/callgraph.py:Graph.callers",
-     "flowmap/callgraph.py:Graph._closure"
-    ],
-    "new:review-change-on-map/build-atlas": [
-     "flowmap/atlas.py:__main__",
-     "flowmap/atlas.py:build",
-     "flowmap/atlas.py:overlay",
-     "flowmap/callgraph.py:Graph.callers",
-     "flowmap/callgraph.py:Graph._closure"
+     "flowmap/callgraph.py:Graph.callers"
     ]
    },
    "callers": [
     {
-     "id": "flowmap/callgraph.py:Graph.callees",
+     "id": "flowmap/atlas.py:overlay",
+     "edited": false
+    },
+    {
+     "id": "flowmap/callgraph.py:impact",
+     "edited": false
+    },
+    {
+     "id": "flowmap/lens.py:main",
      "edited": true
     },
     {
-     "id": "flowmap/callgraph.py:Graph.callers",
+     "id": "flowmap/lens.py:reach_diff",
      "edited": true
     }
    ],
@@ -236,12 +227,56 @@
    "kept_calls": 0
   },
   {
-   "id": "flowmap/callgraph.py:Graph.callers",
+   "id": "flowmap/callgraph.py:Graph.__init__",
    "file": "flowmap/callgraph.py",
-   "sym": "Graph.callers",
+   "sym": "Graph.__init__",
    "status": "modified",
    "contract": false,
    "signature": null,
+   "steps": [
+    "new:review-change-on-map/generate-diagrams",
+    "new:review-change-on-map/lens-place-change",
+    "new:review-change-on-map/callgraph-impact",
+    "new:review-change-on-map/build-atlas"
+   ],
+   "witness": {
+    "new:review-change-on-map/generate-diagrams": [
+     "flowmap/diagrams.py:__main__",
+     "flowmap/diagrams.py:Diagrams",
+     "flowmap/diagrams.py:Diagrams.__init__",
+     "flowmap/callgraph.py:Graph"
+    ]
+   },
+   "callers": [
+    {
+     "id": "flowmap/atlas.py:overlay",
+     "edited": false
+    },
+    {
+     "id": "flowmap/callgraph.py:__main__",
+     "edited": false
+    },
+    {
+     "id": "flowmap/diagrams.py:Diagrams.__init__",
+     "edited": false
+    },
+    {
+     "id": "flowmap/lens.py:graph_at",
+     "edited": true
+    }
+   ],
+   "kept_calls": 1
+  },
+  {
+   "id": "flowmap/callgraph.py:Graph._closure",
+   "file": "flowmap/callgraph.py",
+   "sym": "Graph._closure",
+   "status": "new",
+   "contract": false,
+   "signature": [
+    null,
+    "adj, nid"
+   ],
    "steps": [
     "new:review-change-on-map/lens-place-change",
     "new:review-change-on-map/callgraph-impact",
@@ -251,35 +286,17 @@
     "new:review-change-on-map/lens-place-change": [
      "flowmap/lens.py:__main__",
      "flowmap/lens.py:main",
-     "flowmap/callgraph.py:Graph.callers"
-    ],
-    "new:review-change-on-map/callgraph-impact": [
-     "flowmap/callgraph.py:__main__",
-     "flowmap/callgraph.py:impact",
-     "flowmap/callgraph.py:Graph.callers"
-    ],
-    "new:review-change-on-map/build-atlas": [
-     "flowmap/atlas.py:__main__",
-     "flowmap/atlas.py:build",
-     "flowmap/atlas.py:overlay",
-     "flowmap/callgraph.py:Graph.callers"
+     "flowmap/callgraph.py:Graph.callers",
+     "flowmap/callgraph.py:Graph._closure"
     ]
    },
    "callers": [
     {
-     "id": "flowmap/atlas.py:overlay",
-     "edited": false
-    },
-    {
-     "id": "flowmap/callgraph.py:impact",
-     "edited": false
-    },
-    {
-     "id": "flowmap/lens.py:main",
+     "id": "flowmap/callgraph.py:Graph.callees",
      "edited": true
     },
     {
-     "id": "flowmap/lens.py:reach_diff",
+     "id": "flowmap/callgraph.py:Graph.callers",
      "edited": true
     }
    ],
@@ -319,77 +336,20 @@
    "kept_calls": 0
   },
   {
-   "id": "flowmap/callgraph.py:Graph.__init__",
-   "file": "flowmap/callgraph.py",
-   "sym": "Graph.__init__",
-   "status": "modified",
-   "contract": false,
-   "signature": null,
-   "steps": [
-    "new:review-change-on-map/generate-diagrams",
-    "new:review-change-on-map/lens-place-change",
-    "new:review-change-on-map/callgraph-impact",
-    "new:review-change-on-map/build-atlas"
-   ],
-   "witness": {
-    "new:review-change-on-map/generate-diagrams": [
-     "flowmap/diagrams.py:__main__",
-     "flowmap/diagrams.py:Diagrams",
-     "flowmap/diagrams.py:Diagrams.__init__",
-     "flowmap/callgraph.py:Graph"
-    ],
-    "new:review-change-on-map/lens-place-change": [
-     "flowmap/lens.py:__main__",
-     "flowmap/lens.py:main",
-     "flowmap/lens.py:graph_at",
-     "flowmap/callgraph.py:Graph"
-    ],
-    "new:review-change-on-map/callgraph-impact": [
-     "flowmap/callgraph.py:__main__",
-     "flowmap/callgraph.py:Graph"
-    ],
-    "new:review-change-on-map/build-atlas": [
-     "flowmap/atlas.py:__main__",
-     "flowmap/atlas.py:build",
-     "flowmap/atlas.py:overlay",
-     "flowmap/callgraph.py:Graph"
-    ]
-   },
-   "callers": [
-    {
-     "id": "flowmap/atlas.py:overlay",
-     "edited": false
-    },
-    {
-     "id": "flowmap/callgraph.py:__main__",
-     "edited": false
-    },
-    {
-     "id": "flowmap/diagrams.py:Diagrams.__init__",
-     "edited": false
-    },
-    {
-     "id": "flowmap/lens.py:graph_at",
-     "edited": true
-    }
-   ],
-   "kept_calls": 1
-  },
-  {
-   "id": "flowmap/change.py:signature",
+   "id": "flowmap/change.py:main",
    "file": "flowmap/change.py",
-   "sym": "signature",
+   "sym": "main",
    "status": "new",
    "contract": false,
    "signature": [
     null,
-    "text, sym"
+    ""
    ],
    "steps": [],
    "witness": {},
    "callers": [
     {
-     "id": "flowmap/change.py:facts",
+     "id": "flowmap/change.py:__main__",
      "edited": true
     }
    ],
@@ -404,26 +364,6 @@
    "signature": [
     null,
     "sid"
-   ],
-   "steps": [],
-   "witness": {},
-   "callers": [
-    {
-     "id": "flowmap/change.py:facts",
-     "edited": true
-    }
-   ],
-   "kept_calls": 0
-  },
-  {
-   "id": "flowmap/change.py:hunks",
-   "file": "flowmap/change.py",
-   "sym": "hunks",
-   "status": "new",
-   "contract": false,
-   "signature": [
-    null,
-    "base, head"
    ],
    "steps": [],
    "witness": {},
@@ -456,6 +396,26 @@
    "kept_calls": 0
   },
   {
+   "id": "flowmap/change.py:auto_chapters",
+   "file": "flowmap/change.py",
+   "sym": "auto_chapters",
+   "status": "new",
+   "contract": false,
+   "signature": [
+    null,
+    "fx"
+   ],
+   "steps": [],
+   "witness": {},
+   "callers": [
+    {
+     "id": "flowmap/change.py:merge",
+     "edited": true
+    }
+   ],
+   "kept_calls": 0
+  },
+  {
    "id": "flowmap/change.py:__main__",
    "file": "flowmap/change.py",
    "sym": "__main__",
@@ -465,6 +425,26 @@
    "steps": [],
    "witness": {},
    "callers": [],
+   "kept_calls": 0
+  },
+  {
+   "id": "flowmap/change.py:facts",
+   "file": "flowmap/change.py",
+   "sym": "facts",
+   "status": "new",
+   "contract": false,
+   "signature": [
+    null,
+    "base, head"
+   ],
+   "steps": [],
+   "witness": {},
+   "callers": [
+    {
+     "id": "flowmap/change.py:main",
+     "edited": true
+    }
+   ],
    "kept_calls": 0
   },
   {
@@ -488,49 +468,29 @@
    "kept_calls": 0
   },
   {
-   "id": "flowmap/change.py:main",
+   "id": "flowmap/change.py:signature",
    "file": "flowmap/change.py",
-   "sym": "main",
+   "sym": "signature",
    "status": "new",
    "contract": false,
    "signature": [
     null,
-    ""
+    "text, sym"
    ],
    "steps": [],
    "witness": {},
    "callers": [
     {
-     "id": "flowmap/change.py:__main__",
+     "id": "flowmap/change.py:facts",
      "edited": true
     }
    ],
    "kept_calls": 0
   },
   {
-   "id": "flowmap/change.py:auto_chapters",
+   "id": "flowmap/change.py:hunks",
    "file": "flowmap/change.py",
-   "sym": "auto_chapters",
-   "status": "new",
-   "contract": false,
-   "signature": [
-    null,
-    "fx"
-   ],
-   "steps": [],
-   "witness": {},
-   "callers": [
-    {
-     "id": "flowmap/change.py:merge",
-     "edited": true
-    }
-   ],
-   "kept_calls": 0
-  },
-  {
-   "id": "flowmap/change.py:facts",
-   "file": "flowmap/change.py",
-   "sym": "facts",
+   "sym": "hunks",
    "status": "new",
    "contract": false,
    "signature": [
@@ -541,7 +501,7 @@
    "witness": {},
    "callers": [
     {
-     "id": "flowmap/change.py:main",
+     "id": "flowmap/change.py:facts",
      "edited": true
     }
    ],
@@ -590,34 +550,6 @@
     }
    ],
    "kept_calls": 9
-  },
-  {
-   "id": "flowmap/lens.py:main.listing",
-   "file": "flowmap/lens.py",
-   "sym": "main.listing",
-   "status": "new",
-   "contract": false,
-   "signature": [
-    null,
-    "title, syms"
-   ],
-   "steps": [
-    "new:review-change-on-map/lens-place-change"
-   ],
-   "witness": {
-    "new:review-change-on-map/lens-place-change": [
-     "flowmap/lens.py:__main__",
-     "flowmap/lens.py:main",
-     "flowmap/lens.py:main.listing"
-    ]
-   },
-   "callers": [
-    {
-     "id": "flowmap/lens.py:main",
-     "edited": true
-    }
-   ],
-   "kept_calls": 0
   },
   {
    "id": "flowmap/lens.py:graph_at",
@@ -676,6 +608,34 @@
      "id": "flowmap/change.py:facts",
      "edited": true
     },
+    {
+     "id": "flowmap/lens.py:main",
+     "edited": true
+    }
+   ],
+   "kept_calls": 0
+  },
+  {
+   "id": "flowmap/lens.py:main.listing",
+   "file": "flowmap/lens.py",
+   "sym": "main.listing",
+   "status": "new",
+   "contract": false,
+   "signature": [
+    null,
+    "title, syms"
+   ],
+   "steps": [
+    "new:review-change-on-map/lens-place-change"
+   ],
+   "witness": {
+    "new:review-change-on-map/lens-place-change": [
+     "flowmap/lens.py:__main__",
+     "flowmap/lens.py:main",
+     "flowmap/lens.py:main.listing"
+    ]
+   },
+   "callers": [
     {
      "id": "flowmap/lens.py:main",
      "edited": true

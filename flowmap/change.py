@@ -136,13 +136,17 @@ def facts(base, head):
     for sid, s in symbols.items():
         node = node_for(sid)
         s["steps"], s["witness"] = [], {}
+        proven = set()  # one call path per flow proves the flow reaches it; steps lists the rest
         for st in step_info:
             if node in st["reach"] or sid in st["anchors"]:
                 s["steps"].append(st["key"])
+                if st["flow"] in proven:
+                    continue
                 for h in st["handlers"]:
                     path = g_head.reaches(h, node)
                     if path:
                         s["witness"][st["key"]] = path
+                        proven.add(st["flow"])
                         break
         graph = g_base if s["status"] == "deleted" else g_head
         s["callers"] = [{"id": c, "edited": c in changed} for c in sorted(graph.reverse.get(node, ()))
@@ -257,10 +261,12 @@ def merge(fx, story):
     lint = lint_story(fx, story, chapters, known, claimed_syms, claimed_files)
     folded = [f for f in fx["files"] if f["kind"] in ("generated", "test") or
               (f["kind"] in ("doc", "outside") and f["path"] not in claimed_files and not story.get("chapters"))]
-    # the page shows a hunk only under a chapter that owns its symbols or its file; drop the rest
-    # (regenerated pages, goldens) so the link stays small
-    shown = {f for c in chapters for f in c.get("files", [])}
-    fx = {**fx, "hunks": [h for h in fx["hunks"] if h["symbols"] or h["file"] in shown]}
+    # the page shows a hunk only under a chapter that owns its symbols or a file the story chose;
+    # the rest (regenerated pages, goldens, a plan doc no part claims) is a path and line counts,
+    # so the link stays small. The page draws one call path per symbol.
+    shown = {f for c in story.get("chapters") or [] for f in c.get("files", [])}
+    fx = {**fx, "hunks": [h for h in fx["hunks"] if h["symbols"] or h["file"] in shown],
+          "symbols": [{**s, "witness": dict(list(s["witness"].items())[:1])} for s in fx["symbols"]]}
     return {"facts": fx, "story": {k: v for k, v in story.items() if k != "chapters"},
             "chapters": chapters, "folded": [f["path"] for f in folded if f["path"] not in loose], "lint": lint}
 
@@ -317,6 +323,24 @@ def link(data, viewer):
     return f"{viewer}#v1.{base64.urlsafe_b64encode(packed).rstrip(b'=').decode()}"
 
 
+BUDGET = 60000  # a PR body holds 65536 characters; leave room for the prose around the link
+
+
+def fitted_link(data, viewer):
+    """A link that fits a PR body: past BUDGET, leave out diff text, non-code files first, and
+    say so on the page. (url, what was left out); url is None when even that doesn't fit."""
+    url, dropped = link(data, viewer), []
+    kinds = {f["path"]: f["kind"] for f in data["facts"]["files"]}
+    for what, keep in (("diff text of non-code files", lambda h: kinds.get(h["file"]) == "code"),
+                       ("all diff text", lambda h: False)):
+        if len(url) <= BUDGET:
+            break
+        dropped.append(what)
+        data = {**data, "trimmed": dropped, "facts": {**data["facts"], "hunks": [h for h in data["facts"]["hunks"] if keep(h)]}}
+        url = link(data, viewer)
+    return (url if len(url) <= BUDGET else None), dropped
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base")
@@ -350,10 +374,16 @@ def main():
         viewer = os.environ.get("FLOWMAP_VIEWER") or config.load().get("viewer") or VIEWER
         if data["lint"]:
             sys.exit("no link: fix the story problems above first")
-        url = link(data, viewer)
-        if len(url) > 60000:  # a PR body holds 65536 characters
-            print(f"warning: link is {len(url)} characters, too long for a PR body; "
-                  f"open {out.relative_to(ROOT)} in the viewer instead", file=sys.stderr)
+        url, dropped = fitted_link(data, viewer)
+        if url is None:
+            print("warning: the page is too big for a link in a PR body even without its diff text; "
+                  "put this in the PR body instead:", file=sys.stderr)
+            print(f"Change page: open {viewer} and drop `{out.relative_to(ROOT)}` on it "
+                  f"(download it from this PR's files).")
+            return
+        if dropped:
+            print(f"link leaves out {' and '.join(dropped)} to fit a PR body; the page says so "
+                  f"and {out.relative_to(ROOT)} has it all", file=sys.stderr)
         print(url)
 
 

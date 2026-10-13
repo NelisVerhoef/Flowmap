@@ -131,7 +131,9 @@ Also write the change as a page people can read without the diff:
    changed is hidden. It checks the story against the facts (symbols and files the diff changes,
    cites in the diff, test names that exist at head) and prints no link until the story passes;
    the page shows anything that failed. The link opens `https://flowmap.testabl.ai/v1/change.html`
-   unless `viewer` in `flowmap.toml` names another; put the printed link in the PR body as is.
+   unless `viewer` in `flowmap.toml` names another; put the printed link in the PR body as is
+   (or, for a page too big for any link, the line it prints instead). Diff text of doc and other
+   non-code files only rides along for files a chapter names in `files`.
 4. Reader test, before the PR opens: give a subagent with none of your context only the story file
    and the `--facts` output, and ask it: which flows changed; what is no longer true; what stayed
    the same; what breaks for the user if the core part fails. Compare its answers with the facts

@@ -524,15 +524,15 @@
   ],
   [
    "flowmap/atlas.py:build",
+   "flowmap/diagrams.py:Diagrams.component"
+  ],
+  [
+   "flowmap/atlas.py:build",
    "flowmap/diagrams.py:Diagrams.system"
   ],
   [
    "flowmap/atlas.py:build",
    "flowmap/lens.py:git"
-  ],
-  [
-   "flowmap/atlas.py:build",
-   "flowmap/reconcile.py:UnionFind.union"
   ],
   [
    "flowmap/atlas.py:overlay",
@@ -577,10 +577,6 @@
   [
    "flowmap/atlas.py:overlay",
    "flowmap/lens.py:symbols_at"
-  ],
-  [
-   "flowmap/atlas.py:overlay",
-   "flowmap/reconcile.py:UnionFind.union"
   ],
   [
    "flowmap/atlas.py:split_votes",
@@ -791,10 +787,6 @@
    "flowmap/diagrams.py:nid"
   ],
   [
-   "flowmap/diagrams.py:Diagrams.system",
-   "flowmap/reconcile.py:UnionFind.union"
-  ],
-  [
    "flowmap/diagrams.py:Diagrams.write",
    "flowmap/diagrams.py:Diagrams.flow"
   ],
@@ -935,20 +927,12 @@
    "flowmap/lens.py:py_symbols.walk"
   ],
   [
-   "flowmap/lens.py:rb_symbols",
-   "flowmap/reconcile.py:UnionFind.groups"
-  ],
-  [
    "flowmap/lens.py:show",
    "flowmap/lens.py:git"
   ],
   [
    "flowmap/lens.py:symbols_at",
    "flowmap/lens.py:defs"
-  ],
-  [
-   "flowmap/lens.py:ts_symbols",
-   "flowmap/reconcile.py:UnionFind.groups"
   ],
   [
    "flowmap/reconcile.py:UnionFind",

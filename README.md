@@ -78,8 +78,9 @@ renders the page in a browser without publishing it anywhere: the page's data ri
 `#` fragment, which browsers never send to a server, and a hosted viewer (`flowmap viewer <dir>`,
 one static file with no network access) renders it in the tab. It defaults to
 `https://flowmap.testabl.ai/v1/change.html`, deployed from `fjall/flowmap/`; point `viewer` in
-`flowmap.toml` at your own copy to use that instead. A PR body holds about 60 KB of link; past that, open the committed page in
-the viewer by dropping the file on it.
+`flowmap.toml` at your own copy to use that instead. A PR body holds about 60 KB of link; past that, the link leaves out diff
+text (non-code files first) and the page says so. If even that is too big, `--link` prints a line
+to paste instead, saying to drop the committed page on the viewer.
 
 ## With Claude Code
 

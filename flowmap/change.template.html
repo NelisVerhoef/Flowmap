@@ -495,6 +495,7 @@ if (off.length) {
 }
 if (quiet.length) $("#map").append(el("p", { class: "quiet-flows", text: `Untouched: ${quiet.join(", ")}` }));
 if (DATA.folded.length) $("#folded").textContent = `Not shown: ${plural(DATA.folded.length, "generated or test file")} (${DATA.folded.map(p => p.split("/").pop()).join(", ")})`;
+if ((DATA.trimmed || []).length) $("#folded").textContent += ` Left out of this link to fit a PR body: ${DATA.trimmed.join(" and ")}; see the PR diff.`;
 
 // a part's code as a call tree: the shape that existed, with the calls this change added (+) or
 // removed (−); a changed function in the part opens its own calls, everything else is a leaf, and
@@ -543,7 +544,9 @@ function callTree(c) {
   if (!lines.length) return null;
   const MAX = 18, shown = lines.length > MAX ? [...lines.slice(0, MAX - 1), [`… ${lines.length - MAX + 1} more lines`, "from", "", null]] : lines;
   const blind = (c.files || []).filter(f => !["code", "test", "generated"].includes((F.files.find(x => x.path === f) || {}).kind));
-  if (blind.length) shown.push([`?  ${blind.join(", ")}: not in the call graph, read its code below`, "from", "", null]);
+  const read = blind.filter(f => c.hunks.some(h => h.file === f)), unread = blind.filter(f => !read.includes(f));
+  if (read.length) shown.push([`?  ${read.join(", ")}: not in the call graph, read its code below`, "from", "", null]);
+  if (unread.length) shown.push([`?  ${unread.join(", ")}: not in the call graph, see the PR diff`, "from", "", null]);
   return el("pre", { class: "tree" }, ...shown.map(([t, m, n, id]) => el("span", { class: { "+": "add", "−": "rem", from: "from" }[m] || "", title: id },
     t, n ? el("i", { text: "   " + n }) : null)));
 }

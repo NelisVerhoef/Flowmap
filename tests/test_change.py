@@ -23,9 +23,9 @@ class FactsTest(unittest.TestCase):
         self.assertEqual(self.fx["tests"]["changed"], ["tests/test_graphs.py", "tests/test_merges.py"])
 
     def test_a_reach_move_names_the_call_that_caused_it(self):
-        # both parts of PR #10 sit on the atlas step; each move belongs to one of them
+        # both parts of PR #10 sit on the atlas step; each move belongs to one of them. (build's
+        # map(d.component, ...) reached Diagrams.component before PR #10, so that one didn't move)
         self.assertEqual(self.fx["reach"]["cause"]["gained"], {
-            "flowmap/diagrams.py:Diagrams.component": ["flowmap/atlas.py:merges"],
             "flowmap/graphs/python.py:_find": ["flowmap/atlas.py:functions", "flowmap/graphs/python.py:doc"],
             "flowmap/graphs/python.py:signature": ["flowmap/atlas.py:functions"]})
 
@@ -64,6 +64,33 @@ class LintTest(unittest.TestCase):
 
     def test_no_story_no_lint(self):
         self.assertEqual(self.lint({}), [])
+
+
+class LinkSizeTest(unittest.TestCase):
+    """Issue #13: a plan doc and a call path per step pushed an ordinary PR's link past a PR body."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.fx = json.loads(flowmap("change", *PR10, "--facts"))
+
+    def test_only_files_the_story_claims_keep_their_diff_text(self):
+        fx = {**self.fx, "hunks": [{"file": "README.md", "symbols": [], "lines": ["+x"]},
+                                   {"file": "flowmap/atlas.template.html", "symbols": [], "lines": ["+y"]}]}
+        story = {"chapters": [{"title": "t", "symbols": [], "files": ["flowmap/atlas.template.html"]}]}
+        self.assertEqual([h["file"] for h in change.merge(fx, story)["facts"]["hunks"]], ["flowmap/atlas.template.html"])
+        self.assertEqual(change.merge(fx, {})["facts"]["hunks"], [])
+
+    def test_one_call_path_per_flow_and_one_on_the_page(self):
+        flow = {st["key"]: f["id"] for f in self.fx["map"] for st in f["steps"]}
+        for s in self.fx["symbols"]:
+            self.assertEqual(len(s["witness"]), len({flow[k] for k in s["witness"]}), s["id"])
+        self.assertTrue(all(len(s["witness"]) <= 1 for s in change.merge({**self.fx, "hunks": []}, {})["facts"]["symbols"]))
+
+    def test_an_oversized_link_drops_diff_text_and_says_so(self):
+        big = [{"file": "flowmap/atlas.py", "symbols": ["x"], "lines": [f"+{i} {hash(i * 7.1)}" for i in range(9000)]}]
+        url, dropped = change.fitted_link(change.merge({**self.fx, "hunks": big}, {}), "https://v")
+        self.assertLessEqual(len(url), change.BUDGET)
+        self.assertEqual(dropped, ["diff text of non-code files", "all diff text"])
 
 
 if __name__ == "__main__":

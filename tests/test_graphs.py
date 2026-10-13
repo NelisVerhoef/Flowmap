@@ -85,6 +85,28 @@ class PythonResolutionTest(unittest.TestCase):
         # helpers is imported by name, never passed around as a module: x.shout() is not its shout
         self.assertNotIn(["tool/each.py:unrelated", "tool/helpers.py:shout"], edges)
 
+    def test_a_method_named_like_a_builtin_is_not_every_str_call(self):
+        edges = self.edges({"tool/doc.py": '''
+            class Doc:
+                def replace(self, a, b):
+                    return a
+
+                def fix(self):
+                    return self.replace(1, 2)
+
+
+            def tidy(s):
+                return s.replace("a", "b")
+
+
+            def edit():
+                d = Doc()
+                return d.replace(1, 2)
+        '''})
+        self.assertNotIn(["tool/doc.py:tidy", "tool/doc.py:Doc.replace"], edges)  # str.replace
+        self.assertIn(["tool/doc.py:Doc.fix", "tool/doc.py:Doc.replace"], edges)
+        self.assertIn(["tool/doc.py:edit", "tool/doc.py:Doc.replace"], edges)
+
     def test_flowmap_sees_its_own_builders(self):
         edges = json.loads(flowmap("callgraph", "dump"))["edges"]
         self.assertIn(["flowmap/callgraph.py:Graph.__init__", "flowmap/graphs/python.py:build"], edges)
