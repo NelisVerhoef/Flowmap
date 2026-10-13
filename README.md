@@ -76,9 +76,9 @@ flowmap change <base> <head> --name pr-123      # the change as chapters on the 
 GitHub shows committed HTML as source, not as a page. Add `--link` to also print a link that
 renders the page in a browser without publishing it anywhere: the page's data rides in the link's
 `#` fragment, which browsers never send to a server, and a hosted viewer (`flowmap viewer <dir>`,
-one static file with no network access) renders it in the tab. Point `viewer` in `flowmap.toml`
-at your hosted copy; this repo's is `https://flowmap.testabl.ai/v1/change.html`, deployed from
-`fjall/flowmap/`. A PR body holds about 60 KB of link; past that, open the committed page in
+one static file with no network access) renders it in the tab. It defaults to
+`https://flowmap.testabl.ai/v1/change.html`, deployed from `fjall/flowmap/`; point `viewer` in
+`flowmap.toml` at your own copy to use that instead. A PR body holds about 60 KB of link; past that, open the committed page in
 the viewer by dropping the file on it.
 
 ## With Claude Code
