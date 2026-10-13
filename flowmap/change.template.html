@@ -495,7 +495,7 @@ if (off.length) {
 }
 if (quiet.length) $("#map").append(el("p", { class: "quiet-flows", text: `Untouched: ${quiet.join(", ")}` }));
 if (DATA.folded.length) $("#folded").textContent = `Not shown: ${plural(DATA.folded.length, "generated or test file")} (${DATA.folded.map(p => p.split("/").pop()).join(", ")})`;
-if ((DATA.trimmed || []).length) $("#folded").textContent += ` Left out of this link to fit a PR body: ${DATA.trimmed.join(" and ")}; see the PR diff.`;
+if ((DATA.trimmed || []).length) $("#folded").textContent = `${$("#folded").textContent} Left out of this link to fit a PR body: ${DATA.trimmed.join(" and ")}; see the PR diff.`.trim();
 
 // a part's code as a call tree: the shape that existed, with the calls this change added (+) or
 // removed (−); a changed function in the part opens its own calls, everything else is a leaf, and
