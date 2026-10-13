@@ -3,6 +3,10 @@
 - `f()` / `mod.f()` / `from x import f` -> exact edge.
 - `obj.method()` where obj's type is unknown -> an edge to EVERY app method of that
   name (over-approximates; capped by AMBIGUOUS so `.get()` doesn't connect everything).
+  Not for names builtin types have (`.replace`, `.clear`, `.search`): those calls are mostly
+  on a str, dict or regex, so only a receiver known to be the app's reaches such a method:
+  `self.`/`cls.`, or a local assigned from an app class (`uf = UnionFind(); uf.union()`, which
+  resolves to UnionFind.union exactly when that class defines it).
 - a function referenced without being called (`Depends(f)`, `run_in_background(f)`,
   callbacks) -> edge, since it will be called by someone on our behalf.
 - a script's `if __name__ == "__main__":` block -> node `file:__main__` (CLI entry points).
@@ -17,6 +21,7 @@ Missed on purpose: string/registry dispatch (system workflows by name, block reg
 
 import ast
 import copy
+import re
 from collections import defaultdict
 
 import config
@@ -26,6 +31,8 @@ from .part import Part
 
 EXT = (".py",)
 AMBIGUOUS = 6  # an obj.method() matching more app methods than this is too generic to follow
+BUILTIN = {n for t in (str, bytes, bytearray, dict, list, set, frozenset, tuple, re.Pattern, re.Match)
+           for n in dir(t) if not n.startswith("_")}  # obj.<these>() is a builtin's call until shown otherwise
 
 
 def build(files, read):
@@ -232,6 +239,7 @@ class _Builder:
         mod = config.module_name(rel)
         imports = self._imports(rel, tree)
         local = self.by_module[mod]
+        typed = {}  # def node id -> {local name: app class node id}, from `x = Class(...)`
 
         def resolve_name(name):
             if name in local:
@@ -255,8 +263,14 @@ class _Builder:
                         return {hit} if hit else set()
                     if node.value.id in local and f"{local[node.value.id]}.{node.attr}" in self.defs:
                         return {f"{local[node.value.id]}.{node.attr}"}  # Class.method
+                    cls = typed.get(owner, {}).get(node.value.id)
+                    if cls and f"{cls}.{node.attr}" in self.defs:
+                        return {f"{cls}.{node.attr}"}  # uf = UnionFind(); uf.union()
                 if not called:
                     return set()  # `x.score` read as a field is not a call to any .score()
+                app = isinstance(node.value, ast.Name) and (node.value.id in ("self", "cls") or node.value.id in typed.get(owner, {}))
+                if node.attr in BUILTIN and not app:
+                    return set()  # `s.replace()` is str's, not the app's new Doc.replace
                 cands = self.methods.get(node.attr, set()) | {
                     self.by_module[m][node.attr] for m in self.module_values if node.attr in self.by_module.get(m, {})}
                 return cands if len(cands) <= AMBIGUOUS or self._one_interface(cands) else set()
@@ -274,6 +288,9 @@ class _Builder:
                                 self.edges[nid] |= targets(sub.func)
                             elif isinstance(sub, (ast.Name, ast.Attribute)):
                                 self.edges[nid] |= targets(sub, called=False)
+                    typed[nid] = {a.targets[0].id: cls for a in ast.walk(child)
+                                  if isinstance(a, ast.Assign) and len(a.targets) == 1 and isinstance(a.targets[0], ast.Name)
+                                  and isinstance(a.value, ast.Call) for cls in targets(a.value.func, owner=nid) & self.bases.keys()}
                     walk(child, nid)
                     continue
                 if owner and isinstance(child, (ast.Call, ast.Name, ast.Attribute)):
