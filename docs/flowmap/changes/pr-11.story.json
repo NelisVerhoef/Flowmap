@@ -1,0 +1,104 @@
+{
+  "title": "The change page says what is no longer true, draws each part's calls, and states its facts right",
+  "pr": "PR #11",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/11",
+  "intent": "A reader should leave a change page with an updated picture of the system: what is new, what they believed that is now false, and what they can keep.",
+  "delta": "`flowmap change` pages now open with what is no longer true (the story's cited lines, plus lost reach, removed entry points, module links and map anchors the change removed) and what is still true, scoped to what the call graph sees. Each part draws its calls as a tree, with the calls this change added or removed marked, and says how its claim was verified. The facts stop stating three things wrongly, and a story that claims what the facts don't back gets no link. The code of lens, the atlas, the map and the call graph is unchanged (`flowmap change` now also calls `lens.show` and `Graph.callees`); only `flowmap change` output and the pr-lens skill move.",
+  "no_longer": [
+    {"was": "Tests outside the code dirs are files off the map, so a page can say \"no tests changed\" when they did", "cite": "flowmap/change.py:file_kind"},
+    {"was": "A reach move is matched to parts by entry point, so every part on a step lists every move on that step", "cite": "flowmap/change.template.html"},
+    {"was": "A function whose nested defs changed drops off the list of changed code", "cite": "flowmap/change.py:facts"}
+  ],
+  "chapters": [
+    {
+      "title": "The overview says what a reader believed that is no longer true, and what still is",
+      "role": "core", "kind": "new view",
+      "symbols": ["flowmap/change.py:facts"],
+      "files": ["flowmap/change.template.html"],
+      "before": "The overview gave the delta, number chips (one read \"existing code reached +3 −0\"), the author's intent below them, and the flows a part lands on. What became false was only in prose, if the story said it, and \"Untouched flows\" was the only thing said to be kept.",
+      "after": "The intent is the subtitle. Under the delta, \"No longer true\" strikes through the story's `no_longer` lines, each with its cite, and adds what the facts show on their own: lost reach, removed entry points and module links, and map anchors the change removed (`facts` now lists them as `anchors_lost`). \"Still true\" says which flows are untouched, how many of all entry points run no changed code, and whether any reach or call was lost, ending with what the call graph can't vouch for when the verdict is blind. The reach chips say \"existing functions newly reached\" and \"no longer reached\".",
+      "claim": "On PR #4 the page would have said the map's steps still run 4 functions that change removed; nothing caught that until now.",
+      "why": "Readers add new things to their picture easily and keep old beliefs the change made false; saying the old belief out loud is what makes them replace it. Rather than seeding every line from the graph, which found something on only 1 of the last 6 PRs (#4), the story writes most of them and must cite the diff.",
+      "verified": [
+        {"how": "test", "what": "tests/test_change.py:test_map_anchors_the_change_removed"},
+        {"how": "looked", "what": "PR #10 rendered with a `no_longer` line, and PR #8's old page data in the new template, in a browser"},
+        {"how": "not checked", "what": "dark mode"}
+      ],
+      "questions": [
+        {"q": "A `no_longer` cite passes when it names a changed file or symbol. Should it have to name a line inside a hunk, so a plausible line that is still true is harder to write?", "why": "Decides how much the lint, rather than the reader test, guards this block.", "kind": "ask"},
+        {"q": "\"Still true\" counts entry points that run no changed code from the verdict's `spreads_to`. On a blind verdict that is a floor. Is the scoping note under it enough?", "why": "A kept line that overstates is the same failure as a false \"no longer\" line.", "kind": "ask"},
+        {"q": "Run `flowmap change 0d82693^ 0d82693 --name pr4-check` and open it: No longer true should list the map's steps that still run `Graph._collect`, `_link`, `_imports` and `py_symbols`. Delete the page after.", "why": "The only past PR where the map went stale.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "Each part draws its calls as a tree: what existed, and what this change added or removed",
+      "role": "supporting", "kind": "new view",
+      "symbols": ["flowmap/change.py:facts.causes", "flowmap/change.py:facts.causes.below"],
+      "before": "Calls a part added or removed were flat \"+ call a → b\" rows in the folded Ripple section; one shortest call path per step sat in another fold. Reach moves were matched to parts by entry point, so on PR #10 three questions showed in both parts, ticked.",
+      "after": "Under before/after, \"Calls, before → after\" draws each root of the part from its entry point: + for calls added, − for calls removed, plain for calls that existed, unchanged ones as a count (each changed function's `kept_calls`), at most 18 lines. Changed functions in another part say \"→ part N\"; existing code that now runs somewhere new says so; non-code files the part claims end the tree as \"not in the call graph\". `facts.causes` names, for each reach move, the changed calls nearest the moved function on any path, and the page puts the move with the part that owns them. The Ripple fold becomes \"Callers and reach\" without the call rows.",
+      "claim": "PR #10 part 1 shows `build` now calling `merges` and `functions`, and `merges` calling `Diagrams.component`, which now runs under `flowmap atlas`.",
+      "why": "A reader keeps the shape they know and edits it, which costs less than rebuilding it from prose. Rather than an agent-drawn diagram per PR, the tree comes from the call graph, so it can't claim a call that isn't there.",
+      "verified": [
+        {"how": "test", "what": "tests/test_change.py:test_a_reach_move_names_the_call_that_caused_it"},
+        {"how": "looked", "what": "PR #10 part 1's tree matches the one built by hand from the call graph; PR #8's five parts render"},
+        {"how": "not checked", "what": "the tree's JavaScript has no automated test"}
+      ],
+      "questions": [
+        {"q": "The tree can't tell a name-matched edge (`reconcile.UnionFind.union` from `set().union`) from a real call. Should the graph mark name-resolved edges so the tree can say \"likely over-report\"?", "why": "It is where the tree is most likely to mislead.", "kind": "ask"},
+        {"q": "The first version took the last changed call on one shortest path, and a test failed under some hash seeds because two paths tie. `causes` now takes every nearest changed call. Is crediting both `functions` and `doc` for `_find` right?", "why": "Decides whether a move can show in two parts again.", "kind": "ask"},
+        {"q": "Open PR #10's page before and after this change: the tray should drop from 11 to 8 questions, with each reach question in one part.", "why": "The duplicate questions were the visible symptom.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "Facts the page stated wrongly are right",
+      "role": "supporting", "kind": "fix",
+      "symbols": ["flowmap/change.py:file_kind", "flowmap/change.py:opens_class"],
+      "before": "`file_kind` checked the code dirs before the test pattern, so `tests/` files were \"outside\" and PR #8 and #10 said \"no tests changed\". A def listed with its nested defs was dropped before callers were marked edited, so edited callers read \"not edited\", and a function whose own body changed vanished when a nested def changed too. The header's head sha was the pre-squash branch head, and `head` could be the literal `HEAD`.",
+      "after": "Tests are tests wherever they sit. Only a class is dropped for its methods (`opens_class` reads past decorators for `class `), and callers are marked edited against everything that changed. `base` and `head` are full shas; the header labels the short one \"branch head when rendered\". A page with no verdict says it came from an older flowmap.",
+      "claim": "On the golden test's range (6d9eaff..770f1a7), `change.py:facts` and `lens.py:main` are listed again and 13 callers now read edited.",
+      "why": "One wrong fact costs trust in every other line on the page.",
+      "verified": [
+        {"how": "test", "what": "tests/test_change.py:test_tests_outside_the_code_dirs_count_as_tests"},
+        {"how": "test", "what": "tests/test_golden.py:test_change_facts"}
+      ],
+      "questions": [
+        {"q": "Read the golden diff for `tests/golden/change-facts-6d9eaff-770f1a7.json`: besides new fields, only `edited` flags flip to true and `facts` and `lens.main` reappear.", "why": "A changed golden is a behaviour change; these are the intended ones.", "kind": "check"},
+        {"q": "`opens_class` looks for `class ` after decorators, for regex-outlined TS and Ruby too. Good enough, or should builders say which defs are classes?", "why": "A miss lists a class's in-between lines as a changed symbol again.", "kind": "ask"}
+      ]
+    },
+    {
+      "title": "A story can't claim what the facts don't back",
+      "role": "supporting", "kind": "guard",
+      "symbols": ["flowmap/change.py:lint_story", "flowmap/change.py:merge", "flowmap/change.py:main"],
+      "before": "A story naming symbols the diff doesn't change printed one warning to stderr; files, cites and test names went unchecked, and `--link` printed a link regardless.",
+      "after": "`lint_story` checks story symbols and files against the diff, that each `no_longer` line cites a changed file or a map step, that `verified` uses test, ran, looked or not checked, and that a test named there is in the file at head. The page lists what fails under the title; `--link` prints the problems and no link.",
+      "claim": "A story with an uncited line, a file the diff doesn't touch or a test that doesn't exist can't reach a PR body as a link.",
+      "why": "Agent-written PR descriptions that claim what the code doesn't do get merged far less often; this catches the checkable claims before a reader sees them.",
+      "verified": [
+        {"how": "test", "what": "tests/test_change.py:test_unbacked_claims_are_named"},
+        {"how": "test", "what": "tests/test_change.py:test_a_backed_story_passes"},
+        {"how": "ran", "what": "`flowmap change origin/main HEAD --name pr-11 --link` on this story: no problems, link printed"}
+      ],
+      "questions": [
+        {"q": "A `test` entry passes when its name appears anywhere in the file at head: a name check, not a test run. Enough?", "why": "Decides whether \"verified: test\" can be trusted without CI.", "kind": "check"},
+        {"q": "Lint never fires without a story, so auto-chaptered pages get no check at all. Fine, since they make no claims?", "why": "The lint guards prose, and those pages have none.", "kind": "ask"}
+      ]
+    },
+    {
+      "title": "pr-lens asks for what is no longer true, how each part was verified, the other way, and a reader test",
+      "role": "supporting", "kind": "prose that steers the agent",
+      "files": ["skills/pr-lens/SKILL.md"],
+      "before": "The story schema had no place for false beliefs or verification. \"Alternatives\" was a question for the author, even when the author's own agent wrote the story. The PR body had no door line, and nothing tested whether the story landed.",
+      "after": "The schema adds `no_longer` (at most three, each citing a changed file, symbol or map step, checked against the code at head) and `verified` per part. `why` says \"rather than X, because Y\" when there was another way, and the Alternatives question is only for someone else's PR. The PR body gains a one-way or two-way door line. Before the PR opens, a subagent with none of the author's context reads only the story and the facts and answers four questions; where it is wrong, the story is fixed.",
+      "claim": "The author's agent writes down what only it knows (the other way, how it checked) while it still knows it.",
+      "why": "The reason for a decision is the question reviewers most often can't answer from the diff. Rather than asking the author in review, the story says it.",
+      "verified": [
+        {"how": "ran", "what": "the reader test on this story, with a fresh subagent; its misses were fixed before the PR opened"}
+      ],
+      "questions": [
+        {"q": "Nothing records that the reader test ran. Should the story keep the subagent's answers, or is the step enough?", "why": "An unrecorded step is the first one dropped under time pressure.", "kind": "ask"},
+        {"q": "Is a door line worth its place in every PR body here, where almost every change rolls back cleanly?", "why": "A line that always says two-way stops being read.", "kind": "ask"}
+      ]
+    }
+  ]
+}
