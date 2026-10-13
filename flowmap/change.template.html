@@ -69,6 +69,12 @@ header h1 { font: 800 clamp(24px, 3.4vw, 34px)/1.08 var(--display); font-stretch
 .verdict b { font: 700 11px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 2px 7px; color: var(--surface); }
 .verdict.contained b { background: var(--gain); } .verdict.spreads b { background: var(--outside); } .verdict.blind b { background: var(--loss); }
 .verdict ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.lint { justify-self: start; max-width: 80ch; font-size: 13px; border: 1px solid var(--loss); border-radius: 8px; padding: 8px 12px; }
+.lint ul { margin: 4px 0 0; padding-left: 18px; }
+.was { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
+.was s { text-decoration-color: var(--loss); text-decoration-thickness: 1px; }
+.was small, .kept small { color: var(--muted); font-size: 12px; }
+.kept { margin: 0; font-size: 14px; max-width: 72ch; }
 .shape { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
 .shape li { background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; }
 .shape b { font-variant-numeric: tabular-nums; }
@@ -143,6 +149,12 @@ button.stop:hover { background: var(--surface); }
 .ba > div { background: var(--surface); padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
 .ba .after { background: var(--paper); }
 .ba p { margin: 0; font-size: 14px; }
+.tree { margin: 0; overflow-x: auto; background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; font: 12px/1.6 var(--mono); padding: 8px 0; }
+.tree span { display: block; padding: 0 12px; white-space: pre; min-width: max-content; }
+.tree .add { color: var(--gain); } .tree .rem { color: var(--loss); } .tree .from, .tree i { color: var(--muted); font-style: normal; }
+.verified { margin: 0; font-size: 13px; color: var(--muted); }
+.verified .how { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--gain); }
+.verified .how.no { color: var(--outside); }
 .why { margin: 0; max-width: 72ch; padding-left: 12px; border-left: 3px solid var(--role); }
 .note { font-size: 13px; color: var(--muted); margin: 0; }
 
@@ -163,11 +175,7 @@ button.stop:hover { background: var(--surface); }
 .more summary { cursor: pointer; padding: 10px 2px; font-size: 14px; font-weight: 500; display: flex; gap: 10px; align-items: baseline; }
 .more summary small { color: var(--muted); font-weight: 400; font-size: 12.5px; }
 .more details > div { padding: 2px 2px 14px; display: grid; gap: 10px; }
-.paths, .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 12.5px; }
-.path { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
-.path span { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
-.path span.end { border-color: var(--role); color: var(--role); }
-.path i { color: var(--muted); font-style: normal; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 12.5px; }
 .rows li { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
 .mark { font-family: var(--body); font-size: 11px; font-weight: 600; flex: none; width: 80px; }
 .mark.add { color: var(--gain); } .mark.rem { color: var(--loss); } .mark.no { color: var(--outside); } .mark.yes { color: var(--gain); }
@@ -308,7 +316,7 @@ const sym = (id) => id.split(":").pop();
 const file = (id) => id.split(":")[0].split("/").pop();
 const flowName = (id) => id.replace(/^new:/, "").replace(/-/g, " ");
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Outside the map",
+const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Off the map",
   unassigned: "Not in the story", "off-map": "Off the map" };
 
 const steps = new Map();
@@ -316,28 +324,37 @@ F.map.forEach((f, fi) => f.steps.forEach((s, si) => steps.set(s.key, { ...s, flo
 const symById = new Map(F.symbols.map(s => [s.id, s]));
 const byPlace = (a, b) => (steps.get(a).fi - steps.get(b).fi) || (steps.get(a).si - steps.get(b).si);
 
+// a reach move belongs to the part whose added (or dropped) call caused it; when no part owns the
+// cause (or the data predates causes), to every part on an entry point that moved
+const inIds = (ids, n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
+const owned = new Set(DATA.chapters.flatMap(c => c.symbols || []));
+function movesFor(c, keys, which) {
+  const ids = new Set(c.symbols || []), myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
+  return Object.entries(F.reach[which]).map(([s, eps]) => {
+    const by = ((F.reach.cause || {})[which] || {})[s];
+    if (by && by.some(x => inIds(owned, x))) return [s, by.some(x => inIds(ids, x)) ? eps : []];
+    return [s, eps.filter(e => myEps.has(e))];
+  }).filter(([, eps]) => eps.length);
+}
+
 // chapter facts
 const chapters = DATA.chapters.map((c, i) => {
   const syms = (c.symbols || []).map(id => symById.get(id)).filter(Boolean);
   const keys = [...new Set(syms.flatMap(s => s.steps))].sort(byPlace);
   const ids = new Set(c.symbols || []);
-  const mine = (n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
-  const edgesIn = (list) => list.filter(([a, b]) => mine(a) || mine(b));
   const callers = new Map();
   syms.filter(s => s.status === "modified").forEach(s => s.callers.forEach(c => { if (!ids.has(c.id)) callers.set(c.id, c.edited); }));
   const hunks = F.hunks.filter(h => h.symbols.some(x => ids.has(x)) || (c.files || []).includes(h.file));
   const role = c.role || (c.kind === "outside" ? "outside" : c.kind === "unassigned" ? "unassigned" : c.kind === "off-map" ? "off-map" : i === 0 ? "core" : "supporting");
-  return { ...c, n: i + 1, syms, keys, role, callers, qs: questions(c, i + 1, syms, keys),
-    added: edgesIn(F.edges.added), removed: edgesIn(F.edges.removed), hunks };
+  return { ...c, n: i + 1, syms, keys, role, callers, qs: questions(c, i + 1, syms, keys), hunks };
 });
 
 // the story's questions, then what the graph raises on its own
 function questions(c, n, syms, keys) {
   const qs = [];
-  const myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
-  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
-  moved(F.reach.lost).forEach(([s, eps], i) => qs.push({ id: `c${n}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
-  moved(F.reach.gained).forEach(([s, eps], i) => qs.push({ id: `c${n}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
+  const moved = (which) => movesFor(c, keys, which);
+  moved("lost").forEach(([s, eps], i) => qs.push({ id: `c${n}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
+  moved("gained").forEach(([s, eps], i) => qs.push({ id: `c${n}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
   (c.questions || []).forEach((q, i) => qs.push({ ...q, id: `c${n}q${i}` }));
   syms.filter(s => s.contract).forEach((s, i) => {
     const still = s.callers.filter(x => !x.edited).map(x => sym(x.id));
@@ -359,9 +376,13 @@ const where = (c) => c.keys.length
 // header: which change
 const range = el("div", { class: "range" });
 range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", S.pr ? " · " : "",
-  el("span", { class: "mono", text: `${F.base_sha} → ${F.head_sha}` }), ` · ${F.name}`);
-$("#top").append(range, el("h1", { text: S.title || `${F.base}..${F.head}` }));
-if (F.verdict) {
+  el("span", { class: "mono", title: `${F.base}..${F.head}`, text: `${F.base_sha} → ${F.head_sha}` }),
+  S.pr ? " (branch head when rendered)" : "", ` · ${F.name}`);
+$("#top").append(range, el("h1", { text: S.title || `${F.base_sha}..${F.head_sha}` }));
+if ((DATA.lint || []).length) $("#top").append(el("div", { class: "lint" }, el("b", { text: "The story says things the facts don't back" }),
+  el("ul", {}, ...DATA.lint.map(l => el("li", { text: l })))));
+if (!F.verdict) $("#top").append(el("p", { class: "note", text: "No verdict: an older flowmap rendered this page. Re-render it to see one." }));
+else {
   const V = F.verdict, flowsOf = new Set(F.map.filter(f => f.steps.some(s => s.endpoints.some(e => V.spreads_to.includes(e)))).map(f => flowName(f.id)));
   const spread = V.spreads_to.length ? `reaches ${plural(V.spreads_to.length, "existing entry point")}` + (flowsOf.size ? ` in ${[...flowsOf].join(", ")}` : "") : "";
   const line = { contained: "no existing entry point runs changed code; only new code changed",
@@ -379,8 +400,8 @@ const shape = [
   F.endpoints.added.length && [`+${F.endpoints.added.length}`, "entry points", F.endpoints.added.join(", ")],
   F.endpoints.removed.length && [`−${F.endpoints.removed.length}`, "entry points", F.endpoints.removed.join(", ")],
   nNew && [nNew, "new functions"], nMod && [nMod, "changed functions"],
-  (Object.keys(F.reach.gained).length || Object.keys(F.reach.lost).length) &&
-    [`+${Object.keys(F.reach.gained).length} −${Object.keys(F.reach.lost).length}`, "existing code reached"],
+  Object.keys(F.reach.gained).length && [Object.keys(F.reach.gained).length, "existing functions newly reached", Object.keys(F.reach.gained).map(sym).join(", ")],
+  Object.keys(F.reach.lost).length && [Object.keys(F.reach.lost).length, "existing functions no longer reached", Object.keys(F.reach.lost).map(sym).join(", ")],
   F.modules.added.length && [`+${F.modules.added.length}`, "module links", F.modules.added.map(([a, b]) => `${a.split("/").pop()} → ${b.split("/").pop()}`).join(", ")],
   [F.tests.changed.length || "no", F.tests.changed.length === 1 ? "test changed" : "tests changed", F.tests.changed.join(", ")],
 ].filter(Boolean);
@@ -388,10 +409,14 @@ function overview(pane) {
   pane.className = "pane";
   pane.append(el("div", {}, el("div", { class: "ch-tags" }, el("span", { class: "tag", text: "Overview" })),
     el("h2", { text: `What this change does, in ${plural(chapters.length, "part")}` })));
+  if (S.intent) pane.append(el("p", { class: "claim", html: md(S.intent) }));
   if (S.delta) pane.append(el("p", { class: "delta", html: md(S.delta) }));
+  const was = noLonger();
+  if (was.length) pane.append(el("section", { style: "display:grid;gap:8px" }, el("h3", { class: "label", text: "No longer true" }),
+    el("ul", { class: "was" }, ...was.map(([t, cite]) => el("li", { html: `<s>${t}</s>` + (cite ? ` <small>${cite}</small>` : "") })))));
+  pane.append(el("p", { class: "kept", html: "<b>Still true.</b> " + stillTrue() }));
   pane.append(el("ul", { class: "shape", "aria-label": "Shape of the change" },
     ...shape.map(([v, k, t]) => el("li", { title: t || null }, el("b", { text: String(v) }), " " + k))));
-  if (S.intent) pane.append(el("p", { class: "note", html: "<b>Author's intent:</b> " + md(S.intent) }));
   const ref = (c) => el("button", { type: "button", class: "ref " + c.role, title: c.title, onclick: () => show(c.n) }, String(c.n));
   const lanes = el("div", { class: "lanes" });
   for (const f of F.map) {
@@ -404,12 +429,36 @@ function overview(pane) {
     }))));
   }
   const off = chapters.filter(c => !c.keys.length);
-  if (off.length) lanes.append(el("section", { class: "lane" }, el("h3", { text: "No flow runs this" }),
+  if (off.length) lanes.append(el("section", { class: "lane" }, el("h3", { text: "Off the map" }),
     el("div", { class: "refs", style: "display:grid;gap:6px" }, ...off.map(c => el("span", { style: "display:flex;gap:8px;align-items:baseline;font-size:13px" }, ref(c), c.title)))));
   if (lanes.children.length) pane.append(el("section", { style: "display:grid;gap:10px" }, el("h3", { class: "label", text: "Where it lands" }),
-    el("p", { class: "note", text: "Each line is a user flow, its stops in order. A filled stop runs changed code; the numbers under it are the parts that change it." }), lanes,
-    quiet.length ? el("p", { class: "quiet-flows", text: `Untouched flows: ${quiet.join(", ")}` }) : null));
+    el("p", { class: "note", text: "Each line is a user flow, its stops in order. A filled stop runs changed code; the numbers under it are the parts that change it." }), lanes));
   if (!S.delta) pane.append(el("p", { class: "note", text: "No story for this change: each part below is grouped by the flow steps that run its code." }));
+}
+
+// what a reader of the old map believed that this change makes false: the story's lines (each
+// cites the diff), then what the facts show on their own
+function noLonger() {
+  const name = (k) => steps.has(k) ? steps.get(k).name : k;
+  return [
+    ...(S.no_longer || []).map(w => [md(w.was), md("`" + (w.cite || "") + "`") +
+      (w.step ? ` · the map's step “${esc(name(w.step))}” still says this: re-run the map loop` : "")]),
+    ...F.endpoints.removed.map(e => [md("`" + e + "` is an entry point"), "removed"]),
+    ...Object.entries(F.reach.lost).map(([s, eps]) => [md(`${eps.map(e => "`" + e + "`").join(", ")} can run \`${sym(s)}\``), esc(file(s))]),
+    ...F.modules.removed.map(([a, b]) => [md(`\`${a.split("/").pop()}\` calls into \`${b.split("/").pop()}\``), "no call left"]),
+    ...(F.anchors_lost || []).map(a => [md(`The map's step “${name(a.step)}” runs \`${sym(a.anchor)}\``), "gone from the code: re-run the map loop"]),
+  ];
+}
+// what the reader can keep, scoped to what the call graph can vouch for
+function stillTrue() {
+  const V = F.verdict, parts = [];
+  if (quiet.length) parts.push(`${quiet.join(", ")} ${quiet.length === 1 ? "is" : "are"} untouched`);
+  if (V && F.endpoints.total) parts.push(`${F.endpoints.total - V.spreads_to.length} of ${F.endpoints.total} entry points run no changed code`);
+  if (!Object.keys(F.reach.lost).length && !F.endpoints.removed.length) parts.push("no entry point lost reach to existing code");
+  if (!F.edges.removed.length) parts.push("no existing call was removed");
+  const scope = V && V.blind.length ? ` <small>(in code the call graph sees; it can't vouch for: ${V.blind.map(md).join("; ")})</small>`
+    : ` <small>(in code the call graph sees)</small>`;
+  return (parts.length ? parts.join("; ") : "nothing the graph can vouch for") + "." + scope;
 }
 
 // rail: the parts
@@ -442,18 +491,61 @@ if (off.length) {
   const ol = el("ol", { class: "stops" });
   off.forEach(c => ol.append(el("li", {}, el("button", { type: "button", class: "stop touched " + c.role, "data-off": c.n, title: c.title, onclick: () => show(c.n) },
     el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "nm", text: `${c.n} · ${c.title}` })))));
-  $("#map").append(el("section", { class: "flow" }, el("h3", { text: "No flow runs this" }), ol));
+  $("#map").append(el("section", { class: "flow" }, el("h3", { text: "Off the map" }), ol));
 }
 if (quiet.length) $("#map").append(el("p", { class: "quiet-flows", text: `Untouched: ${quiet.join(", ")}` }));
 if (DATA.folded.length) $("#folded").textContent = `Not shown: ${plural(DATA.folded.length, "generated or test file")} (${DATA.folded.map(p => p.split("/").pop()).join(", ")})`;
 
-function pathEl(p) {
-  const box = el("div", { class: "path" });
-  p.forEach((n, i) => {
-    if (i) box.append(el("i", { text: "›" }));
-    box.append(el("span", { class: i === p.length - 1 ? "end" : "", title: n, text: i === 0 ? file(n) : sym(n) }));
-  });
-  return box;
+// a part's code as a call tree: the shape that existed, with the calls this change added (+) or
+// removed (−); a changed function in the part opens its own calls, everything else is a leaf, and
+// calls nothing changed collapse to a count
+const label = (n) => `${n.split(":")[0].replace(/(\/__init__)?\.\w+$/, "").split("/").pop()}.${sym(n)}`;  // graphs/__init__.py -> graphs
+function callTree(c) {
+  const ids = new Set(c.symbols || []);
+  const node = (id) => id.replace(/\.__init__$/, "");
+  const symOf = (n) => symById.get(n) || symById.get(n + ".__init__");
+  const edge = (list, a, b) => list.some(([x, y]) => x === a && y === b);
+  const kids = (n) => {
+    const out = [...F.edges.added.filter(([a]) => a === n).map(([, b]) => ["+", b]),
+      ...F.edges.removed.filter(([a]) => a === n).map(([, b]) => ["−", b]),
+      ...F.symbols.filter(t => node(t.id) !== n && t.callers.some(x => x.id === n) && !edge(F.edges.added, n, node(t.id)) &&
+        !edge(F.edges.removed, n, node(t.id))).map(t => ["", node(t.id)])];
+    const rest = (symOf(n) || {}).kept_calls - out.filter(([m]) => !m).length;
+    return [out, rest > 0 ? rest : 0];
+  };
+  const note = (n) => {
+    const s = symOf(n);
+    if (s) {
+      const o = chapters.find(x => x !== c && (x.symbols || []).includes(s.id));
+      return { new: "new", modified: "changed", deleted: "deleted" }[s.status] + (o ? ` → part ${o.n}` : "");
+    }
+    if (F.reach.gained[n]) return "existing, now runs from " + F.reach.gained[n].join(", ");
+    if (F.reach.lost[n]) return "existing, no longer runs from " + F.reach.lost[n].join(", ");
+    return "";
+  };
+  const lines = [], seen = new Set();
+  const walk = (n, mark, prefix, last, root) => {
+    lines.push([(root ? "" : prefix + (last ? "└─ " : "├─ ")) + (mark || " ") + " " + label(n), mark, note(n), n]);
+    if (seen.has(n) || !(root || inIds(ids, n))) return;
+    seen.add(n);
+    const [out, rest] = kids(n), sub = root ? "" : prefix + (last ? "   " : "│  ");
+    out.forEach(([m, b], i) => walk(b, m, sub, i === out.length - 1 && !rest, false));
+    if (rest) lines.push([sub + "└─   " + plural(rest, "call") + " unchanged", "", "", null]);
+  };
+  const roots = c.syms.filter(s => !s.callers.some(x => inIds(ids, x.id)));
+  for (const s of roots.length ? roots : c.syms.slice(0, 1)) {
+    if (seen.has(node(s.id))) continue;
+    const [k, path] = Object.entries(s.witness)[0] || [];
+    const hops = path ? path.slice(0, -1).map(label) : [];
+    if (k) lines.push([[steps.get(k).endpoints[0], ...(hops.length > 3 ? [hops[0], "…", ...hops.slice(-2)] : hops)].join(" › "), "from", "", null]);
+    walk(node(s.id), "", "", true, true);
+  }
+  if (!lines.length) return null;
+  const MAX = 18, shown = lines.length > MAX ? [...lines.slice(0, MAX - 1), [`… ${lines.length - MAX + 1} more lines`, "from", "", null]] : lines;
+  const blind = (c.files || []).filter(f => !["code", "test", "generated"].includes((F.files.find(x => x.path === f) || {}).kind));
+  if (blind.length) shown.push([`?  ${blind.join(", ")}: not in the call graph, read its code below`, "from", "", null]);
+  return el("pre", { class: "tree" }, ...shown.map(([t, m, n, id]) => el("span", { class: { "+": "add", "−": "rem", from: "from" }[m] || "", title: id },
+    t, n ? el("i", { text: "   " + n }) : null)));
 }
 const fold = (title, sub, ...body) => el("details", {}, el("summary", {}, title, sub ? el("small", { text: sub }) : null), el("div", {}, ...body));
 
@@ -500,6 +592,11 @@ function part(pane, c) {
   if (c.before || c.after) pane.append(el("div", { class: "ba" },
     el("div", {}, el("p", { class: "label", text: "Before" }), el("p", { html: md(c.before || "—") })),
     el("div", { class: "after" }, el("p", { class: "label", text: "After" }), el("p", { html: md(c.after || "—") }))));
+  if ((c.verified || []).length) pane.append(el("p", { class: "verified", html: "<b>Verified:</b> " +
+    c.verified.map(v => `<span class="how${v.how === "not checked" ? " no" : ""}">${esc(v.how)}</span> ${md(v.what)}`).join(" · ") }));
+  const tree = callTree(c);
+  if (tree) pane.append(el("section", { style: "display:grid;gap:8px" }, el("h3", { class: "label", text: "Calls, before → after" }), tree,
+    el("p", { class: "note", text: "+ added, − removed by this change; the rest existed before. Built from the call graph, so dispatch it can't follow (dicts, templates) is missing." })));
   if (c.why) pane.append(el("p", { class: "why", html: "<b>Why it matters.</b> " + md(c.why) }));
   if (!c.before && !c.after && !c.why) pane.append(el("p", { class: "note", text: "No story for this part: the facts below are all flowmap knows. Add it to the story file to say what changes and why." }));
 
@@ -518,27 +615,15 @@ function part(pane, c) {
 
   // evidence, on demand
   const more = el("div", { class: "more" });
-  const witnesses = new Map();
-  c.syms.forEach(s => Object.entries(s.witness).forEach(([k, p]) => { if (!witnesses.has(k) || witnesses.get(k).length > p.length) witnesses.set(k, p); }));
-  if (witnesses.size) {
-    const unproved = c.keys.filter(k => !witnesses.has(k));
-    more.append(fold("How the flows reach this code", `${plural(witnesses.size, "call path")} from an entry point`,
-      el("ul", { class: "paths" }, ...[...witnesses].map(([k, p]) => el("li", {}, el("p", { class: "note", text: `${steps.get(k).name} · ${steps.get(k).endpoints.join(", ")}` }), pathEl(p)))),
-      unproved.length ? el("p", { class: "note", text: `Also on the map's own anchors for: ${unproved.map(k => steps.get(k).name).join("; ")} (no call path found).` }) : null));
-  }
-  const myEps = new Set(c.keys.flatMap(k => steps.get(k).endpoints));
-  const moved = (table) => Object.entries(table).map(([s, eps]) => [s, eps.filter(e => myEps.has(e))]).filter(([, eps]) => eps.length);
-  const ripple = [
-    ...moved(F.reach.lost).map(([s, eps]) => ["rem", "no longer", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
-    ...moved(F.reach.gained).map(([s, eps]) => ["add", "now reaches", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
+  const rows = [
+    ...movesFor(c, c.keys, "lost").map(([s, eps]) => ["rem", "no longer", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
+    ...movesFor(c, c.keys, "gained").map(([s, eps]) => ["add", "now reaches", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
     ...[...c.callers].sort((a, b) => a[1] - b[1]).map(([id, edited]) => [edited ? "yes" : "no", edited ? "caller, edited" : "caller, not edited", `${file(id)} · ${sym(id)}`]),
-    ...c.added.map(([a, b]) => ["add", "+ call", `${sym(a)} → ${sym(b)}`]),
-    ...c.removed.map(([a, b]) => ["rem", "− call", `${sym(a)} → ${sym(b)}`]),
   ];
-  if (ripple.length) {
+  if (rows.length) {
     const notEdited = [...c.callers.values()].filter(e => !e).length;
-    more.append(fold("Ripple", [notEdited && `${notEdited} caller${notEdited === 1 ? "" : "s"} not edited`, (c.added.length || c.removed.length) && `+${c.added.length} −${c.removed.length} calls`].filter(Boolean).join(" · "),
-      el("ul", { class: "rows" }, ...ripple.map(([k, m, t]) => el("li", {}, el("span", { class: "mark " + k, text: m }), el("span", { text: t }))))));
+    more.append(fold("Callers and reach", notEdited ? `${notEdited} caller${notEdited === 1 ? "" : "s"} not edited` : "",
+      el("ul", { class: "rows" }, ...rows.map(([k, m, t]) => el("li", {}, el("span", { class: "mark " + k, text: m }), el("span", { text: t }))))));
   }
   if (c.hunks.length) {
     const box = el("div", { style: "display:grid;gap:10px" });
