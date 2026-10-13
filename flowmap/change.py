@@ -8,7 +8,7 @@ flow steps that run the changed code and say only what the graph can.
     python tools/flowmap/change.py <base> [<head>] [--name pr-12] [--story path.json] [--facts] [--link]
 
 Writes <out>/changes/<name>.html. --facts prints the facts as JSON instead (input for a story).
---link also prints a link to the hosted viewer (`viewer` in flowmap.toml, or FLOWMAP_VIEWER) that
+--link also prints a link to the hosted viewer (`viewer` in flowmap.toml, FLOWMAP_VIEWER, else VIEWER) that
 carries the whole page in its fragment, so it renders in any browser without publishing the data.
 Story format: see STORY in the /pr-lens skill.
 """
@@ -298,6 +298,9 @@ def lint_story(fx, story, chapters, known, claimed_syms, claimed_files):
     return out
 
 
+VIEWER = "https://flowmap.testabl.ai/v1/change.html"  # public; the data stays in the fragment
+
+
 def viewer_html():
     """The page with no data in it: it reads a link's fragment or a dropped file. No fonts or other
     requests, and a CSP that forbids any, so a reader can see their data stays in the tab."""
@@ -344,10 +347,7 @@ def main():
           f"{', story ' + str(story_path.relative_to(ROOT) if story_path.is_relative_to(ROOT) else story_path) if story else ', no story'})",
           file=sys.stderr if a.link else sys.stdout)  # with --link, stdout is just the link
     if a.link:
-        viewer = os.environ.get("FLOWMAP_VIEWER") or config.load().get("viewer")
-        if not viewer:
-            sys.exit("no viewer: set viewer = \"https://.../change.html\" in flowmap.toml or FLOWMAP_VIEWER "
-                     "(build it with `flowmap viewer <dir>`)")
+        viewer = os.environ.get("FLOWMAP_VIEWER") or config.load().get("viewer") or VIEWER
         if data["lint"]:
             sys.exit("no link: fix the story problems above first")
         url = link(data, viewer)
