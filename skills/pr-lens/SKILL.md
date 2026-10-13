@@ -47,6 +47,7 @@ A PR number, a branch, or a commit range. Resolve to `<base> <head>`:
 ## <one line: what this change does, in user terms>
 
 **Verdict:** <contained | spreads to N entry points in <flows> | blind: what lens can't see>
+**Door:** <two-way: rolls back cleanly | one-way: what can't be walked back, e.g. stored data, a format others read, a removed entry point>
 **Lands on:** <flow> → <step>, <step> · <flow> → <step>
 **New on the map:** <endpoints added / off-map code that is really a new step — name the step you'd add>
 
@@ -69,7 +70,8 @@ Draw questions from these patterns, picking only the ones the change actually ra
 - **Failure** — if this new step/dependency fails (LLM down, background task dies), what does the user experience?
 - **Blast radius** — N other steps share `<anchor>`; did any rely on the old behaviour?
 - **Altitude** — why is this handled at this layer rather than where the data enters?
-- **Alternatives** — what was the simpler version, and why didn't it work?
+- **Alternatives** — what was the simpler version, and why didn't it work? (Only for someone
+  else's PR: when you wrote the change, you know, so the story's `why` says it instead.)
 - **Reversibility** — if we roll this back, is the stored data still coherent?
 - **Map gap** — this code isn't on the map; which flow does it belong to?
 
@@ -92,12 +94,18 @@ Also write the change as a page people can read without the diff:
     "pr": "PR #12", "url": "<pr url>",
     "intent": "the author's stated intent, one sentence",
     "delta": "how the system moves, in 2-3 sentences of flow terms; say what did NOT change too",
+    "no_longer": [{"was": "a belief a reader of the old system holds that this change makes false",
+                   "cite": "the changed file, file:line or symbol that shows it",
+                   "step": "optional: the map step key whose text still says it"}],
     "chapters": [{
       "title": "one behaviour change, stated as what the system now does",
       "role": "core | supporting | refactor | outside", "kind": "free text, e.g. new capability",
       "symbols": ["path.py:Qual.name", "..."], "files": ["non-code files, e.g. a skill"],
       "before": "system behaviour before", "after": "system behaviour after",
-      "claim": "one line", "why": "who/what runs through this and what it costs or risks them",
+      "claim": "one line",
+      "why": "who/what runs through this and what it costs or risks them; when there was another way, 'rather than X, because Y'",
+      "verified": [{"how": "test | ran | looked | not checked",
+                    "what": "test: tests/test_x.py:Name, which must exist at head; ran: the command and its result; looked: what you saw"}],
       "questions": [{"q": "concrete, cites a function or flow", "why": "what the answer decides",
                      "kind": "ask | check"}]}]}
    ```
@@ -107,10 +115,29 @@ Also write the change as a page people can read without the diff:
    refactor gets its own `refactor` chapter so it can be read quickly. Prose that steers an
    agent (skills, prompts) is behaviour: give it a chapter. Two to five questions per chapter.
    "Ask" means only the author can answer; "check" means the reviewer can settle it themselves.
+
+   `no_longer` is the part a reader most needs and most often misses: what they believed that is
+   now false (a removed check, a view that is gone, a rule that moved). At most three, each citing
+   the diff. A line that sounds right but is still true is worse than none: check each against the
+   code at head. When the map's own step text says the old thing, name the step. The page adds what
+   the facts show on their own (lost reach, removed entry points and module links, map anchors the
+   change removed) and a "still true" line, so don't repeat those.
+
+   `verified` says how each part's `after` was checked, so the reader can tell what is proven
+   from what is claimed. "not checked" is a fine answer; leaving it out is not.
 3. `flowmap change <base> <head> --name <name> --link` writes
    `docs/flowmap/changes/<name>.html` and prints a viewer link carrying the whole page, for the
    PR body. Symbols the story leaves out land in a "not in the story" chapter, so nothing
-   changed is hidden. Without `viewer` in `flowmap.toml`, drop `--link` and link the committed page.
+   changed is hidden. It checks the story against the facts (symbols and files the diff changes,
+   cites in the diff, test names that exist at head) and prints no link until the story passes;
+   the page shows anything that failed. Without `viewer` in `flowmap.toml`, drop `--link` and link
+   the committed page.
+4. Reader test, before the PR opens: give a subagent with none of your context only the story file
+   and the `--facts` output, and ask it: which flows changed; what is no longer true; what stayed
+   the same; what breaks for the user if the core part fails. Compare its answers with the facts
+   and your own understanding. Where it is wrong or has to guess, fix the story, not the reader,
+   and render again. It is the same model as you, so it catches what the story leaves out, not
+   what it gets subtly wrong.
 
 ## After
 

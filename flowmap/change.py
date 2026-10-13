@@ -36,8 +36,10 @@ DOC = re.compile(r"\.(md|rst|txt)$|^docs/|(^|/)LICENSE")
 
 
 def file_kind(rel):
+    if lens.TEST.search(rel):  # before code: tests usually sit outside the code dirs
+        return "test"
     if lens.CODE.match(rel):
-        return "test" if lens.TEST.search(rel) else "code"
+        return "code"
     if rel.startswith(config.load().get("out", "docs/flowmap").rstrip("/") + "/"):
         return "generated"
     return "doc" if DOC.search(rel) else "outside"
@@ -65,6 +67,14 @@ def signature(rel, text, sym):
     return builder.signature(text, sym) if builder else None
 
 
+def opens_class(text, start):
+    """Does the def that starts at this line (decorators first) open a class?"""
+    for line in (text or "").splitlines()[start - 1:]:
+        if not line.lstrip().startswith("@"):
+            return line.lstrip().startswith("class ")
+    return False
+
+
 def facts(base, head):
     the_map = json.loads(lens.MAP.read_text())
     keys = step_keys(the_map)
@@ -77,7 +87,7 @@ def facts(base, head):
     eps_base, eps_head = lens.endpoint_set(base), lens.endpoint_set(head)
 
     # changed symbols, with status
-    symbols = {}
+    symbols, classes = {}, set()
     for f in files:
         if f["kind"] != "code":
             continue
@@ -86,6 +96,7 @@ def facts(base, head):
         base_text, head_text = lens.show(base, rel), lens.show(head, rel)
         base_syms = {s for *_, s in lens.defs(rel, base_text)}
         head_syms = {s for *_, s in lens.defs(rel, head_text)}
+        classes |= {f"{rel}:{s}" for text in (base_text, head_text) for a, _, s in lens.defs(rel, text) if opens_class(text, a)}
         for s in lens.symbols_at(rel, head_text, new) | lens.symbols_at(rel, base_text, old):
             if s == "<module>":
                 continue
@@ -95,8 +106,10 @@ def facts(base, head):
                                      "contract": status == "modified" and sig_b != sig_h,
                                      "signature": [sig_b, sig_h] if sig_b != sig_h else None}
 
-    # a class reported alongside its own methods is just the lines between them
-    for sid in [k for k in symbols if any(o.startswith(k + ".") for o in symbols)]:
+    # a class reported alongside its own methods is just the lines between them (a function's
+    # own lines are its body, so it stays); it still counts as an edited caller
+    changed = set(symbols)
+    for sid in [k for k in symbols if k in classes and any(o.startswith(k + ".") for o in symbols)]:
         del symbols[sid]
 
     # where each step's code lives: what its handlers can reach at head
@@ -132,10 +145,30 @@ def facts(base, head):
                         s["witness"][st["key"]] = path
                         break
         graph = g_base if s["status"] == "deleted" else g_head
-        s["callers"] = [{"id": c, "edited": c in symbols} for c in sorted(graph.reverse.get(node, ()))
+        s["callers"] = [{"id": c, "edited": c in changed} for c in sorted(graph.reverse.get(node, ()))
                         if c != node and not c.startswith(node + ".")]
+        # calls that exist on both sides; the added and removed ones are in edges
+        s["kept_calls"] = len(g_base.edges.get(node, set()) & g_head.edges.get(node, set()))
 
     added_edges, removed_edges, moved = lens.reach_diff(g_base, g_head, eps_base, eps_head)
+
+    def causes(graph, eps, sid, edges):
+        """The callers whose added (or dropped) call moved sid's reach: of the changed calls on a
+        path from a moved endpoint to sid, the ones nearest sid. So a move sits with the part that
+        made it, not with every part on the step."""
+        def below(n):
+            return graph.callees(n) | {n}
+        handlers = set(eps.values())
+        on_path = [(a, b) for a, b in edges if sid in below(b) and any(a in below(h) for h in handlers)]
+        return sorted({a for a, b in on_path if not any(a2 in below(b) for a2, b2 in on_path if (a2, b2) != (a, b))})
+    cause = {"gained": {k: causes(g_head, {e: eps_head[e] for e in v[0]}, k, added_edges) for k, v in moved.items() if v[0]},
+             "lost": {k: causes(g_base, {e: eps_base[e] for e in v[1]}, k, removed_edges) for k, v in moved.items() if v[1]}}
+
+    # map anchors this change removed: the map still points at code that is gone
+    anchors_lost = [{"step": keys[(f["id"], i)], "anchor": a}
+                    for f in the_map["flows"] for i, st in enumerate(f["steps"])
+                    for a in st["code_path"] + st["ui"]
+                    if a in g_base.defs and a not in g_head.defs]
 
     def module(nid):
         return nid.rsplit(":", 1)[0]
@@ -167,7 +200,7 @@ def facts(base, head):
     tests_cfg = config.load().get("code", {}).get("tests", [])
     lf, _ = lens.analyse(base, head)
     return {
-        "base": base, "head": head,
+        "base": lens.git("rev-parse", base).strip(), "head": lens.git("rev-parse", head).strip(),
         "base_sha": lens.git("rev-parse", "--short", base).strip(),
         "head_sha": lens.git("rev-parse", "--short", head).strip(),
         "name": config.load().get("name") or ROOT.name,
@@ -176,9 +209,12 @@ def facts(base, head):
                                            for i, s in enumerate(f["steps"])]} for f in the_map["flows"]],
         "files": files,
         "symbols": list(symbols.values()),
-        "endpoints": {"added": sorted(set(eps_head) - set(eps_base)), "removed": sorted(set(eps_base) - set(eps_head))},
+        "endpoints": {"added": sorted(set(eps_head) - set(eps_base)), "removed": sorted(set(eps_base) - set(eps_head)),
+                      "total": len(eps_head)},
         "reach": {"gained": {k: sorted(v[0]) for k, v in moved.items() if v[0]},
-                  "lost": {k: sorted(v[1]) for k, v in moved.items() if v[1]}},
+                  "lost": {k: sorted(v[1]) for k, v in moved.items() if v[1]},
+                  "cause": cause},
+        "anchors_lost": anchors_lost,
         "edges": {"added": sorted(map(list, added_edges)), "removed": sorted(map(list, removed_edges))},
         "modules": {"added": sorted(map(list, mod_head - mod_base)), "removed": sorted(map(list, mod_base - mod_head))},
         "verdict": {"verdict": lf["verdict"], "blind": lf["blind"], "spreads_to": lf["spreads_to"]},
@@ -218,9 +254,7 @@ def merge(fx, story):
     loose = [f["path"] for f in fx["files"] if f["kind"] in ("outside", "doc") and f["path"] not in claimed_files]
     if loose and story.get("chapters"):
         chapters.append({"title": "Changed outside the map", "kind": "outside", "files": loose})
-    unknown = sorted(claimed_syms - known)
-    if unknown:
-        print("story names symbols this diff does not change: " + ", ".join(unknown), file=sys.stderr)
+    lint = lint_story(fx, story, chapters, known, claimed_syms, claimed_files)
     folded = [f for f in fx["files"] if f["kind"] in ("generated", "test") or
               (f["kind"] in ("doc", "outside") and f["path"] not in claimed_files and not story.get("chapters"))]
     # the page shows a hunk only under a chapter that owns its symbols or its file; drop the rest
@@ -228,7 +262,40 @@ def merge(fx, story):
     shown = {f for c in chapters for f in c.get("files", [])}
     fx = {**fx, "hunks": [h for h in fx["hunks"] if h["symbols"] or h["file"] in shown]}
     return {"facts": fx, "story": {k: v for k, v in story.items() if k != "chapters"},
-            "chapters": chapters, "folded": [f["path"] for f in folded if f["path"] not in loose]}
+            "chapters": chapters, "folded": [f["path"] for f in folded if f["path"] not in loose], "lint": lint}
+
+
+VERIFIED = ("test", "ran", "looked", "not checked")
+
+
+def lint_story(fx, story, chapters, known, claimed_syms, claimed_files):
+    """What the story says that the facts don't back: the page shows these, and --link refuses."""
+    out = []
+    if not story.get("chapters"):
+        return out
+    paths = {f["path"] for f in fx["files"]}
+    steps = {st["key"] for f in fx["map"] for st in f["steps"]}
+    if claimed_syms - known:
+        out.append("story names symbols this diff does not change: " + ", ".join(sorted(claimed_syms - known)))
+    if claimed_files - paths:
+        out.append("story names files this diff does not change: " + ", ".join(sorted(claimed_files - paths)))
+    for item in story.get("no_longer", []):
+        cite = item.get("cite", "")
+        if not cite or (cite.split(":")[0] not in paths and cite not in steps):
+            out.append(f"no longer true \"{item.get('was', '')[:60]}\" needs a cite: a changed file, file:line or symbol")
+        if item.get("step") and item["step"] not in steps:
+            out.append(f"no longer true names step {item['step']}, which is not on the map")
+    for c in chapters:
+        for v in c.get("verified", []):
+            how, what = v.get("how"), v.get("what", "")
+            if how not in VERIFIED:
+                out.append(f"part \"{c['title'][:40]}\": verified how must be one of {', '.join(VERIFIED)}, not {how!r}")
+            elif how == "test":
+                rel, _, name = what.partition(":")
+                text = lens.show(fx["head"], rel)
+                if text is None or (name and name.split(".")[-1] not in text):
+                    out.append(f"part \"{c['title'][:40]}\": verified by test {what}, which is not in the code at head")
+    return out
 
 
 def viewer_html():
@@ -271,6 +338,8 @@ def main():
             .replace("/*__CHANGE_DATA__*/null", json.dumps(data, separators=(",", ":")).replace("</", "<\\/")))
     out = out_dir / f"{name}.html"
     out.write_text(html)
+    for problem in data["lint"]:
+        print("story: " + problem, file=sys.stderr)
     print(f"wrote {out.relative_to(ROOT)} ({len(data['chapters'])} chapters"
           f"{', story ' + str(story_path.relative_to(ROOT) if story_path.is_relative_to(ROOT) else story_path) if story else ', no story'})",
           file=sys.stderr if a.link else sys.stdout)  # with --link, stdout is just the link
@@ -279,6 +348,8 @@ def main():
         if not viewer:
             sys.exit("no viewer: set viewer = \"https://.../change.html\" in flowmap.toml or FLOWMAP_VIEWER "
                      "(build it with `flowmap viewer <dir>`)")
+        if data["lint"]:
+            sys.exit("no link: fix the story problems above first")
         url = link(data, viewer)
         if len(url) > 60000:  # a PR body holds 65536 characters
             print(f"warning: link is {len(url)} characters, too long for a PR body; "
