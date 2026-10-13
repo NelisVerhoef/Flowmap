@@ -1,0 +1,48 @@
+{
+  "title": "flowmap change --link prints a working link in any repo, opening the hosted viewer by default",
+  "pr": "PR #12",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/12",
+  "intent": "An agent following pr-lens in a repo other than flowmap should still get a link that renders the change page, instead of being told to link committed HTML that GitHub shows as source.",
+  "delta": "`flowmap change --link` used to stop with \"no viewer\" unless `viewer` was in flowmap.toml or FLOWMAP_VIEWER was set, and only this repo's flowmap.toml has it. It now falls back to `https://flowmap.testabl.ai/v1/change.html`; the toml key and the env var still win. The pr-lens skill names that URL and no longer says to drop `--link`. The page, the link format, the story lint that withholds a link, and every other command are unchanged.",
+  "no_longer": [
+    {"was": "`flowmap change --link` exits with \"no viewer\" in a repo whose flowmap.toml has no `viewer`", "cite": "flowmap/change.py:main"},
+    {"was": "pr-lens tells the agent to drop `--link` and link the committed page when no viewer is configured", "cite": "skills/pr-lens/SKILL.md"}
+  ],
+  "chapters": [
+    {
+      "title": "--link falls back to the hosted viewer instead of exiting",
+      "role": "core", "kind": "default",
+      "symbols": ["flowmap/change.py:main"],
+      "files": ["flowmap/config.py", "README.md"],
+      "before": "`main` read FLOWMAP_VIEWER, then `viewer` from flowmap.toml, and exited with \"no viewer: set viewer = ...\" when both were empty, before printing any link.",
+      "after": "`main` reads FLOWMAP_VIEWER, then `viewer` from flowmap.toml, then the module constant VIEWER (`https://flowmap.testabl.ai/v1/change.html`), so a link is always printed once the story passes. The README and config.py comment say what the default is.",
+      "claim": "Any repo gets a viewer link without configuring anything.",
+      "why": "Every reviewer of a PR made in another repo hit this: the agent had no link to put in the PR body, and the committed HTML only shows as source on GitHub. Defaulting is safe because the page data rides in the URL fragment, which browsers never send to the server; rather than make each repo add the key, because nobody knew they had to.",
+      "verified": [
+        {"how": "ran", "what": "In a clone with the `viewer` line deleted from flowmap.toml, `bin/flowmap change HEAD~1 HEAD --name probe --link` printed `https://flowmap.testabl.ai/v1/change.html#v1.…`"},
+        {"how": "ran", "what": "`python3 -m unittest discover tests`: 53 tests, OK; none cover the fallback"}
+      ],
+      "questions": [
+        {"q": "Should a repo that hosts its own viewer be warned when it falls back to flowmap.testabl.ai, or is a silent default right?", "why": "Decides whether private-repo users notice their links point at a public host (the data still never reaches it).", "kind": "ask"},
+        {"q": "The README names only `viewer` in flowmap.toml; should it also name FLOWMAP_VIEWER, which wins over the toml key in `main`?", "why": "Someone overriding per machine vs per repo needs to know which wins.", "kind": "check"}
+      ]
+    },
+    {
+      "title": "pr-lens names the viewer URL and keeps the link in every repo",
+      "role": "supporting", "kind": "agent instruction",
+      "symbols": [],
+      "files": ["skills/pr-lens/SKILL.md", ".claude-plugin/plugin.json"],
+      "before": "Step 3 of \"The change page\" said: without `viewer` in flowmap.toml, drop `--link` and link the committed page. It never named a URL.",
+      "after": "Step 3 says the link opens `https://flowmap.testabl.ai/v1/change.html` unless flowmap.toml names another, and to put the printed link in the PR body as is. The plugin version moves to 0.2.1 so `/plugin marketplace update flowmap` picks up the new text.",
+      "claim": "An agent in another repo is told which link to use and gets one.",
+      "why": "The old line sent agents in every other repo down the committed-HTML path, which renders as source on GitHub; without the version bump installed plugins would keep the old text.",
+      "verified": [
+        {"how": "looked", "what": "the new step 3 text in skills/pr-lens/SKILL.md and version 0.2.1 in .claude-plugin/plugin.json"}
+      ],
+      "questions": [
+        {"q": "Is 0.2.1 the right bump, or should skill-text changes move the minor version?", "why": "Decides how installed plugins pick up skill changes going forward.", "kind": "ask"},
+        {"q": "Does the line \"put the printed link in the PR body as is\" conflict with the 60 KB warning `main` prints for long links?", "why": "An agent might paste a link GitHub rejects.", "kind": "check"}
+      ]
+    }
+  ]
+}
