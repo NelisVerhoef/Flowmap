@@ -2,6 +2,7 @@
 Cases come from this repo's own history: PR #10 (4247d94..2559b22) and PR #4 (0d82693)."""
 
 import json
+import os
 import sys
 import unittest
 
@@ -91,7 +92,7 @@ class LinkSizeTest(unittest.TestCase):
         url, dropped = change.fitted_link(change.merge({**self.fx, "hunks": big}, {}), "https://v")
         self.assertLessEqual(len(url), change.BUDGET)
         self.assertEqual(dropped, ["diff text of non-code files", "all diff text"])
-        data = change.merge({**self.fx, "hunks": []}, {"intent": " ".join(str(hash(i * 7.1)) for i in range(9000))})
+        data = change.merge({**self.fx, "hunks": []}, {"intent": os.urandom(60000).hex()})
         self.assertIsNone(change.fitted_link(data, "https://v")[0])  # main prints a line to paste instead
 
 

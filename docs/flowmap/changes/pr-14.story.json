@@ -5,63 +5,131 @@
   "intent": "Fix issue #13: on a normal 40-file PR, `flowmap change --link` printed a 125,000-character link that a PR body can't hold. Most of it was a plan doc's diff text and hundreds of call paths that came from false call edges.",
   "delta": "Three things moved. The Python call graph no longer links `x.replace()`, `x.clear()`, `x.search()` and other names builtin types have to app methods of that name unless the receiver is known to be the app's; it now also resolves `d = Diagrams(); d.component` exactly. The change page carries diff text only for code and for files a story chapter names, and one call path per symbol. The facts keep one per flow. `--link` now has a 60,000-character budget: past it, the link drops diff text (non-code files first) and the page says so; if even that is too big, it prints a line to paste instead. The page layout, the story format and lint, and the golden `lens` output are unchanged. lens calls this PR blind only because both code files gained a module-level constant (the builtin method names, the link budget).",
   "no_longer": [
-    {"was": "Adding an app method called `replace`, `clear` or `search` gives it an edge from every `str.replace()`, `dict.clear()` or regex `.search()` in the repo", "cite": "flowmap/graphs/python.py:_Builder._link.targets", "step": "new:review-change-on-map/callgraph-impact"},
-    {"was": "Every doc or other non-code file a PR changes rides in the link as full diff text, under \"Changed outside the map\"", "cite": "flowmap/change.py:merge"},
-    {"was": "A link over 60,000 characters gets a warning and nothing else", "cite": "flowmap/change.py:main"}
+    {
+      "was": "Adding an app method called `replace`, `clear` or `search` gives it an edge from every `str.replace()`, `dict.clear()` or regex `.search()` in the repo",
+      "cite": "flowmap/graphs/python.py:_Builder._link.targets",
+      "step": "new:review-change-on-map/callgraph-impact"
+    },
+    {
+      "was": "Every doc or other non-code file a PR changes rides in the link as full diff text, under \"Changed outside the map\"",
+      "cite": "flowmap/change.py:merge"
+    },
+    {
+      "was": "A link over 60,000 characters gets a warning and nothing else",
+      "cite": "flowmap/change.py:main"
+    }
   ],
   "chapters": [
     {
       "title": "The call graph stops linking builtin-type calls to app methods of the same name",
-      "role": "core", "kind": "graph accuracy",
-      "symbols": ["flowmap/graphs/python.py:_Builder._link", "flowmap/graphs/python.py:_Builder._link.targets", "flowmap/graphs/python.py:_Builder._link.walk"],
+      "role": "core",
+      "kind": "graph accuracy",
+      "symbols": [
+        "flowmap/graphs/python.py:_Builder._link",
+        "flowmap/graphs/python.py:_Builder._link.targets",
+        "flowmap/graphs/python.py:_Builder._link.walk"
+      ],
       "before": "`obj.method()` with an unknown receiver got an edge to every app method of that name (up to AMBIGUOUS = 6). So `set().union(...)` called `UnionFind.union`, `m.groups()` called `UnionFind.groups`, and in issue #13 a new `replace` method gained 155 false callers. The verdict said the PR spread to 196 entry points.",
       "after": "When the name is a public method of str, bytes, bytearray, dict, list, set, frozenset, tuple, re.Pattern or re.Match, the call is resolved only if the receiver is known to be the app's: `self`/`cls`, or a local assigned from an app class in the same def (`uf = UnionFind()`). That local rule also resolves `uf.union` (and `map(d.component, ...)`) to the exact method when the class defines it, for any name. On the golden commits (6d9eaff, 770f1a7) that drops 5 false edges and finds 1 real one (`atlas.build` → `Diagrams.component`).",
       "claim": "Reach and the verdict stop counting callers that only call str, dict or regex methods.",
       "why": "Reach, the verdict and the questions all come from this graph. A false edge from every `str.replace()` makes a contained change look like it spreads everywhere, and then the witnesses fill the link. Rather than tracking types in general, this checks only the case the issue hit: a name that builtin types also have.",
       "verified": [
-        {"how": "test", "what": "tests/test_graphs.py:PythonResolutionTest.test_a_method_named_like_a_builtin_is_not_every_str_call"},
-        {"how": "looked", "what": "golden graph diff for 6d9eaff and 770f1a7: the 5 removed edges are set().union and re.Match.groups; the added edge is `d = Diagrams()` then `map(d.component, ...)` in atlas.build"},
-        {"how": "test", "what": "tests/test_change.py:FactsTest.test_a_reach_move_names_the_call_that_caused_it"}
+        {
+          "how": "test",
+          "what": "tests/test_graphs.py:PythonResolutionTest.test_a_method_named_like_a_builtin_is_not_every_str_call"
+        },
+        {
+          "how": "looked",
+          "what": "golden graph diff for 6d9eaff and 770f1a7: the 5 removed edges are set().union and re.Match.groups; the added edge is `d = Diagrams()` then `map(d.component, ...)` in atlas.build"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_change.py:FactsTest.test_a_reach_move_names_the_call_that_caused_it"
+        }
       ],
       "questions": [
-        {"q": "An app object whose type the graph can't see (a parameter `repo`, an attribute `self.store`) calling `.get()` or `.update()` now gets no edge. Is losing those true edges acceptable next to the false ones dropped?", "why": "Decides whether the receiver rule needs parameter annotations or attribute types next.", "kind": "ask"},
-        {"q": "Run `flowmap callgraph dump` on a repo you know and diff the edges into methods named like builtins: are the removed ones all calls on str, dict or regex values?", "why": "The golden repo has only a few such methods; a bigger repo is a better check.", "kind": "check"}
+        {
+          "q": "An app object whose type the graph can't see (a parameter `repo`, an attribute `self.store`) calling `.get()` or `.update()` now gets no edge. Is losing those true edges acceptable next to the false ones dropped?",
+          "why": "Decides whether the receiver rule needs parameter annotations or attribute types next.",
+          "kind": "ask"
+        },
+        {
+          "q": "Run `flowmap callgraph dump` on a repo you know and diff the edges into methods named like builtins: are the removed ones all calls on str, dict or regex values?",
+          "why": "The golden repo has only a few such methods; a bigger repo is a better check.",
+          "kind": "check"
+        }
       ]
     },
     {
       "title": "The page carries diff text only for code and claimed files, and one call path per symbol",
-      "role": "supporting", "kind": "smaller page",
-      "symbols": ["flowmap/change.py:merge", "flowmap/change.py:facts"],
-      "files": ["flowmap/change.template.html"],
+      "role": "supporting",
+      "kind": "smaller page",
+      "symbols": [
+        "flowmap/change.py:merge",
+        "flowmap/change.py:facts"
+      ],
+      "files": [
+        "flowmap/change.template.html"
+      ],
       "before": "`merge` kept the diff text of every file in any chapter, including the automatic \"Changed outside the map\" chapter, so a long plan doc no part claimed filled the link. `facts` kept one call path per changed symbol per reachable step: about 650 paths in issue #13.",
       "after": "`merge` keeps diff text for hunks in changed code and for files a story chapter names in `files`; unclaimed docs and other non-code files show their path and line counts. The call tree says \"see the PR diff\" for those. `facts` keeps one path per flow (the step list still has every step), and the page data keeps one path per symbol, which is all the page draws.",
       "claim": "A long doc or a widely reached symbol no longer makes the link too big.",
       "why": "A reviewer needs one path proving a flow is reached, not one per step. A plan doc's diff text is readable in the PR itself. Rather than capping doc text at N lines, drop it unless the story chose the file, because the story author knows which non-code files are part of the change.",
       "verified": [
-        {"how": "test", "what": "tests/test_change.py:LinkSizeTest"},
-        {"how": "ran", "what": "a probe commit adding a 2,500-line plan doc with no story: link 48,041 characters before, 1,281 after"},
-        {"how": "ran", "what": "links for PRs #8, #9, #10, #12 on this repo: within 200 characters of before"}
+        {
+          "how": "test",
+          "what": "tests/test_change.py:LinkSizeTest"
+        },
+        {
+          "how": "ran",
+          "what": "a probe commit adding a 2,500-line plan doc with no story: link 48,041 characters before, 1,281 after"
+        },
+        {
+          "how": "ran",
+          "what": "links for PRs #8, #9, #10, #12 on this repo: within 200 characters of before"
+        }
       ],
       "questions": [
-        {"q": "Should a story be able to keep a doc's text without naming it as a chapter file, for a PR whose point is the doc?", "why": "Today naming it in `files` is the only way.", "kind": "ask"}
+        {
+          "q": "Should a story be able to keep a doc's text without naming it as a chapter file, for a PR whose point is the doc?",
+          "why": "Today naming it in `files` is the only way.",
+          "kind": "ask"
+        }
       ]
     },
     {
       "title": "--link fits the budget by dropping diff text, or prints a line to paste",
-      "role": "supporting", "kind": "overflow",
-      "symbols": ["flowmap/change.py:fitted_link", "flowmap/change.py:main"],
-      "files": ["README.md", "skills/pr-lens/SKILL.md", ".claude-plugin/plugin.json"],
+      "role": "supporting",
+      "kind": "overflow",
+      "symbols": [
+        "flowmap/change.py:fitted_link",
+        "flowmap/change.py:main"
+      ],
+      "files": [
+        "README.md",
+        "skills/pr-lens/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
       "before": "Past 60,000 characters, `main` printed a warning and the too-long link anyway; the reader had to download the page and drop it on the viewer.",
       "after": "`fitted_link` drops diff text of non-code files, then all diff text, until the link fits BUDGET (60,000). It records what it dropped in the page's `trimmed`, which the page shows under the parts list. If nothing fits, `main` prints a line for the PR body: open the viewer and drop the committed page on it. README and pr-lens say so; the plugin moves to 0.2.2.",
       "claim": "--link always prints something that fits a PR body.",
       "why": "Diff text is the one part of the page the PR itself already shows, so it goes first. The committed HTML keeps everything.",
       "verified": [
-        {"how": "test", "what": "tests/test_change.py:LinkSizeTest.test_an_oversized_link_drops_diff_text_and_says_so"},
-        {"how": "ran", "what": "a story-claimed 120 KB doc: the link drops its text, prints the note to stderr, and is 1,298 characters; the page rendered in Chromium shows \"Left out of this link to fit a PR body\""},
-        {"how": "test", "what": "tests/test_change.py:LinkSizeTest.test_an_oversized_link_drops_diff_text_and_says_so, whose last case gets no link back, so main prints the paste line"}
+        {
+          "how": "test",
+          "what": "tests/test_change.py:LinkSizeTest.test_an_oversized_link_drops_diff_text_and_says_so"
+        },
+        {
+          "how": "ran",
+          "what": "a story-claimed 120 KB doc: the link drops its text, prints the note to stderr, and is 1,298 characters; the page rendered in Chromium shows \"Left out of this link to fit a PR body\""
+        }
       ],
       "questions": [
-        {"q": "The hosted viewer at flowmap.testabl.ai is built from this template; until it is redeployed, trimmed links render without the \"left out\" note. Redeploy with this PR?", "why": "Without it, a reader of a trimmed link isn't told the code is missing.", "kind": "ask"}
+        {
+          "q": "The hosted viewer at flowmap.testabl.ai is built from this template; until it is redeployed, trimmed links render without the \"left out\" note. Redeploy with this PR?",
+          "why": "Without it, a reader of a trimmed link isn't told the code is missing.",
+          "kind": "ask"
+        }
       ]
     }
   ]
