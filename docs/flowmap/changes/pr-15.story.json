@@ -1,0 +1,140 @@
+{
+ "title": "The story check names the field, the fix, and the line a cite must sit on",
+ "pr": "PR #15",
+ "url": "https://github.com/NelisVerhoef/flowmap/pull/15",
+ "intent": "Make story problems something an agent can repair without weakening the story, and stop file:line cites from passing on any line of a changed file.",
+ "delta": "Only the flowmap change command moves. Its story check used to return sentences; each problem is now a record with a code, the story field it is about and a fix, and a new --check prints them as JSON without writing the page. A file:line cite now has to be a line the diff shows, at base or head. The facts, the page's layout, --link and its size budget are unchanged, and a story that passed before still passes unless it cited a line outside the diff.",
+ "no_longer": [
+  {
+   "was": "A no_longer cite of file:line passes whenever that file is in the diff, whatever the line (the old check, change.py line 290 at base)",
+   "cite": "flowmap/change.py:290"
+  },
+  {
+   "was": "Story problems are plain strings, on stderr and in the page data's lint list",
+   "cite": "flowmap/change.py:lint_story"
+  }
+ ],
+ "chapters": [
+  {
+   "title": "A cite of file:line must point at a line the diff shows",
+   "role": "core",
+   "kind": "stricter check",
+   "symbols": [
+    "flowmap/change.py:cite_in_diff",
+    "flowmap/change.py:hunk_lines",
+    "flowmap/change.py:facts"
+   ],
+   "before": "lint_story accepted a no_longer cite when its file part was a changed path or the whole cite was a map step; the line number was never read.",
+   "after": "cite_in_diff also requires a file:line or file:a-b cite to overlap a line some hunk of that file shows, old or new side, context included. A cite of file:symbol (anything not a number after the colon) still passes on the file alone. facts and the check share hunk_lines, so both count a hunk's lines the same way. facts now calls hunk_lines in place of the same two set comprehensions it had inline, so the facts it prints are unchanged.",
+   "claim": "A story can no longer say 'this line shows it' about a line the change never touched.",
+   "why": "The cite is what lets a reader trust a no_longer line without reading the diff; a cite that only names the file proves nothing about the claim. Rather than checking the line against the whole file at head, it checks against the hunks, because a no_longer claim is about what the change did. Context lines count so a cite on the line next to a removal still passes.",
+   "verified": [
+    {
+     "how": "test",
+     "what": "tests/test_change.py:LintTest.test_a_cited_line_must_be_one_the_diff_shows"
+    },
+    {
+     "how": "ran",
+     "what": "flowmap change <c>^ <c> --check on the committed stories for PRs 5, 7, 8, 9, 10, 11, 12 and 14: all ok, so the stricter rule rejects none of them"
+    },
+    {
+     "how": "ran",
+     "what": "facts('4247d94', '2559b22') from change.py at f72e78a and at head, compared in Python: equal, hunks included"
+    }
+   ],
+   "questions": [
+    {
+     "q": "cite_in_diff accepts a line on either side; should a no_longer cite be held to the base side, since what is no longer true lived there?",
+     "why": "Either side is looser but lets a cite point at the replacement; base-only is stricter about what was removed.",
+     "kind": "ask"
+    },
+    {
+     "q": "A cite of file:symbol passes on the file alone, even when the symbol is not in the changed symbols; should it be checked against --facts symbols too?",
+     "why": "Decides whether a symbol cite is as strong as a line cite.",
+     "kind": "ask"
+    },
+    {
+     "q": "Hunks carry 2 lines of context (hunks uses -U2); is a cite two lines from any change close enough to count?",
+     "why": "Context makes the check forgiving by up to two lines either way.",
+     "kind": "check"
+    }
+   ]
+  },
+  {
+   "title": "Each story problem says which field it is about and how to fix it, and --check prints them as JSON",
+   "role": "supporting",
+   "kind": "agent-facing output",
+   "symbols": [
+    "flowmap/change.py:lint_story",
+    "flowmap/change.py:problem",
+    "flowmap/change.py:merge",
+    "flowmap/change.py:main"
+   ],
+   "files": [
+    "flowmap/change.template.html"
+   ],
+   "before": "lint_story returned sentences; symbol and file problems were pooled across chapters into one line each; main printed them to stderr and the page listed them.",
+   "after": "Each problem is {code, subject, problem, fix} (problem() stores its text argument under problem), one per offending field (e.g. chapters[0].symbols, no_longer[1].cite). lint_story drops the claimed_syms and claimed_files arguments it no longer needs; merge, its only caller, changes just that call. --check prints {ok, story, problems} and exits 1 when any remain, writing nothing. stderr shows the problem with its subject and fix; the page shows the problem text.",
+   "claim": "An agent repairing a story gets the exact field and an allowed fix instead of a sentence to interpret.",
+   "why": "The pr-lens skill has the agent write the story and then repair it until --link prints. With sentences, the easiest way to pass was to delete the failing claim; a fix that says 'cite the line, or mark it not checked' points at the honest repair. Rather than a separate validator, it is the same lint the page and --link already use, so the three can't disagree.",
+   "verified": [
+    {
+     "how": "test",
+     "what": "tests/test_change.py:LintTest.test_unbacked_claims_are_named"
+    },
+    {
+     "how": "ran",
+     "what": "flowmap change f72e78a HEAD --name pr-15 --check on this story"
+    },
+    {
+     "how": "not checked",
+     "what": "the page's lint box in a browser; the template change is one map over l.problem"
+    }
+   ],
+   "questions": [
+    {
+     "q": "Are the codes (story/cite-not-in-diff, story/test-not-at-head, …) a contract other tools may match on, or free to rename?",
+     "why": "Decides whether they need to be listed in the skill or kept stable.",
+     "kind": "ask"
+    },
+    {
+     "q": "--check exits before writing the page; is there a caller that expects --check to also refresh the HTML?",
+     "why": "If the skill runs --check then --link, the page is written once, by --link.",
+     "kind": "check"
+    }
+   ]
+  },
+  {
+   "title": "The skill bounds story repair: two rounds, and fix the claim rather than delete it",
+   "role": "supporting",
+   "kind": "agent instructions",
+   "files": [
+    "skills/pr-lens/SKILL.md",
+    "README.md",
+    ".claude-plugin/plugin.json"
+   ],
+   "before": "The skill said --link prints no link until the story passes, with no limit on attempts and nothing about how to repair.",
+   "after": "It points at --check, says a file:line cite must be a line the diff shows, and says to repair by citing, correcting or marking not checked, for two rounds, then stop and show the user. README lists --check; the plugin version moves to 0.2.3 so installs pick it up.",
+   "claim": "An agent stops looping on a story it can't back and doesn't buy a pass by dropping claims.",
+   "why": "Borrowed from archify, whose skill caps repair at two rounds and requires keeping the requested meaning while fixing. Without the rule the check is easy to game, and gaming it removes exactly the no_longer lines a reader most needs.",
+   "verified": [
+    {
+     "how": "looked",
+     "what": "this PR's own story went through --check before --link"
+    }
+   ],
+   "questions": [
+    {
+     "q": "flowmap change is not on the map (no step's endpoints include CLI flowmap change); which flow should it join when the map is next rebuilt?",
+     "why": "Map gap: the verdict spreads to CLI flowmap change but no step owns it.",
+     "kind": "ask"
+    },
+    {
+     "q": "Is two rounds right for an agent that also has to fix questions and verified entries, or should the limit count per problem?",
+     "why": "Too few rounds stops honest repairs; too many lets the agent wear the check down.",
+     "kind": "ask"
+    }
+   ]
+  }
+ ]
+}
