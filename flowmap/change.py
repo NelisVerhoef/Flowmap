@@ -5,9 +5,10 @@ The facts are deterministic (diff, call graph at base and head, map.json). The p
 and comes from a story file the /pr-lens skill writes; without one, chapters are grouped by the
 flow steps that run the changed code and say only what the graph can.
 
-    python tools/flowmap/change.py <base> [<head>] [--name pr-12] [--story path.json] [--facts] [--link]
+    python tools/flowmap/change.py <base> [<head>] [--name pr-12] [--story path.json] [--facts] [--check] [--link]
 
 Writes <out>/changes/<name>.html. --facts prints the facts as JSON instead (input for a story).
+--check prints what the story claims that the facts don't back, as JSON, and writes nothing.
 --link also prints a link to the hosted viewer (`viewer` in flowmap.toml, FLOWMAP_VIEWER, else VIEWER) that
 carries the whole page in its fragment, so it renders in any browser without publishing the data.
 Story format: see STORY in the /pr-lens skill.
@@ -59,6 +60,12 @@ def hunks(base, head):
         elif out and line[:1] in (" ", "+", "-"):
             out[-1]["lines"].append(line)
     return out
+
+
+def hunk_lines(h):
+    """The line numbers a hunk shows (context included): (at base, at head)."""
+    return ({h["old"] + i for i, _ in enumerate(x for x in h["lines"] if x[0] != "+")},
+            {h["new"] + i for i, _ in enumerate(x for x in h["lines"] if x[0] != "-")})
 
 
 def signature(rel, text, sym):
@@ -193,8 +200,7 @@ def facts(base, head):
         if not lens.CODE.match(rel or ""):
             h["symbols"] = []
             continue
-        new_lines = {h["new"] + i for i, ln in enumerate(x for x in h["lines"] if x[0] != "-")}
-        old_lines = {h["old"] + i for i, ln in enumerate(x for x in h["lines"] if x[0] != "+")}
+        old_lines, new_lines = hunk_lines(h)
         syms = lens.symbols_at(rel, lens.show(head, rel), new_lines) | lens.symbols_at(rel, lens.show(base, rel), old_lines)
         ids = {f"{rel}:{s}" for s in syms}
         # lines between a class's methods belong to the changed methods around them
@@ -258,7 +264,7 @@ def merge(fx, story):
     loose = [f["path"] for f in fx["files"] if f["kind"] in ("outside", "doc") and f["path"] not in claimed_files]
     if loose and story.get("chapters"):
         chapters.append({"title": "Changed outside the map", "kind": "outside", "files": loose})
-    lint = lint_story(fx, story, chapters, known, claimed_syms, claimed_files)
+    lint = lint_story(fx, story, chapters, known)
     folded = [f for f in fx["files"] if f["kind"] in ("generated", "test") or
               (f["kind"] in ("doc", "outside") and f["path"] not in claimed_files and not story.get("chapters"))]
     # the page shows a hunk only under a chapter that owns its symbols or a file the story chose;
@@ -274,33 +280,64 @@ def merge(fx, story):
 VERIFIED = ("test", "ran", "looked", "not checked")
 
 
-def lint_story(fx, story, chapters, known, claimed_syms, claimed_files):
-    """What the story says that the facts don't back: the page shows these, and --link refuses."""
+def problem(code, subject, text, fix):
+    return {"code": code, "subject": subject, "problem": text, "fix": fix}
+
+
+def cite_in_diff(cite, fx, paths, steps):
+    """A cite is a map step, a changed file or symbol, or file:line on a line the diff shows."""
+    if cite in steps:
+        return True
+    rel, _, at = cite.partition(":")
+    if rel not in paths:
+        return False
+    if not re.fullmatch(r"\d+(-\d+)?", at):
+        return True
+    lo, _, hi = at.partition("-")
+    want = set(range(int(lo), int(hi or lo) + 1))
+    return any(want & (old | new) for h in fx.get("hunks", []) if h["file"] == rel for old, new in [hunk_lines(h)])
+
+
+def lint_story(fx, story, chapters, known):
+    """What the story says that the facts don't back: the page shows these, and --link refuses.
+    Each names the field (subject) and how to back it (fix), so the author repairs the claim."""
     out = []
     if not story.get("chapters"):
         return out
     paths = {f["path"] for f in fx["files"]}
     steps = {st["key"] for f in fx["map"] for st in f["steps"]}
-    if claimed_syms - known:
-        out.append("story names symbols this diff does not change: " + ", ".join(sorted(claimed_syms - known)))
-    if claimed_files - paths:
-        out.append("story names files this diff does not change: " + ", ".join(sorted(claimed_files - paths)))
-    for item in story.get("no_longer", []):
-        cite = item.get("cite", "")
-        if not cite or (cite.split(":")[0] not in paths and cite not in steps):
-            out.append(f"no longer true \"{item.get('was', '')[:60]}\" needs a cite: a changed file, file:line or symbol")
+    for i, c in enumerate(story["chapters"]):
+        for s in c.get("symbols", []):
+            if s not in known:
+                out.append(problem("story/symbol-not-changed", f"chapters[{i}].symbols", f"story names symbol {s}, which this diff does not change",
+                                   "use a symbol id from --facts symbols, or move the claim to the part that changed it"))
+        for f in c.get("files", []):
+            if f not in paths:
+                out.append(problem("story/file-not-changed", f"chapters[{i}].files", f"story names file {f}, which this diff does not change",
+                                   "use a path from --facts files"))
+    for i, item in enumerate(story.get("no_longer", [])):
+        cite, was = item.get("cite", ""), item.get("was", "")[:60]
+        if not cite or not cite_in_diff(cite, fx, paths, steps):
+            out.append(problem("story/cite-not-in-diff", f"no_longer[{i}].cite",
+                               f"no longer true \"{was}\" needs a cite: a changed file, a line the diff shows, or a symbol",
+                               "cite the line the diff removes or changes (file:line, either side), or the changed symbol"))
         if item.get("step") and item["step"] not in steps:
-            out.append(f"no longer true names step {item['step']}, which is not on the map")
-    for c in chapters:
-        for v in c.get("verified", []):
+            out.append(problem("story/step-not-on-map", f"no_longer[{i}].step", f"no longer true names step {item['step']}, which is not on the map",
+                               "use a step key from --facts map, or leave step out"))
+    for i, c in enumerate(chapters):
+        for j, v in enumerate(c.get("verified", [])):
             how, what = v.get("how"), v.get("what", "")
             if how not in VERIFIED:
-                out.append(f"part \"{c['title'][:40]}\": verified how must be one of {', '.join(VERIFIED)}, not {how!r}")
+                out.append(problem("story/verified-how", f"chapters[{i}].verified[{j}].how",
+                                   f"part \"{c['title'][:40]}\": verified how must be one of {', '.join(VERIFIED)}, not {how!r}",
+                                   "say how it was checked; if it wasn't, \"not checked\""))
             elif how == "test":
                 rel, _, name = what.partition(":")
                 text = lens.show(fx["head"], rel)
                 if text is None or (name and name.split(".")[-1] not in text):
-                    out.append(f"part \"{c['title'][:40]}\": verified by test {what}, which is not in the code at head")
+                    out.append(problem("story/test-not-at-head", f"chapters[{i}].verified[{j}].what",
+                                       f"part \"{c['title'][:40]}\": verified by test {what}, which is not in the code at head",
+                                       "name a test file:Name that exists at head, or say \"not checked\""))
     return out
 
 
@@ -349,6 +386,7 @@ def main():
     ap.add_argument("--story", help="story JSON (default: <out>/changes/<name>.story.json if present)")
     ap.add_argument("--facts", action="store_true", help="print facts as JSON and exit")
     ap.add_argument("--link", action="store_true", help="also print a viewer link carrying the page")
+    ap.add_argument("--check", action="store_true", help="print the story's problems as JSON and exit 1 if any")
     a = ap.parse_args()
     fx = facts(a.base, a.head)
     if a.facts:
@@ -360,13 +398,16 @@ def main():
     story_path = Path(a.story) if a.story else out_dir / f"{name}.story.json"
     story = json.loads(story_path.read_text()) if story_path.exists() else {}
     data = merge(fx, story)
+    if a.check:
+        print(json.dumps({"ok": not data["lint"], "story": str(story_path), "problems": data["lint"]}, indent=1))
+        sys.exit(1 if data["lint"] else 0)
     title = story.get("title") or f"{a.base}..{a.head}"
     html = (TEMPLATE.read_text().replace("__TITLE__", title.replace("&", "&amp;").replace("<", "&lt;"))
             .replace("/*__CHANGE_DATA__*/null", json.dumps(data, separators=(",", ":")).replace("</", "<\\/")))
     out = out_dir / f"{name}.html"
     out.write_text(html)
-    for problem in data["lint"]:
-        print("story: " + problem, file=sys.stderr)
+    for p in data["lint"]:
+        print(f"story: {p['problem']} ({p['subject']}; fix: {p['fix']})", file=sys.stderr)
     print(f"wrote {out.relative_to(ROOT)} ({len(data['chapters'])} chapters"
           f"{', story ' + str(story_path.relative_to(ROOT) if story_path.is_relative_to(ROOT) else story_path) if story else ', no story'})",
           file=sys.stderr if a.link else sys.stdout)  # with --link, stdout is just the link

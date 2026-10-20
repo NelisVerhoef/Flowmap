@@ -40,7 +40,7 @@ class FactsTest(unittest.TestCase):
 class LintTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.fx = {**json.loads(flowmap("change", *PR10, "--facts")), "hunks": []}
+        cls.fx = {**json.loads(flowmap("change", *PR10, "--facts")), "hunks": [{**h, "symbols": []} for h in change.hunks(*PR10)]}
 
     def lint(self, story):
         return change.merge(self.fx, story)["lint"]
@@ -61,7 +61,18 @@ class LintTest(unittest.TestCase):
         problems = self.lint(story)
         self.assertEqual(len(problems), 6, problems)
         for word in ("flowmap/atlas.py:nope", "nope.md", "uncited", "cites code", "test_no_such_test", "'guessed'"):
-            self.assertTrue(any(word in p for p in problems), word)
+            self.assertTrue(any(word in p["problem"] for p in problems), word)
+        self.assertEqual({p["subject"] for p in problems}, {
+            "chapters[0].symbols", "chapters[0].files", "no_longer[0].cite", "no_longer[1].cite",
+            "chapters[0].verified[0].what", "chapters[0].verified[1].how"})
+
+    def test_a_cited_line_must_be_one_the_diff_shows(self):
+        # PR #10's first atlas.template.html hunk shows lines 7-15 at head; line 1 and 5000 it leaves alone
+        cite = lambda c: self.lint({"no_longer": [{"was": "w", "cite": c}], "chapters": [{"title": "t"}]})
+        self.assertEqual(cite("flowmap/atlas.template.html:120"), [])
+        self.assertEqual(cite("flowmap/atlas.template.html:3-8"), [])  # a span that touches the diff
+        self.assertEqual(cite("flowmap/atlas.py:merges"), [])  # a symbol, not a line
+        self.assertEqual([p["code"] for p in cite("flowmap/atlas.template.html:1")], ["story/cite-not-in-diff"])
 
     def test_no_story_no_lint(self):
         self.assertEqual(self.lint({}), [])

@@ -380,7 +380,7 @@ range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", 
   S.pr ? " (branch head when rendered)" : "", ` · ${F.name}`);
 $("#top").append(range, el("h1", { text: S.title || `${F.base_sha}..${F.head_sha}` }));
 if ((DATA.lint || []).length) $("#top").append(el("div", { class: "lint" }, el("b", { text: "The story says things the facts don't back" }),
-  el("ul", {}, ...DATA.lint.map(l => el("li", { text: l })))));
+  el("ul", {}, ...DATA.lint.map(l => el("li", { text: l.problem ?? l })))));
 if (!F.verdict) $("#top").append(el("p", { class: "note", text: "No verdict: an older flowmap rendered this page. Re-render it to see one." }));
 else {
   const V = F.verdict, flowsOf = new Set(F.map.filter(f => f.steps.some(s => s.endpoints.some(e => V.spreads_to.includes(e)))).map(f => flowName(f.id)));
