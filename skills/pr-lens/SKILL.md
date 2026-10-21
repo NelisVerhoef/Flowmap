@@ -134,6 +134,12 @@ Also write the change as a page people can read without the diff:
    unless `viewer` in `flowmap.toml` names another; put the printed link in the PR body as is
    (or, for a page too big for any link, the line it prints instead). Diff text of doc and other
    non-code files only rides along for files a chapter names in `files`.
+
+   `flowmap change <base> <head> --name <name> --check` prints the story's problems as JSON, each
+   with a `code`, the field it is about (`subject`, e.g. `no_longer[1].cite`) and a `fix`. A
+   `file:line` cite must be a line the diff shows, at base or head. Repair the claim, not the
+   check: cite what backs it, correct it, or mark it `not checked`; don't delete a claim only to
+   pass. Two rounds; if it still fails, stop and show the user the remaining problems.
 4. Reader test, before the PR opens: give a subagent with none of your context only the story file
    and the `--facts` output, and ask it: which flows changed; what is no longer true; what stayed
    the same; what breaks for the user if the core part fails. Compare its answers with the facts

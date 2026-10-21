@@ -71,6 +71,7 @@ flowmap atlas                     # the interactive map (docs/flowmap/atlas.html
 flowmap lens <base> <head>                       # placement, reach, reach diff, off-map code
 flowmap atlas --pr '<base>..<head>=PR #123'      # paint it on the map
 flowmap change <base> <head> --name pr-123      # the change as chapters on the map (docs/flowmap/changes/)
+flowmap change <base> <head> --name pr-123 --check   # the story's unbacked claims as JSON: code, field, fix
 ```
 
 GitHub shows committed HTML as source, not as a page. Add `--link` to also print a link that
