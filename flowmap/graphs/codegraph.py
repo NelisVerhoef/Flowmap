@@ -64,17 +64,17 @@ def _part(db, texts):
     rows = db.execute(f"SELECT id, kind, name, qualified_name, file_path, start_line, end_line, signature, docstring "
                       f"FROM nodes WHERE kind IN ({','.join('?' * len(DEFS))})", DEFS).fetchall()
     ids, names, part = {}, {}, Part()
-    outline = {rel: {"syms": [], "sig": {}, "doc": {}} for rel in texts}
-    for cid, kind, name, qual, rel, start, end, sig, doc in rows:
+    outlines = {rel: {"syms": [], "sig": {}, "doc": {}} for rel in texts}
+    for cid, kind, name, qual, rel, start, end, sig, docstring in rows:
         if rel not in texts:
             continue
         q = qual.replace("::", ".")
         ids[cid], names[cid] = f"{rel}:{q}", name
         part.defs[ids[cid]] = (start, end)
-        o = outline[rel]
+        o = outlines[rel]
         o["syms"].append((start, end, q))
         o["sig"][q] = sig[1:-1] if sig and sig.startswith("(") and sig.endswith(")") else sig
-        o["doc"][q] = (doc or "").strip().split("\n\n")[0].replace("\n", " ") or None
+        o["doc"][q] = (docstring or "").strip().split("\n\n")[0].replace("\n", " ") or None
     for src, dst, kind in db.execute("SELECT source, target, kind FROM edges WHERE kind IN "
                                      "('calls', 'instantiates', 'references', 'contains', 'extends', 'implements')"):
         if src not in ids or dst not in ids:
@@ -89,7 +89,7 @@ def _part(db, texts):
     for rel, errors in db.execute("SELECT path, errors FROM files"):
         if rel in texts and errors and json.loads(errors):
             part.unparsed.append(rel)
-    for rel, o in outline.items():
+    for rel, o in outlines.items():
         o["syms"].sort()
         _SEEN[texts[rel]] = o
     return part
