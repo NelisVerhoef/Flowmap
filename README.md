@@ -12,15 +12,18 @@ Python 3.11+, no dependencies.
 | stack | entry points come from | call graph (deterministic reach) |
 |---|---|---|
 | FastAPI | `@router.<verb>` + `include_router` prefixes | yes (Python AST) |
-| Rails | `bin/rails routes` (or a saved dump), actions resolved through concerns and parent controllers | not yet: the map and anchor matching work, reach doesn't |
-| Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `"use server"` actions | not yet |
+| Rails | `bin/rails routes` (or a saved dump), actions resolved through concerns and parent controllers | not yet: the map and anchor matching work; codegraph parses Ruby, but names an action `Admin.UsersController.index` where this adapter says `index` |
+| Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `"use server"` actions | yes, with [codegraph](https://github.com/colbymchenry/codegraph) on PATH |
 | React SPA | its backend's entry points; top-down passes start from its router | via the backend |
 | anything else | `pattern`: a regex for its registrations (`@app.get(...)`, `@server.tool`, `app.get("/x", show)`), written into `flowmap.toml` at setup; the handler is the definition it sits on. `list` for registries no regex finds | yes for Python, including defs built in factory functions |
 | Python CLI | `if __name__ == "__main__"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |
 
 ## On a new machine
 
-Python 3.11+ and `git`. In Claude Code, inside any session:
+Python 3.11+ and `git`. For a call graph of anything but Python (TypeScript/JS, Ruby, Go, Java,
+…), also [codegraph](https://github.com/colbymchenry/codegraph): `npm i -g @colbymchenry/codegraph`.
+Without it, lens says *blind* for that code instead of naming what it reaches. In Claude Code,
+inside any session:
 
 ```
 /plugin marketplace add NelisVerhoef/flowmap
@@ -156,7 +159,10 @@ Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{"endpoint", "h
 `flowmap/brief.py`. The `endpoint` string is the join key between passes, so derive it from code,
 never from a model.
 
-For deterministic reach, the language also needs a call-graph builder: `flowmap/graphs/<lang>.py`
+For deterministic reach, the language also needs a call-graph builder. Python has its own
+(`graphs/python.py`); TypeScript/JS, Ruby, Go, Java, Kotlin, Swift, Rust, PHP, C# and more come
+from `graphs/codegraph.py` when `codegraph` is on PATH (`npm i -g @colbymchenry/codegraph`): it
+indexes the files at the revision being read and reads codegraph's SQLite graph. A new builder is `flowmap/graphs/<lang>.py`
 with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (see
 `graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then
 `flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node

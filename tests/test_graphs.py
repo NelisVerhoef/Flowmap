@@ -2,7 +2,7 @@ import json
 import sys
 import unittest
 
-from tests.helpers import REPO, cli_app, fixture_repo, flowmap
+from tests.helpers import REPO, cli_app, commit, fixture_repo, flowmap
 
 sys.path.insert(0, str(REPO / "flowmap"))
 import graphs  # noqa: E402
@@ -11,7 +11,8 @@ import graphs  # noqa: E402
 class RegistryTest(unittest.TestCase):
     def test_builder_dispatch_by_suffix(self):
         self.assertIs(graphs.builder_for("app/x.py"), graphs.python)
-        self.assertIsNone(graphs.builder_for("app/page.tsx"))
+        tsx = graphs.codegraph if graphs.codegraph.BIN else None  # only with codegraph on PATH
+        self.assertIs(graphs.builder_for("app/page.tsx"), tsx)
         self.assertIn(".py", graphs.suffixes())
 
     def test_python_symbols_and_signature(self):
@@ -112,3 +113,51 @@ class PythonResolutionTest(unittest.TestCase):
         self.assertIn(["flowmap/callgraph.py:Graph.__init__", "flowmap/graphs/python.py:build"], edges)
         self.assertIn(["flowmap/lens.py:defs", "flowmap/graphs/python.py:symbols"], edges)
         self.assertIn(["flowmap/callgraph.py:Graph", "flowmap/callgraph.py:Graph.__init__"], edges)
+
+
+NEXT_APP = {
+    "flowmap.toml": '[[entry]]\nadapter = "nextjs"\n\n[code]\ngraph = ["app", "lib"]\n',
+    "tsconfig.json": '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./*"]}}}\n',
+    "docs/flowmap/map.json": '{"flows": [], "runs": []}\n',
+    "app/api/quote/route.ts": '''
+        import { Registry } from '@/lib/registry'
+
+        export async function POST() {
+          const r = new Registry()
+          return Response.json(r.price(1))
+        }
+    ''',
+    "lib/registry.ts": '''
+        export class Registry {
+          rates: number[]
+          constructor() {
+            this.rates = load()
+          }
+          price(n: number) {
+            return n * 2
+          }
+        }
+
+        function load() {
+          return [2]
+        }
+    ''',
+}
+
+
+@unittest.skipUnless(graphs.codegraph.BIN, "codegraph is not on PATH")
+class CodegraphBuilderTest(unittest.TestCase):
+    def test_typescript_reach_from_a_route(self):
+        root, base = fixture_repo(self, NEXT_APP)
+        edges = json.loads(flowmap("callgraph", "dump", base, root=root))["edges"]
+        for edge in (["app/api/quote/route.ts:POST", "lib/registry.ts:Registry.price"],
+                     ["lib/registry.ts:Registry", "lib/registry.ts:Registry.constructor"],
+                     ["lib/registry.ts:Registry.constructor", "lib/registry.ts:load"]):
+            self.assertIn(edge, edges)
+        self.assertIn("0 broken", flowmap("callgraph", "check", root=root))
+
+    def test_lens_names_the_method_a_change_is_in(self):
+        root, base = fixture_repo(self, NEXT_APP)
+        head = commit(root, {"lib/registry.ts": NEXT_APP["lib/registry.ts"].replace("n * 2", "n * 3")})
+        self.assertIn("`lib/registry.ts:Registry.price` — reachable from 1 endpoints",
+                      flowmap("lens", base, head, root=root))

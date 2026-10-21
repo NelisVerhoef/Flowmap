@@ -16,10 +16,10 @@ entry point's handler is a node the graph can walk from (`flowmap callgraph chec
 are not). `read(rel) -> text | None` lets a builder parse any git revision.
 """
 
-from . import python
+from . import codegraph, python
 from .part import Part  # noqa: F401
 
-BUILDERS = [python]
+BUILDERS = [python, codegraph]  # codegraph: only when it is on PATH
 
 
 def builder_for(rel):

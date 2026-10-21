@@ -12,10 +12,16 @@ right. Agreement only means something between *different methods*, so never skip
 `"${CLAUDE_PLUGIN_ROOT}/bin/flowmap"` (or wherever the flowmap repo is checked out).
 Run everything from the root of the repo being mapped.
 
+0. **Call graph for every language.** Python's is built in. TypeScript/JS, Ruby, Go, Java,
+   Kotlin, Swift, Rust, PHP and C# need [codegraph](https://github.com/colbymchenry/codegraph).
+   If the repo has such code and `command -v codegraph` finds nothing, stop and tell the user:
+   without it, reach (which entry points a change can run under) is blind for that code. Ask
+   to run `npm i -g @colbymchenry/codegraph` (it needs Node; telemetry stays off under
+   flowmap), and carry on without it only if they say so.
 1. **Config.** If there is no `flowmap.toml`, run `flowmap inventory` and see what was
    auto-detected. Rails needs its routes dumped once where the app boots
    (`bin/rails routes > tmp/routes.txt`, then `routes_file` in `flowmap.toml`). Write a
-   minimal `flowmap.toml` with `[code] tests = [...]` and `graph = [...]` (the app's source dirs the call graph is built from; Python today).
+   minimal `flowmap.toml` with `[code] tests = [...]` and `graph = [...]` (the app's source dirs the call graph is built from).
 2. **Inventory.** `flowmap inventory` finds entry points from code, never from you, so they
    stay a stable join key on every later run. Your job is to make the rules complete:
    - Read the code yourself and list every way it can be entered: HTTP routes, CLI commands,

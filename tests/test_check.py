@@ -5,6 +5,7 @@ from tests.helpers import REPO, cli_app, fixture_repo, flowmap
 
 sys.path.insert(0, str(REPO / "flowmap"))
 import callgraph  # noqa: E402
+import graphs  # noqa: E402
 
 NEXT_ROUTE = "export async function GET() {\n  return Response.json({ ok: true })\n}\n"
 
@@ -31,4 +32,6 @@ class CheckCommandTest(unittest.TestCase):
         root, _ = fixture_repo(self, files)
         out = flowmap("callgraph", "check", root=root)  # raises if it exits non-zero
         self.assertIn("2 entry points: 1 handlers are graph nodes, 1 not graphed, 0 broken", out)
-        self.assertIn("NOT GRAPHED GET /api/ping -> web/app/api/ping/route.ts:GET (no builder for .ts)", out)
+        why = ("outside [code].graph" if graphs.codegraph.BIN
+               else "no builder for .ts (`npm i -g @colbymchenry/codegraph` gives these a call graph)")
+        self.assertIn(f"NOT GRAPHED GET /api/ping -> web/app/api/ping/route.ts:GET ({why})", out)
