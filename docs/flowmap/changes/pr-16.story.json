@@ -1,0 +1,160 @@
+{
+  "title": "The call graph covers TypeScript/JS, Ruby, Go, Java and more when codegraph is installed, and says to install it when it isn't",
+  "pr": "PR #16",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/16",
+  "intent": "Reuse codegraph (github.com/colbymchenry/codegraph, a tree-sitter indexer for 20+ languages) so flowmap gives deterministic reach for languages other than Python, and recommend installing it strongly without forcing it.",
+  "delta": "A second call-graph builder now sits next to the Python one. When `codegraph` is on PATH, it indexes the graph files of every non-Python language at the revision being read and turns codegraph's SQLite graph into flowmap's `rel:Qual.name` nodes and call edges. Reach, the verdict, `callgraph check`, change pages and the atlas then cover that code. Without codegraph nothing changes: those files stay blind spots, but lens, `callgraph check` and the flowmap-build skill now name the install command. The Python builder, the graph format, adapters and map files are unchanged. Rails handlers still don't match codegraph's names (`index` vs `Admin.UsersController.index`), so Rails reach is still \"not yet\". lens calls this PR blind because `graphs/__init__.py` and `codegraph.py` gained module-level code (the builder list, the suffix and kind tables) and because of the plugin version bump.",
+  "no_longer": [
+    {
+      "was": "A change to a TypeScript/JS or Ruby file always gets the blind-spot line \"code with no call graph (no builder for its language …)\", so lens can't name what it reaches",
+      "cite": "flowmap/graphs/codegraph.py:build",
+      "step": "new:review-change-on-map/lens-place-change"
+    },
+    {
+      "was": "The flowmap-build skill treats the call graph as Python-only (\"Python today\") and goes on without asking about other languages",
+      "cite": "skills/flowmap-build/SKILL.md"
+    }
+  ],
+  "chapters": [
+    {
+      "title": "Non-Python code gets a call graph from codegraph's index",
+      "role": "core",
+      "kind": "new capability",
+      "symbols": [
+        "flowmap/graphs/codegraph.py:build",
+        "flowmap/graphs/codegraph.py:_part",
+        "flowmap/graphs/codegraph.py:symbols",
+        "flowmap/graphs/codegraph.py:signature",
+        "flowmap/graphs/codegraph.py:doc"
+      ],
+      "before": "The only builder was graphs/python.py. Files in any other language had no nodes or edges: a Next.js route or a TS helper was \"not graphed\", and any change to one made lens say blind.",
+      "after": "`build` writes the files (plus tsconfig/jsconfig/package.json/go.mod at the root and up to two levels down) into a temp dir and runs `codegraph init --yes` with DO_NOT_TRACK=1 and CODEGRAPH_NO_DAEMON=1. `_part` then reads functions, methods, constructors, classes, structs, modules and components as nodes. `A::b` becomes `rel:A.b`. calls, instantiations and references become edges, and a class also reaches its constructor (`constructor`, `initialize`, `__init__`, `init`, `new`). extends/implements become bases, and files with parse errors are reported as unparsed. `symbols`, `signature` and `doc` answer from the outline recorded while building, since flowmap asks them with file text alone. Python files keep their own builder. When `codegraph init` exits non-zero, every file it was given is reported as unparsed, so lens says blind (\"could not parse …\") instead of guessing. The builder reads codegraph's tables directly: a renamed column raises an error, and a renamed node kind would leave handlers out of the graph, which `flowmap callgraph check` reports as broken.",
+      "claim": "With codegraph installed, a TS/JS, Ruby, Go or Java change gets reach like a Python one.",
+      "why": "Reach is what lets a reviewer trust lens when it is quiet, and so far only Python repos had it. Rather than writing tree-sitter resolution in flowmap (a dependency, and a lot of resolver work per language), this reads a maintained indexer's output. Its node names already match what flowmap's adapters emit: all 36 handlers in a real Next.js app are nodes.",
+      "verified": [
+        {
+          "how": "test",
+          "what": "tests/test_graphs.py:CodegraphBuilderTest.test_typescript_reach_from_a_route"
+        },
+        {
+          "how": "ran",
+          "what": "`flowmap callgraph check` on a copy of a Next.js app (brutus, 263 files): 36 entry points, 36 handlers are graph nodes, 0 broken; 884 definitions, 989 edges"
+        },
+        {
+          "how": "ran",
+          "what": "codegraph on flowmap's own Python, compared with the Python builder: 145 of 145 codegraph definitions have the same id, 215 edges in common (the rest are mostly module-level `__main__` code, which only the Python builder models)"
+        },
+        {
+          "how": "looked",
+          "what": "a small Rails sample: a concern's method, `User.active` and the superclass resolve; the action is named `Admin.UsersController.index` while the Rails adapter emits `index`, so `callgraph check` would call it broken"
+        }
+      ],
+      "questions": [
+        {
+          "q": "Rails: should the adapter emit class-qualified handlers (`users_controller.rb:Admin.UsersController.index`) so codegraph reach works, even though that renames handler ids in existing Rails maps?",
+          "why": "Decides whether Rails reach comes in the next PR or waits for a migration path.",
+          "kind": "ask"
+        },
+        {
+          "q": "Run `flowmap callgraph check` with codegraph on a TS or Go repo you know: are any handlers broken, and are the edges into shared helpers the ones you'd expect?",
+          "why": "Only one Next.js app and a Rails toy were checked; other frameworks may spell handlers differently.",
+          "kind": "check"
+        },
+        {
+          "q": "`build` runs codegraph twice per lens (base and head), about 1.2s each on 263 files. Is that acceptable on your largest repo, or should it reuse a `.codegraph/` index when the ref is the working tree?",
+          "why": "Decides whether caching is needed before this is the default for big monorepos.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "lens and atlas name the method a change sits in, not its class",
+      "role": "supporting",
+      "kind": "fix",
+      "symbols": [
+        "flowmap/lens.py:defs",
+        "flowmap/lens.py:analyse",
+        "flowmap/graphs/codegraph.py:outline"
+      ],
+      "before": "Callers place diff lines on definitions through `lens.defs`, and lens and `atlas --pr` do it before building any graph. An indexer outlines a file only once it has indexed it, so a change inside `InsurerRegistry.isSupported` came out as `InsurerRegistry` (the regex outline's top-level name).",
+      "after": "`lens.defs` asks a builder that has `outline` to index a text no build has seen, on its own (a single-file codegraph index), before reading its symbols. Every caller goes through `defs`: lens, `atlas --pr` and change facts. `analyse` also builds the base and head graphs first when there are graph roots, so changed files are outlined from those builds instead of one by one; it built both later anyway.",
+      "claim": "Reach is reported for the changed method itself.",
+      "why": "Reach is looked up by node id, and the class node doesn't carry the method's callers, so naming the class hid the endpoints that reach the method. The fix is in `defs` rather than in each caller because `atlas --pr` had the same order and never builds the base graph. Rather than giving `symbols()` a file path (changing the builder interface for Python too), the indexer gets an optional `outline(rel, text)`.",
+      "verified": [
+        {
+          "how": "test",
+          "what": "tests/test_graphs.py:CodegraphBuilderTest.test_a_file_no_build_has_seen_is_outlined_on_its_own"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_graphs.py:CodegraphBuilderTest.test_lens_names_the_method_a_change_is_in"
+        },
+        {
+          "how": "ran",
+          "what": "lens on a planted one-line edit in brutus: \"`src/lib/quote-generation/insurer-registry.ts:InsurerRegistry.isSupported` — reachable from 1 endpoints\", verdict spreads; `lens.symbols_at` with no graph built also gives `InsurerRegistry.isSupported`"
+        },
+        {
+          "how": "not checked",
+          "what": "`flowmap atlas --pr` itself was not run on a TS repo"
+        }
+      ],
+      "questions": [
+        {
+          "q": "A single-file index can't resolve imports, but `outline` only reads definitions from it. Is any caller of `codegraph.signature` or `doc` reached with a text that no full build saw, where a missing signature would hide a contract change?",
+          "why": "change.py's contract check reads `signature`; it runs after both graphs are built, but a future caller might not.",
+          "kind": "check"
+        },
+        {
+          "q": "When codegraph fails on a file (exit code non-zero), `outline` retries every time `defs` asks for it. Worth caching the failure?",
+          "why": "Only matters if a repo has files codegraph crashes on; it costs time, not correctness.",
+          "kind": "ask"
+        }
+      ]
+    },
+    {
+      "title": "Where codegraph is missing, flowmap says how to install it",
+      "role": "supporting",
+      "kind": "guidance",
+      "symbols": [
+        "flowmap/graphs/codegraph.py:hint",
+        "flowmap/lens.py:blind_spots",
+        "flowmap/callgraph.py:__main__"
+      ],
+      "files": [
+        "skills/flowmap-build/SKILL.md",
+        "README.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "before": "Nothing told anyone a builder for other languages existed: the blind spot said \"no builder for its language\" and the skill said \"Python today\".",
+      "after": "When codegraph is absent and a file it would parse has no graph, lens's blind spot and `callgraph check`'s \"no builder for .ts\" end with \"(`npm i -g @colbymchenry/codegraph` gives these a call graph)\". The flowmap-build skill has a step 0: if the repo has non-Python code and no codegraph, stop, explain that reach will be blind there, and ask to install it. Carry on without it only if the user says so. README lists it under \"On a new machine\". The plugin version moves to 0.3.0 so installed copies update.",
+      "claim": "codegraph is strongly recommended at the moment its absence costs something, never installed behind anyone's back.",
+      "why": "Claude Code plugins can't declare npm dependencies. Forcing it would mean a hook running a global npm install on every teammate's machine, which changes their machine and runs third-party install scripts without asking. Rather than a SessionStart nudge in every session, the hint appears only where reach is actually missing: lens output, which pr-lens copies into PR summaries, and setup.",
+      "verified": [
+        {
+          "how": "test",
+          "what": "tests/test_check.py:CheckCommandTest.test_handler_without_builder_is_not_graphed_not_broken"
+        },
+        {
+          "how": "ran",
+          "what": "lens on brutus without codegraph: the blind spot reads \"code with no call graph …: `src/lib/quote-generation/insurer-registry.ts` (`npm i -g @colbymchenry/codegraph` gives these a call graph)\""
+        },
+        {
+          "how": "not checked",
+          "what": "the skill's step 0 has not been run by an agent on a fresh repo"
+        }
+      ],
+      "questions": [
+        {
+          "q": "Should the install line pin the tested version (`@colbymchenry/codegraph@1.6.2`), given that the builder reads codegraph's database schema directly?",
+          "why": "A renamed column in codegraph's database crashes the builder loudly, but a renamed node kind only shows up as broken handlers in `callgraph check`. Pinning trades that for missing upstream fixes.",
+          "kind": "ask"
+        },
+        {
+          "q": "Is asking at build time enough, or do teammates who only review PRs (pr-lens) also need a nudge before their first lens?",
+          "why": "Reviewers may never run the build skill; the lens hint reaches them only once a blind spot shows up.",
+          "kind": "ask"
+        }
+      ]
+    }
+  ]
+}

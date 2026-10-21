@@ -84,6 +84,8 @@ def defs(rel, text):
         return []
     builder = graphs.builder_for(rel)
     if builder:
+        if hasattr(builder, "outline"):  # an indexer outlines a file only once it has indexed it
+            builder.outline(rel, text)
         return builder.symbols(text)
     return rb_symbols(text) if rel.endswith(".rb") else ts_symbols(text)
 
@@ -231,7 +233,8 @@ def blind_spots(files, code, tests, changed, new_symbols, reach_of, graphs_at, b
     no_graph = [f for f in code if not graphed(f)]
     if no_graph:
         blind.append("code with no call graph (no builder for its language, or outside [code].graph): "
-                     + ", ".join(f"`{f}`" for f in no_graph[:6]) + (f" +{len(no_graph) - 6}" if len(no_graph) > 6 else ""))
+                     + ", ".join(f"`{f}`" for f in no_graph[:6]) + (f" +{len(no_graph) - 6}" if len(no_graph) > 6 else "")
+                     + graphs.codegraph.hint(no_graph))
     out_dir = config.out().relative_to(ROOT).as_posix()
     docs = re.compile(r"\.(md|rst|txt|png|jpe?g|svg|gif)$|(^|/)(docs?|LICENSE)(/|$)", re.I)
     unanalysed = [f for f in files if f not in code and f not in tests and not f.startswith(out_dir + "/")
@@ -254,6 +257,8 @@ def analyse(base, head="HEAD"):
     code = [f for f in files if CODE.match(f) and not TEST.search(f)]
     tests = [f for f in files if TEST.search(f)]
 
+    if config.graph_roots():  # built now, not at reach: codegraph outlines changed files from these, not one by one
+        graph_at(base), graph_at(head)
     changed = set()  # "rel:symbol"
     new_symbols = set()    # symbols that did not exist at base
     cosmetic_only = set()  # symbols whose edit is docstrings, comments or formatting only

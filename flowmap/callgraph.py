@@ -140,7 +140,8 @@ if __name__ == "__main__":
               f"{len(got['not graphed'])} not graphed, {len(got['broken'])} broken")
         for e in got["not graphed"]:
             rel = e["handler"].rsplit(":", 1)[0]
-            why = f"no builder for {Path(rel).suffix or rel}" if graphs.builder_for(rel) is None else "outside [code].graph"
+            why = (f"no builder for {Path(rel).suffix or rel}{graphs.codegraph.hint([rel])}"
+                   if graphs.builder_for(rel) is None else "outside [code].graph")
             print(f"  NOT GRAPHED {e['endpoint']} -> {e['handler']} ({why})")
         for e in got["broken"]:
             print(f"  BROKEN {e['endpoint']} -> {e['handler']} (file is parsed, no such node)")
