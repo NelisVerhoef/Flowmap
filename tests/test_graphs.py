@@ -156,6 +156,11 @@ class CodegraphBuilderTest(unittest.TestCase):
             self.assertIn(edge, edges)
         self.assertIn("0 broken", flowmap("callgraph", "check", root=root))
 
+    def test_a_file_no_build_has_seen_is_outlined_on_its_own(self):
+        text = "export class Quote {\n  price() {\n    return 1\n  }\n}\n"
+        graphs.codegraph.outline("lib/quote.ts", text)
+        self.assertEqual(graphs.codegraph.symbols(text), [(1, 5, "Quote"), (2, 4, "Quote.price")])
+
     def test_lens_names_the_method_a_change_is_in(self):
         root, base = fixture_repo(self, NEXT_APP)
         head = commit(root, {"lib/registry.ts": NEXT_APP["lib/registry.ts"].replace("n * 2", "n * 3")})

@@ -83,8 +83,10 @@ def defs(rel, text):
     if not text:
         return []
     builder = graphs.builder_for(rel)
-    if builder and (syms := builder.symbols(text)) is not None:
-        return syms
+    if builder:
+        if hasattr(builder, "outline"):  # an indexer outlines a file only once it has indexed it
+            builder.outline(rel, text)
+        return builder.symbols(text)
     return rb_symbols(text) if rel.endswith(".rb") else ts_symbols(text)
 
 
@@ -255,7 +257,7 @@ def analyse(base, head="HEAD"):
     code = [f for f in files if CODE.match(f) and not TEST.search(f)]
     tests = [f for f in files if TEST.search(f)]
 
-    if config.graph_roots():  # built now, not at reach: the codegraph builder outlines files as it builds
+    if config.graph_roots():  # built now, not at reach: codegraph outlines changed files from these, not one by one
         graph_at(base), graph_at(head)
     changed = set()  # "rel:symbol"
     new_symbols = set()    # symbols that did not exist at base

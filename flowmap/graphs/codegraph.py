@@ -33,7 +33,7 @@ DEFS = ("function", "method", "constructor", "class", "struct", "module", "compo
 EDGES = ("calls", "instantiates", "references")
 INITS = ("constructor", "initialize", "__init__", "init", "new")
 CONFIG = ("tsconfig.json", "jsconfig.json", "package.json", "go.mod")  # how imports resolve
-_SEEN = {}  # file text -> its outline, from every build: lens and change ask by text alone
+_SEEN = {}  # file text -> its outline, from every build: callers ask by text alone (see outline)
 
 
 def build(files, read):
@@ -100,9 +100,14 @@ def hint(rels):
     return "" if BIN or not any(r.endswith(LANGS) for r in rels) else f" (`{INSTALL}` gives these a call graph)"
 
 
+def outline(rel, text):
+    """Index `text` on its own if no build has seen it, so symbols/signature/doc can answer."""
+    if text not in _SEEN:
+        build([rel], lambda r: text if r == rel else None)
+
+
 def symbols(text):
-    """None for a text no build has seen: lens falls back to its regex outline."""
-    return _SEEN[text]["syms"] if text in _SEEN else None
+    return _SEEN.get(text, {}).get("syms", [])
 
 
 def signature(text, sym):
