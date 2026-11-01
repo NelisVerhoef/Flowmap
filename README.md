@@ -66,7 +66,12 @@ flowmap reconcile docs/flowmap/runs/??-?.json
 #    answer split votes in docs/flowmap/decisions.json, then reconcile again
 flowmap diagrams                  # Mermaid at three zoom levels
 flowmap atlas                     # the interactive map (docs/flowmap/atlas.html)
+flowmap canvas                    # the map as one picture (docs/flowmap/canvas.html)
 ```
+
+The canvas reads left to right: screens, the flows and their steps, the files they run (placed by
+call depth), the data they write. Click a flow to light its path, ▶ to walk it step by step,
+double-click a file to see its functions, callers on the left and callees on the right.
 
 ## Every PR
 
@@ -75,6 +80,7 @@ flowmap lens <base> <head>                       # placement, reach, reach diff,
 flowmap atlas --pr '<base>..<head>=PR #123'      # paint it on the map
 flowmap change <base> <head> --name pr-123      # the change as chapters on the map (docs/flowmap/changes/)
 flowmap change <base> <head> --name pr-123 --check   # the story's unbacked claims as JSON: code, field, fix
+flowmap canvas --change pr-123=<base>..<head>   # paint it on the canvas, the story's parts numbered on their cards
 ```
 
 GitHub shows committed HTML as source, not as a page. Add `--link` to also print a link that
