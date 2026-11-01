@@ -71,14 +71,27 @@ def canonical_new_flows(runs):
         for rj, fj, ej in news[i + 1:]:
             if ri != rj and jaccard(ei, ej) >= 0.3:
                 uf.union((ri, fi), (rj, fj))
+    adopted = adopted_flows()
     rename = {}
     for group in uf.groups(keys):
-        name = Counter(fid for _, fid in group).most_common(1)[0][0]
-        if name.removeprefix("new:") in FLOW_ORDER:
-            name = name.removeprefix("new:")  # the human adopted it into the vocabulary
+        votes = Counter(fid for _, fid in group)
+        name = votes.most_common(1)[0][0]
+        # the human adopted it into the vocabulary, under its proposed id or a name of their own
+        name = next((adopted[f] for f, _ in votes.most_common() if f in adopted), name)
         for k in group:
             rename[k] = name
     return rename
+
+
+def adopted_flows():
+    """`new:<id>` -> vocabulary id, for every proposal a vocabulary entry names: its own id, or the
+    ids in its `proposed` (a flow renamed when it was adopted)."""
+    out = {}
+    for v in config.load()["flows"]["vocabulary"]:
+        was = v.get("proposed", [])
+        for p in [v["id"], *([was] if isinstance(was, str) else was)]:
+            out["new:" + p.removeprefix("new:")] = v["id"]
+    return out
 
 
 def path_regex(path):
@@ -339,6 +352,7 @@ def write_questions_md(runs, m, contested, endpoint_flow, flow_status, handler, 
         lines += ["", "```toml"]
         for f in proposed:
             lines += ["[[flows.vocabulary]]", f'id = "{f["id"].removeprefix("new:")}"',
+                      f'proposed = "{f["id"]}"  # keep when you rename id: it ties the passes\' flow to yours',
                       f'scope = "{f["summary"].replace(chr(34), chr(39))}"']
         lines += ["```", ""]
     lines += ["## Split votes (placed by router-file affinity — please decide)", ""]

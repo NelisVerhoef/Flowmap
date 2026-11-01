@@ -28,6 +28,7 @@ Every key is optional; a repo with no config gets discovery mode and auto-detect
     plumbing = ["auth", "db"]                          # components hidden from the system view
     [[flows.vocabulary]]                               # empty = discovery mode
     id = "review-queue"
+    proposed = "new:triage-held-runs"                 # optional: the proposal this names, when renamed
     scope = "held/released/rejected runs, annotations"
 """
 

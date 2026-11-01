@@ -9,3 +9,17 @@ commands = "flowmap"
 [code]
 graph = ["flowmap"]
 other = ["bin"]
+
+[flows]
+[[flows.vocabulary]]
+id = "build-the-map"
+proposed = "new:build-the-flow-map"
+scope = "Map a repo as flows -> steps -> code by agreement: list its entry points, hand briefs to independent passes, check their citations, and vote them into one map a human settles."
+[[flows.vocabulary]]
+id = "browse-the-map"
+proposed = "new:browse-the-map"
+scope = "See the settled map: Mermaid diagrams at system/flow/step zoom, the interactive atlas, and the left-to-right canvas of screens, steps, code and data."
+[[flows.vocabulary]]
+id = "review-a-change"
+proposed = "new:tell-a-change-as-a-story"
+scope = "Review a PR on the map: lens places the diff and gives its verdict, and the change page tells it as chapters with what to ask, linkable from the PR body."

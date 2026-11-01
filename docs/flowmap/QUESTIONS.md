@@ -2,82 +2,68 @@
 
 Where independent runs disagreed. Each answer can be pinned in `decisions.json`.
 
-## Proposed flows (name them, then paste into flowmap.toml)
-
-Passes proposed these flows independently; ones covering the same entry points were merged. Rename, merge or drop them, then paste the block into `flowmap.toml`. From then on they are your fixed vocabulary.
-
-| proposed id | steps | entry points | seen by | summary |
-|---|---|---|---|---|
-| `new:discover-entry-points` | 1 | 1 | bu-1, bu-2, td-1, td-2 | Maintainer scans the repo being mapped and gets the list of every entry point, the join key for all later passes. |
-| `new:review-change-on-map` | 4 | 4 | bu-1, bu-2, td-1, td-2 | See the map: flows, their steps and the code each step runs, as Mermaid diagrams and an interactive atlas page. |
-| `new:run-mapping-passes` | 3 | 3 | bu-1, bu-2, td-1, td-2 | Turn a repo into a first flow map: list its entry points, brief independent mapping passes, check each pass, and vote them into one map. |
-
-```toml
-[[flows.vocabulary]]
-id = "discover-entry-points"
-scope = "Maintainer scans the repo being mapped and gets the list of every entry point, the join key for all later passes."
-[[flows.vocabulary]]
-id = "review-change-on-map"
-scope = "See the map: flows, their steps and the code each step runs, as Mermaid diagrams and an interactive atlas page."
-[[flows.vocabulary]]
-id = "run-mapping-passes"
-scope = "Turn a repo into a first flow map: list its entry points, brief independent mapping passes, check each pass, and vote them into one map."
-```
-
 ## Split votes (placed by router-file affinity — please decide)
 
 
 ## Endpoints the runs put in different flows
 
-- `CLI flowmap inventory` (`flowmap/inventory.py:__main__`): bu-1→new:run-mapping-passes, bu-2→new:discover-entry-points, td-1→new:discover-entry-points, td-2→new:discover-entry-points
+- `CLI flowmap change` (`flowmap/change.py:__main__`): bu-1→review-a-change, bu-2→browse-the-map, td-1→review-a-change, td-2→review-a-change
 
 ## Endpoints at least one run could not place in any flow
 
 
 ## Busiest steps (hops ≥ 8)
 
-- new:discover-entry-points / **Maintainer lists every entry point the repo exposes into inventory.json** — 11 hops over 4 files
-- new:review-change-on-map / **Maintainer generates Mermaid diagrams at system, flow and step zoom** — 12 hops over 2 files
-- new:review-change-on-map / **Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)** — 12 hops over 3 files
-- new:review-change-on-map / **Developer asks which entry points and flows can reach a file:symbol** — 8 hops over 1 files
-- new:review-change-on-map / **Maintainer builds the interactive atlas page and browses flows, steps and components** — 12 hops over 4 files
-- new:run-mapping-passes / **Maintainer votes the passes into one map with evidence levels and a list of open questions** — 10 hops over 1 files
+- build-the-map / **Maintainer lists every entry point the repo exposes into inventory.json** — 9 hops over 4 files
+- build-the-map / **Maintainer checks that every entry point's handler is a call-graph node** — 9 hops over 6 files
+- build-the-map / **Maintainer votes the passes into one map with evidence levels and a list of open questions** — 9 hops over 1 files
+- browse-the-map / **Maintainer generates Mermaid diagrams of the map at system, flow and step zoom** — 9 hops over 2 files
+- browse-the-map / **Maintainer builds the interactive atlas page and browses flows, steps, merges and code** — 10 hops over 2 files
+- review-a-change / **Reviewer runs lens on base..head to get the verdict, touched steps, reach and blind spots** — 13 hops over 2 files
+- review-a-change / **Author pulls the change's deterministic facts as JSON to write the story from** — 12 hops over 3 files
 
 ## Observations ("fighting the system"), by run
 
 ### bu-1 (bottom-up)
-- Two implementations of 'place a diff on the map': flowmap/atlas.py:overlay re-derives changed/new symbols and call-graph reach itself using lens helpers, instead of sharing logic with flowmap/lens.py:main. They already differ: overlay skips test files and '<module>' hits, lens.main counts '<module>' as a changed symbol and classifies steps by anchor match first.
-- flowmap/atlas.py:build calls flowmap/diagrams.py:Diagrams.system and throws away the Mermaid it returns, only to get self.matrix set as a side effect.
-- flowmap/atlas.py:split_votes scrapes split votes back out of the human-facing QUESTIONS.md written by flowmap/reconcile.py:write_questions_md (regex on '→ placed'): a generated report doubles as a data interface, and the vote data is never written to map.json.
-- The call graph is rebuilt from scratch in four places: flowmap/callgraph.py:__main__, flowmap/diagrams.py:Diagrams.__init__, flowmap/lens.py:main and once per --pr in flowmap/atlas.py:overlay (plus Diagrams again in flowmap/atlas.py:build).
-- flowmap/adapters/cli.py:_files lists commands with git ls-files, so a new, untracked command script is invisible to inventory while every other tool reads the worktree; flowmap/config.py:detect_entries never auto-detects the cli adapter, so CLI repos depend on flowmap.toml.
-- flowmap/verify.py:anchor_ok checks each dotted part of 'Class.method' independently anywhere in the file, so a method cited under the wrong class still passes.
-- flowmap/reconcile.py:canonical_new_flows merges proposed flows transitively at Jaccard >= 0.3 via union-find, so a chain of partially overlapping proposals can collapse into one flow.
-- Docstrings and messages still name another repo's layout ('tools/flowmap/...', 'backend/app' in flowmap/callgraph.py and flowmap/reconcile.py:write_map_md), though the real path is flowmap/ under config.root().
+- Three separate implementations of 'which symbols did this diff change': flowmap/lens.py:analyse (filters docstring/format-only edits via flowmap/lens.py:cosmetic), flowmap/change.py:facts (no cosmetic filter, adds new/deleted/modified status and class folding) and flowmap/atlas.py:overlay (no cosmetic filter, its own new-vs-changed split). change.facts then calls lens.analyse anyway just for the verdict, and flowmap/canvas.py:main calls lens.analyse again after atlas.overlay already walked the same diff, so a docstring-only edit can be 'changed' on the change page and canvas paint yet not count toward the lens verdict.
+- The same bounded breadth-first 'code under a step' walk exists twice: flowmap/diagrams.py:Diagrams.step and flowmap/atlas.py:step_code (same MAX_NODES/MAX_DEPTH, same noise skip), differing only in output shape.
+- State round-tripped through prose: reconcile records tie-broken split votes only in QUESTIONS.md (flowmap/reconcile.py:write_questions_md), and flowmap/atlas.py:split_votes regex-scrapes them back out of that markdown; flowmap/canvas.py:from_page likewise regex-scrapes JSON out of a rendered atlas HTML page; bin/flowmap-pr-hook:hook regex-scrapes counts from lens's markdown instead of using its --json mode.
+- Building the static, data-free viewer (flowmap/viewer.py:main -> flowmap/change.py:viewer_html) imports change.py, which imports lens, atlas, diagrams, graphs and config at module level (lens compiles CODE from config.app_dirs(), atlas/diagrams read config.load()), so `flowmap viewer` needs a git repo and flowmap config even though the page it writes holds no repo data.
+- flowmap/diagrams.py:Diagrams.write hard-codes text from the app this tool was extracted from ('workflow engine = `executor.run_workflow`') and tells the reader to override plumbing 'in decisions.json', while plumbing is actually read from flowmap.toml [flows].plumbing via flowmap/config.py:load.
+- Reads with side effects: flowmap/lens.py:defs calls flowmap/graphs/codegraph.py:outline, which runs a full codegraph index into a temp dir and fills a module-level cache keyed by file text; flowmap/lens.py:endpoint_set records failures into the module-global INVENTORY_ERRORS that flowmap/lens.py:blind_spots later reads, so blind spots depend on what earlier calls in the same process happened to inventory.
+- `flowmap callgraph` is three commands behind one entry point (check, impact, dump), and only impact needs map.json (flowmap/callgraph.py:endpoint_flows), so the reach check used during setup works before a map exists but impact does not.
+- Every command is dispatched by bin/flowmap via runpy after flowmap's bin/flowmap:project_python may re-exec under the target repo's .venv; the inventory's handlers (`file:__main__`) hide that dispatcher, so it appears on no step's code path.
 
 ### bu-2 (bottom-up)
-- flowmap/atlas.py:overlay re-implements PR change detection (changed_lines/symbols_at/endpoint_set from lens.py) with its own changed/new classification, parallel to flowmap/lens.py:main.
-- flowmap/atlas.py:build and flowmap/callgraph.py:__main__ import other command scripts as libraries (diagrams, lens), so 'commands' are also shared modules; flowmap/atlas.py:step_code duplicates flowmap/diagrams.py:Diagrams.step.
-- flowmap/callgraph.py:endpoint_flows and flowmap/diagrams.py:Diagrams.__init__ each independently load inventory.json and map.json to build the endpoint-to-handler lookup.
-- flowmap/verify.py:anchor_ok uses regex definition matching while flowmap/callgraph.py:Graph uses the AST, so what counts as a valid symbol can differ between verify and the call graph.
-- flowmap/reconcile.py:main is one very large function doing voting, step clustering, evidence and file writing in one body.
-- flowmap/inventory.py:endpoints is reused by lens.py via git revisions through a custom read callable; the 'inventory' command itself only writes the worktree view.
+- `CLI flowmap callgraph` (flowmap/callgraph.py:__main__) and `CLI flowmap change` (flowmap/change.py:main) are each one entry point that fronts several unrelated intents chosen by argv/flags (dump / check / impact / summary; --facts / --check / --link / render). The inventory cannot tell these apart, so I had to repeat the same endpoint in several steps.
+- `--link` still renders and writes the change HTML (flowmap/change.py:main) although its documented job is only to print a link; `--facts` and `--check` return before writing. Same command, three different write behaviours.
+- reconcile writes QUESTIONS.md as prose and atlas re-parses it with a regex to recover split votes (flowmap/reconcile.py:write_questions_md writes it; flowmap/atlas.py:split_votes parses it). State round-trips through Markdown.
+- flowmap/atlas.py:data calls Diagrams.system() only for its side effect of filling d.matrix (comment: `fills d.matrix`), so the atlas depends on the Mermaid diagram generator's internal state; flowmap/diagrams.py:Diagrams.system reads as a pure render but mutates the object.
+- flowmap/reconcile.py:main is one long function that votes flows, clusters steps, scores evidence, clusters endpoint-less steps, builds map.json and drives two renderers; by far the busiest single hop.
+- Several modules evaluate config at import time (flowmap/lens.py MAP/CODE regex, flowmap/diagrams.py ENGINE_ROOT/PLUMBING/APP_DIRS, flowmap/atlas.py OUT, flowmap/verify.py ROOT), and flowmap/viewer.py imports flowmap/change.py:viewer_html, which drags in lens, atlas, graphs and config just to read a template. Running the viewer builder needs a valid repo config.
+- flowmap/change.py:facts, flowmap/lens.py:analyse and flowmap/canvas.py:main all recompute overlapping facts (changed symbols, graph at base and head, endpoint sets); change.facts even calls lens.analyse for the verdict after recomputing most of it itself. lru_cache on lens.graph_at is what keeps this affordable.
+- Three overlapping notions of 'app code': config.graph_files/graph_roots ([code].graph), config.app_dirs (adapter roots plus other) feeding lens.CODE, and the adapter-specific file listings in flowmap/adapters/cli.py:_files. A file can be in one and not the others (bin/ is `other` only, so bin/flowmap-pr-hook is not an entry point and is not in the call graph).
+- Symbol-definition detection exists in multiple places with different rules: flowmap/verify.py:anchor_ok (regex), flowmap/lens.py:defs (builder.symbols or ts_symbols/rb_symbols regex outlines) and flowmap/graphs/python.py:symbols (AST). A citation verify accepts may not be a node the graph knows.
+- flowmap/diagrams.py still hard-codes an app-specific `workflow engine` notion (ENGINE_ROOT from [flows].engine, text mentioning `executor.run_workflow`) in an otherwise generic tool; this repo sets no engine, so that branch is dead here.
+- flowmap/callgraph.py:endpoint_flows reads docs/flowmap/map.json, so `callgraph impact` crashes before the first reconcile, while `callgraph check` and the plain/dump forms do not need it. The dependency on reconcile's output is invisible from the command list.
 
 ### td-1 (top-down)
-- flowmap/bin/flowmap dispatches by runpy, so every command is a `__main__` block with business logic inline (flowmap/inventory.py:__main__, flowmap/diagrams.py:__main__) while others delegate to main(); inconsistent shape.
-- flowmap/lens.py:main is a ~200-line function mixing diff parsing, map matching, call-graph reach and markdown rendering.
-- flowmap/atlas.py:overlay duplicates the changed/new symbol computation from flowmap/lens.py:main instead of sharing it.
-- flowmap/reconcile.py:main is very large and writes map.json, MAP.md and QUESTIONS.md in one pass (write_map_md, write_questions_md).
-- flowmap/config.py:load is cached and also auto-detects entries (detect_entries), so a read of config can scan the filesystem with glob.
-- flowmap/brief.py:main reads flowmap/RUN_SPEC.md and drops the first lines by split, so the template header layout is load-bearing.
-- Commands lens, callgraph, diagrams and atlas require docs/flowmap/map.json (from reconcile) at import time (flowmap/lens.py MAP, flowmap/callgraph.py:endpoint_flows), so ordering between commands is implicit.
+- Changed-symbol detection is done three times with near-identical loops: flowmap/lens.py:analyse, flowmap/change.py:facts and flowmap/atlas.py:overlay each call changed_lines/symbols_at/defs and classify new vs modified separately, so lens, change and atlas --pr can disagree on what 'changed' means.
+- flowmap/atlas.py:split_votes reads generated Markdown (QUESTIONS.md) back with a regex to recover data that reconcile.py:main already had in memory; an edit to reconcile.py:write_questions_md silently breaks atlas.
+- flowmap/canvas.py:from_page scrapes `const DATA = {...};` out of a rendered atlas.html, coupling canvas to the atlas template's exact text.
+- The `CLI flowmap callgraph` entry point serves four unrelated jobs (summary, dump, check, impact) in one __main__ block (flowmap/callgraph.py:__main__); check is a setup step while impact is a review step, so one inventory endpoint has to appear in two flows.
+- Module-level side effects at import: flowmap/lens.py reads config and compiles CODE/MAP, flowmap/diagrams.py reads ENGINE_ROOT/PLUMBING/APP_DIRS, flowmap/atlas.py fixes OUT, flowmap/verify.py fixes ROOT. atlas, canvas and change all import these, so config is frozen at first import (config.load/root are also @cache).
+- flowmap/diagrams.py:Diagrams.system is called by flowmap/atlas.py:data purely for its side effect of filling d.matrix ('d.system()  # fills d.matrix'), a read that writes hidden state.
+- flowmap/reconcile.py:tested_endpoints has a special CLI heuristic that greps test text for the module's file name or 'import <module>', a much weaker notion of 'tested' than the path match used for HTTP endpoints.
+- bin/flowmap-pr-hook and bin/flowmap are shell/script entry points a person or Claude Code hook runs but they are not in inventory.json (the cli adapter only scans flowmap/*.py), so the PR hook flow described in README is invisible to the map.
 
 ### td-2 (top-down)
-- Two implementations of 'which symbols did this diff change': flowmap/lens.py:main (keeps <module>, tracks new_symbols vs base) and flowmap/atlas.py:overlay (drops <module>, splits new/changed) each re-derive it from flowmap/lens.py:changed_lines + flowmap/lens.py:symbols_at, and each rebuilds a head-revision flowmap/callgraph.py:Graph.__init__ separately.
-- flowmap/atlas.py:split_votes reads split votes back out of the human-facing QUESTIONS.md with a regex instead of from map.json; the data written by flowmap/reconcile.py:write_questions_md becomes an implicit machine format.
-- flowmap/atlas.py:overlay calls flowmap/lens.py:endpoint_set(head) twice, each re-running the whole inventory over git show.
-- Stale/mismatched prose baked into outputs: flowmap/diagrams.py:Diagrams.write always prints '**workflow engine** = `executor.run_workflow`' and says plumbing is overridden in decisions.json, while plumbing actually comes from flowmap.toml via flowmap/config.py:load; flowmap/reconcile.py:write_map_md cites 'tools/flowmap/reconcile.py'; callgraph's docstring still says 'backend/app'.
-- flowmap/callgraph.py:Graph.reaches has no callers in the repo (dead code).
-- Importing flowmap/atlas.py pulls in flowmap/lens.py, whose module-level code compiles regexes from flowmap/config.py:app_dirs, so even a plain atlas build depends on lens's config side effects.
-- flowmap/verify.py:anchor_ok treats any line matching `^\s*name\s*[:=(]` as a definition, so a local assignment or a call at line start satisfies a citation; verification is looser than 'defined in that file'.
-- Nothing writes flowmap.toml or decisions.json; the human decision step between two reconcile runs is entirely off-CLI, and flowmap/callgraph.py:endpoint_flows and flowmap/diagrams.py:Diagrams.__init__ fail outright if map.json does not yet exist.
+- Three separate derivations of 'which symbols changed': flowmap/lens.py:analyse (drops docstring/format-only edits via flowmap/lens.py:cosmetic), flowmap/change.py:facts (no cosmetic filter, adds new/deleted/modified status) and flowmap/atlas.py:overlay (no cosmetic filter, new vs changed by base defs). A change page can list a symbol whose edit the verdict on the same page ignored.
+- flowmap/change.py:facts calls flowmap/lens.py:analyse in full just to read verdict/blind/spreads_to, after already recomputing changed lines, graphs and endpoint sets itself; flowmap/canvas.py:main does the same per --change on top of flowmap/atlas.py:overlay. `flowmap change` is busier than its intent ('render a page') because it is lens plus a second lens.
+- flowmap/atlas.py:data builds the call graph from the working tree (flowmap/diagrams.py:Diagrams.__init__ -> flowmap/callgraph.py:Graph.__init__) while flowmap/atlas.py:overlay uses flowmap/lens.py:graph_at(head) from git; one atlas page can mix two graphs when the worktree differs from head.
+- flowmap/atlas.py:split_votes reads the reconciler's split votes back by regex-parsing the generated QUESTIONS.md prose instead of structured data from flowmap/reconcile.py:main: a markdown wording change in flowmap/reconcile.py:write_questions_md silently empties the atlas's split badges.
+- flowmap/change.py imports flowmap/atlas.py:step_keys, which pulls in flowmap/diagrams.py (module-level config reads, Diagrams) just for a tiny key helper: the change command depends on the atlas/diagram stack.
+- flowmap/lens.py:endpoint_set records failures into the module-global INVENTORY_ERRORS that flowmap/lens.py:blind_spots later reads; since flowmap/change.py:facts calls endpoint_set itself and then lens.analyse, state from one call leaks into the next analysis in the same process.
+- flowmap/diagrams.py:Diagrams.write hardcodes '`executor.run_workflow`' in the generated README text regardless of the configured [flows].engine, and generated docs still say 'tools/flowmap/...'; leftovers from the app the tool was first built in.
+- Two lists of commands must stay in sync: bin/flowmap's COMMANDS set dispatches via runpy, while the inventory derives commands from every flowmap/*.py with a __main__ block (flowmap/adapters/cli.py:entries); bin/flowmap-pr-hook, the only automatic caller, is not an entry point at all.
+- flowmap/change.py:main writes the HTML page before refusing --link on story lint problems, so a 'refused' run still overwrites docs/flowmap/changes/<name>.html.
