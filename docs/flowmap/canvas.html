@@ -1,0 +1,811 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flowmap · flowmap canvas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* One canvas, read left to right: screens, the flows and their steps, the code they run (a card
+   per file, placed by call depth), the data they write. A flow is a path on it; a change is paint
+   on it. Positions follow the map's own order, so the picture stays put between builds. */
+:root {
+  --paper: #eef1f4; --surface: #ffffff; --ink: #17202b; --muted: #5b6676; --faint: #8a95a3;
+  --rule: #d5dbe2; --wire: #aab4c0; --wire-hi: #2e5bff; --accent: #2e5bff; --accent-soft: rgba(46, 91, 255, .10);
+  --chg: #c77700; --chg-soft: rgba(230, 150, 20, .16); --new: #1e8a4c; --new-soft: rgba(30, 138, 76, .13);
+  --ev-good: #2f9e5b; --ev-mid: #d99a0b; --ev-bad: #c8423b;
+  --k-screen: #7a4fd6; --k-code: #2e5bff; --k-data: #0f8a8a; --k-flow: #17202b;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #171e27; --ink: #e6ebf1; --muted: #9aa6b5; --faint: #6b7787; --rule: #2a3441;
+    --wire: #3f4b5b; --wire-hi: #7c9cff; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .14);
+    --chg: #f0a83a; --chg-soft: rgba(240, 168, 58, .16); --new: #4cc27f; --new-soft: rgba(76, 194, 127, .14);
+    --k-screen: #a98cf0; --k-code: #7c9cff; --k-data: #3cc2c2; --k-flow: #e6ebf1; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #171e27; --ink: #e6ebf1; --muted: #9aa6b5; --faint: #6b7787; --rule: #2a3441;
+  --wire: #3f4b5b; --wire-hi: #7c9cff; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .14);
+  --chg: #f0a83a; --chg-soft: rgba(240, 168, 58, .16); --new: #4cc27f; --new-soft: rgba(76, 194, 127, .14);
+  --k-screen: #a98cf0; --k-code: #7c9cff; --k-data: #3cc2c2; --k-flow: #e6ebf1; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.45 var(--body); display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+button { font: inherit; color: inherit; }
+.mono { font-family: var(--mono); }
+
+/* header */
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 16px; border-bottom: 1px solid var(--rule); background: var(--surface); z-index: 5; }
+h1 { font: 800 22px/1 var(--display); font-stretch: 75%; margin: 0; letter-spacing: .01em; }
+.crumbs { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; min-width: 0; }
+.crumbs a { color: inherit; cursor: pointer; text-decoration: none; }
+.crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.crumbs b { color: var(--ink); font-weight: 600; }
+.spacer { flex: 1; }
+.ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+select, input[type="search"] { font: 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; }
+input[type="search"] { width: 200px; }
+.btn { border: 1px solid var(--rule); background: var(--surface); border-radius: 8px; padding: 6px 11px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--muted); }
+.btn.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+/* stage */
+main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+#stage { position: relative; overflow: hidden; cursor: grab; touch-action: none; background-image: radial-gradient(var(--rule) 1px, transparent 1px); background-size: 22px 22px; }
+#stage.panning { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.zoom { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 4px; z-index: 3; }
+.zoom .btn { width: 34px; padding: 6px 0; text-align: center; }
+.colhead { position: absolute; font: 600 11px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+
+/* wires */
+.w { fill: none; stroke: var(--wire); stroke-width: 1.3; transition: opacity .15s, stroke .15s; }
+.w.ui { stroke-dasharray: 4 4; }
+.w.writes { stroke: var(--k-data); stroke-opacity: .55; stroke-dasharray: 2 3; }
+.w.hi { stroke: var(--wire-hi); stroke-opacity: 1; stroke-width: 2.2; }
+.w.writes.hi { stroke: var(--k-data); stroke-width: 2.2; }
+.dim .w:not(.hi) { opacity: .18; }
+.pulse { fill: var(--wire-hi); }
+
+/* cards */
+.card { position: absolute; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 10px 12px; cursor: pointer; transition: opacity .15s, box-shadow .15s, border-color .15s; overflow: hidden; }
+.card:hover { border-color: var(--muted); }
+.card.sel { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+.dim .card:not(.hi):not(.sel), .dim .flowbox:not(.hi) > .fbhead { opacity: .28; }
+.kind { display: inline-flex; align-items: center; gap: 6px; font: 600 10.5px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.kind i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.title { font-weight: 600; font-size: 14px; line-height: 1.3; margin-top: 4px; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.sub { color: var(--muted); font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.screen .kind i { background: var(--k-screen); }
+.card.file .kind i { background: var(--k-code); }
+.card.data { border-style: dashed; }
+.card.off { border-style: dashed !important; }
+.card.data .kind i { background: var(--k-data); border-radius: 50%; }
+.card.file .title { font-family: var(--mono); font-size: 13.5px; -webkit-line-clamp: 1; }
+.card.step { border-radius: 10px; padding: 8px 11px; }
+.card.step .title { -webkit-line-clamp: 2; font-weight: 500; font-size: 13px; margin-top: 0; }
+.card.step .foot { display: flex; gap: 6px; align-items: center; margin-top: 5px; color: var(--muted); font-size: 11.5px; min-width: 0; }
+.ep { font: 500 11px/1.2 var(--mono); background: var(--paper); border-radius: 5px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.ev { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+.ev.confirmed, .ev.tested, .ev.agreed { background: var(--ev-good); }
+.ev.contested { background: var(--ev-mid); }
+.ev.single-source, .ev.single { background: var(--ev-bad); }
+.card.flow { border-width: 1.5px; border-color: var(--k-flow); border-radius: 16px; }
+.card.flow .title { font: 700 17px/1.15 var(--display); font-stretch: 85%; -webkit-line-clamp: 1; }
+.card.flow .summary { color: var(--muted); font-size: 12px; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tag { display: inline-block; font: 600 10.5px/1 var(--body); padding: 3px 6px; border-radius: 5px; background: var(--paper); color: var(--muted); letter-spacing: .02em; }
+.flowbox { position: absolute; border: 1.5px solid var(--k-flow); border-radius: 18px; background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.fbhead { position: absolute; left: 14px; right: 10px; top: 10px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.fbhead .title { font: 700 17px/1.15 var(--display); font-stretch: 85%; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.icon-btn { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+.icon-btn:hover { background: var(--paper); color: var(--ink); }
+.fnlist { margin-top: 4px; line-height: 1.35 !important; font: 11.5px/1.45 var(--mono); color: var(--muted); }
+.fnlist span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.far .sub, .far .fnlist, .far .card.step .foot, .far .summary { visibility: hidden; }
+
+/* change paint */
+.card.p-changed { background: linear-gradient(var(--chg-soft), var(--chg-soft)), var(--surface); border-color: var(--chg); border-width: 2px; }
+.card.p-new { background: linear-gradient(var(--new-soft), var(--new-soft)), var(--surface); border-color: var(--new); border-width: 2px; }
+.card.p-direct { box-shadow: inset 4px 0 0 var(--chg); border-color: var(--chg); }
+.card.p-reach { box-shadow: inset 4px 0 0 var(--chg); border-style: dashed; border-color: var(--chg); }
+.card.p-newstep { box-shadow: inset 4px 0 0 var(--new); border-color: var(--new); }
+.card.sel.p-direct, .card.sel.p-reach, .card.sel.p-newstep { box-shadow: 0 0 0 2px var(--accent); }
+.badges { position: absolute; top: -9px; right: 10px; display: flex; gap: 4px; }
+.badge { min-width: 20px; height: 20px; border-radius: 10px; background: var(--chg); color: #fff; font: 700 11px/20px var(--body); text-align: center; padding: 0 6px; box-shadow: 0 0 0 2px var(--paper); }
+.badge.n { background: var(--ink); color: var(--surface); }
+.card { overflow: visible; }
+.card .clip { overflow: hidden; }
+.pill { position: absolute; border: 1px dashed var(--muted); border-radius: 999px; padding: 6px 14px; background: var(--surface); font-size: 12.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill:hover { border-style: solid; }
+
+/* flow bar */
+#flowbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 10px 14px; display: none; gap: 12px; align-items: center; z-index: 4; box-shadow: 0 8px 24px rgba(0,0,0,.08); max-width: min(720px, calc(100% - 28px)); }
+#flowbar.on { display: flex; }
+#flowbar .fb-text { min-width: 0; }
+#flowbar .fb-k { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+#flowbar .fb-t { font-weight: 600; font-size: 13.5px; }
+
+/* panel */
+aside { border-left: 1px solid var(--rule); background: var(--surface); overflow: auto; padding: 18px 18px 40px; }
+aside h2 { font: 800 21px/1.12 var(--display); font-stretch: 80%; margin: 4px 0 8px; }
+aside h3 { font: 600 11px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 20px 0 8px; }
+aside p { margin: 6px 0; }
+aside .lead { color: var(--muted); }
+aside ul { margin: 4px 0; padding-left: 18px; }
+aside li { margin: 3px 0; }
+.rowlink { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; margin: 0 -8px; border-radius: 8px; cursor: pointer; }
+.rowlink:hover { background: var(--paper); }
+.rowlink > span { min-width: 0; }
+.rowlink .sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rowlink .n { font: 700 11px/18px var(--body); min-width: 18px; height: 18px; border-radius: 9px; text-align: center; background: var(--paper); color: var(--muted); flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font: 12px var(--mono); background: var(--paper); border-radius: 6px; padding: 2px 7px; cursor: pointer; }
+.chip:hover { outline: 1px solid var(--muted); }
+.kv { display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.verdict { display: inline-block; font: 700 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 4px 7px; border-radius: 5px; color: #fff; }
+.verdict.contained { background: var(--ev-good); }
+.verdict.spreads { background: var(--chg); }
+.verdict.blind { background: var(--ev-bad); }
+.ba { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 8px 0; }
+.ba div { background: var(--paper); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.ba b { display: block; font: 600 10.5px/1.4 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.legend { display: grid; gap: 7px; font-size: 12.5px; }
+.legend div { display: flex; gap: 9px; align-items: center; }
+.sw { width: 22px; height: 14px; border-radius: 4px; border: 1px solid var(--rule); background: var(--surface); flex: none; }
+.calltree { font: 12px/1.6 var(--mono); }
+.calltree ul { list-style: none; padding-left: 14px; margin: 0; border-left: 1px solid var(--rule); }
+.calltree > ul { border: 0; padding-left: 0; }
+.struck { text-decoration: line-through; text-decoration-color: var(--ev-bad); color: var(--muted); }
+.q { border-left: 3px solid var(--accent); padding: 2px 0 2px 10px; margin: 6px 0; font-size: 13px; }
+a.ext { color: var(--accent); }
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 1fr 42%; }
+  aside { border-left: 0; border-top: 1px solid var(--rule); }
+  input[type="search"] { width: 140px; }
+}
+</style>
+
+<header>
+  <h1>flowmap</h1>
+  <nav class="crumbs" id="crumbs"></nav>
+  <span class="spacer"></span>
+  <div class="ctl">
+    <select id="change" aria-label="Paint a change"></select>
+    <button class="btn" id="expand" title="Show every step (E)">Expand all</button>
+    <input type="search" id="find" placeholder="Find a step, file, endpoint…" aria-label="Find">
+  </div>
+</header>
+<main>
+  <div id="stage" tabindex="0" aria-label="Map canvas">
+    <div id="world"><svg id="wires"></svg></div>
+    <div id="flowbar"><button class="icon-btn" id="fb-prev" aria-label="Previous step">←</button><div class="fb-text"><div class="fb-k" id="fb-k"></div><div class="fb-t" id="fb-t"></div></div><button class="icon-btn" id="fb-next" aria-label="Next step">→</button><button class="icon-btn" id="fb-x" aria-label="Stop">✕</button></div>
+    <div class="zoom"><button class="btn" id="z-in" aria-label="Zoom in">+</button><button class="btn" id="z-out" aria-label="Zoom out">−</button><button class="btn" id="z-fit" aria-label="Fit" title="Fit (F)">⤢</button></div>
+  </div>
+  <aside id="panel"></aside>
+</main>
+
+<script>
+const G = {"flows":[{"id":"flow:new:discover-entry-points","key":"new:discover-entry-points","title":"Discover entry points","summary":"Maintainer scans the repo being mapped and gets the list of every entry point, the join key for all later passes.","steps":["s:new:discover-entry-points/list-entry-points"],"draft":true},{"id":"flow:new:review-change-on-map","key":"new:review-change-on-map","title":"Review change on map","summary":"See the map: flows, their steps and the code each step runs, as Mermaid diagrams and an interactive atlas page.","steps":["s:new:review-change-on-map/generate-diagrams","s:new:review-change-on-map/lens-place-change","s:new:review-change-on-map/callgraph-impact","s:new:review-change-on-map/build-atlas"],"draft":true},{"id":"flow:new:run-mapping-passes","key":"new:run-mapping-passes","title":"Run mapping passes","summary":"Turn a repo into a first flow map: list its entry points, brief independent mapping passes, check each pass, and vote them into one map.","steps":["s:new:run-mapping-passes/write-pass-brief","s:new:run-mapping-passes/reconcile-runs","s:new:run-mapping-passes/verify-pass-citations"],"draft":true}],"steps":{"s:new:discover-entry-points/list-entry-points":{"id":"s:new:discover-entry-points/list-entry-points","key":"new:discover-entry-points/list-entry-points","flow":"flow:new:discover-entry-points","name":"Maintainer lists every entry point the repo exposes into inventory.json","actor":"user","evidence":"agreed","endpoints":["CLI flowmap inventory"],"writes":["docs/flowmap/inventory.json"],"ui":[],"handlers":["f:inventory.py"],"roots":["flowmap/inventory.py:__main__"],"fns":["flowmap/inventory.py:__main__"],"calls":[],"hidden":0,"also":["endpoints","out","root"]},"s:new:review-change-on-map/generate-diagrams":{"id":"s:new:review-change-on-map/generate-diagrams","key":"new:review-change-on-map/generate-diagrams","flow":"flow:new:review-change-on-map","name":"Maintainer generates Mermaid diagrams at system, flow and step zoom","actor":"user","evidence":"agreed","endpoints":["CLI flowmap diagrams"],"writes":["docs/flowmap/diagrams/<flow>.md","docs/flowmap/diagrams/README.md"],"ui":["flowmap/diagrams.py:Diagrams.write"],"handlers":["f:diagrams.py"],"roots":["flowmap/diagrams.py:__main__"],"fns":["flowmap/diagrams.py:__main__","flowmap/diagrams.py:Diagrams.write","flowmap/diagrams.py:Diagrams.flow","flowmap/diagrams.py:Diagrams.step","flowmap/diagrams.py:Diagrams.system","flowmap/diagrams.py:label","flowmap/diagrams.py:nid","flowmap/diagrams.py:short","flowmap/diagrams.py:Diagrams._forward_avoiding"],"calls":[["flowmap/diagrams.py:__main__","flowmap/diagrams.py:Diagrams.write"],["flowmap/diagrams.py:Diagrams.write","flowmap/diagrams.py:Diagrams.flow"],["flowmap/diagrams.py:Diagrams.write","flowmap/diagrams.py:Diagrams.step"],["flowmap/diagrams.py:Diagrams.write","flowmap/diagrams.py:Diagrams.system"],["flowmap/diagrams.py:Diagrams.flow","flowmap/diagrams.py:label"],["flowmap/diagrams.py:Diagrams.flow","flowmap/diagrams.py:nid"],["flowmap/diagrams.py:Diagrams.step","flowmap/diagrams.py:label"],["flowmap/diagrams.py:Diagrams.step","flowmap/diagrams.py:nid"],["flowmap/diagrams.py:Diagrams.step","flowmap/diagrams.py:short"],["flowmap/diagrams.py:Diagrams.system","flowmap/diagrams.py:Diagrams._forward_avoiding"],["flowmap/diagrams.py:Diagrams.system","flowmap/diagrams.py:label"],["flowmap/diagrams.py:Diagrams.system","flowmap/diagrams.py:nid"]],"hidden":0,"also":[]},"s:new:review-change-on-map/lens-place-change":{"id":"s:new:review-change-on-map/lens-place-change","key":"new:review-change-on-map/lens-place-change","flow":"flow:new:review-change-on-map","name":"Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)","actor":"user","evidence":"agreed","endpoints":["CLI flowmap lens"],"writes":[],"ui":[],"handlers":["f:lens.py"],"roots":["flowmap/lens.py:__main__"],"fns":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:analyse","flowmap/lens.py:analyse.hits","flowmap/lens.py:analyse.listing","flowmap/lens.py:blind_spots","flowmap/lens.py:changed_lines","flowmap/lens.py:cosmetic","flowmap/lens.py:defs","flowmap/lens.py:endpoint_set","flowmap/lens.py:importers","flowmap/lens.py:reach_diff","flowmap/lens.py:symbols_at","flowmap/graphs/codegraph.py:hint","flowmap/graphs/python.py:same","flowmap/graphs/codegraph.py:outline","flowmap/graphs/codegraph.py:symbols","flowmap/graphs/python.py:symbols","flowmap/lens.py:rb_symbols","flowmap/lens.py:ts_symbols","flowmap/callgraph.py:Graph.callees","flowmap/callgraph.py:Graph.edge_set"],"calls":[["flowmap/lens.py:__main__","flowmap/lens.py:main"],["flowmap/lens.py:main","flowmap/lens.py:analyse"],["flowmap/lens.py:analyse","flowmap/lens.py:analyse.hits"],["flowmap/lens.py:analyse","flowmap/lens.py:analyse.listing"],["flowmap/lens.py:analyse","flowmap/lens.py:blind_spots"],["flowmap/lens.py:analyse","flowmap/lens.py:changed_lines"],["flowmap/lens.py:analyse","flowmap/lens.py:cosmetic"],["flowmap/lens.py:analyse","flowmap/lens.py:defs"],["flowmap/lens.py:analyse","flowmap/lens.py:endpoint_set"],["flowmap/lens.py:analyse","flowmap/lens.py:importers"],["flowmap/lens.py:analyse","flowmap/lens.py:reach_diff"],["flowmap/lens.py:analyse","flowmap/lens.py:symbols_at"],["flowmap/lens.py:blind_spots","flowmap/graphs/codegraph.py:hint"],["flowmap/lens.py:cosmetic","flowmap/graphs/python.py:same"],["flowmap/lens.py:defs","flowmap/graphs/codegraph.py:outline"],["flowmap/lens.py:defs","flowmap/graphs/codegraph.py:symbols"],["flowmap/lens.py:defs","flowmap/graphs/python.py:symbols"],["flowmap/lens.py:defs","flowmap/lens.py:rb_symbols"],["flowmap/lens.py:defs","flowmap/lens.py:ts_symbols"],["flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.callees"],["flowmap/lens.py:reach_diff","flowmap/callgraph.py:Graph.edge_set"],["flowmap/lens.py:symbols_at","flowmap/lens.py:defs"]],"hidden":1,"also":["Graph._closure","Graph.callers","build","builder_for","endpoints","git","graph_at","graph_roots","main_guard","module_name","out","show","suffixes"]},"s:new:review-change-on-map/callgraph-impact":{"id":"s:new:review-change-on-map/callgraph-impact","key":"new:review-change-on-map/callgraph-impact","flow":"flow:new:review-change-on-map","name":"Developer asks which entry points and flows can reach a file:symbol","actor":"user","evidence":"agreed","endpoints":["CLI flowmap callgraph"],"writes":[],"ui":[],"handlers":["f:callgraph.py"],"roots":["flowmap/callgraph.py:__main__"],"fns":["flowmap/callgraph.py:__main__","flowmap/callgraph.py:Graph.edge_set","flowmap/callgraph.py:classify","flowmap/callgraph.py:impact","flowmap/graphs/codegraph.py:hint","flowmap/callgraph.py:endpoint_flows"],"calls":[["flowmap/callgraph.py:__main__","flowmap/callgraph.py:Graph.edge_set"],["flowmap/callgraph.py:__main__","flowmap/callgraph.py:classify"],["flowmap/callgraph.py:__main__","flowmap/callgraph.py:impact"],["flowmap/callgraph.py:__main__","flowmap/graphs/codegraph.py:hint"],["flowmap/callgraph.py:impact","flowmap/callgraph.py:endpoint_flows"]],"hidden":0,"also":["Graph.callers","builder_for","endpoints","graph_at","graph_files","out"]},"s:new:review-change-on-map/build-atlas":{"id":"s:new:review-change-on-map/build-atlas","key":"new:review-change-on-map/build-atlas","flow":"flow:new:review-change-on-map","name":"Maintainer builds the interactive atlas page and browses flows, steps and components","actor":"user","evidence":"agreed","endpoints":["CLI flowmap atlas"],"writes":["docs/flowmap/atlas.html"],"ui":["flowmap/atlas.py:build","flowmap/atlas.template.html:codeFlow","flowmap/atlas.template.html:paint","flowmap/atlas.template.html:renderCore","flowmap/atlas.template.html:renderLines","flowmap/atlas.template.html:renderRail","flowmap/atlas.template.html:select"],"handlers":["f:atlas.py"],"roots":["flowmap/atlas.py:__main__"],"fns":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:data","flowmap/atlas.py:functions","flowmap/atlas.py:merges","flowmap/atlas.py:overlay","flowmap/atlas.py:split_votes","flowmap/atlas.py:step_code","flowmap/atlas.py:step_keys","flowmap/diagrams.py:Diagrams._forward_avoiding","flowmap/diagrams.py:Diagrams.component","flowmap/diagrams.py:Diagrams.system","flowmap/graphs/codegraph.py:doc","flowmap/graphs/codegraph.py:signature","flowmap/graphs/python.py:doc","flowmap/graphs/python.py:signature","flowmap/diagrams.py:short","flowmap/diagrams.py:Diagrams._forward","flowmap/lens.py:changed_lines","flowmap/lens.py:defs","flowmap/lens.py:endpoint_set","flowmap/lens.py:symbols_at"],"calls":[["flowmap/atlas.py:__main__","flowmap/atlas.py:build"],["flowmap/atlas.py:build","flowmap/atlas.py:data"],["flowmap/atlas.py:data","flowmap/atlas.py:functions"],["flowmap/atlas.py:data","flowmap/atlas.py:merges"],["flowmap/atlas.py:data","flowmap/atlas.py:overlay"],["flowmap/atlas.py:data","flowmap/atlas.py:split_votes"],["flowmap/atlas.py:data","flowmap/atlas.py:step_code"],["flowmap/atlas.py:data","flowmap/atlas.py:step_keys"],["flowmap/atlas.py:data","flowmap/diagrams.py:Diagrams._forward_avoiding"],["flowmap/atlas.py:data","flowmap/diagrams.py:Diagrams.component"],["flowmap/atlas.py:data","flowmap/diagrams.py:Diagrams.system"],["flowmap/atlas.py:functions","flowmap/graphs/codegraph.py:doc"],["flowmap/atlas.py:functions","flowmap/graphs/codegraph.py:signature"],["flowmap/atlas.py:functions","flowmap/graphs/python.py:doc"],["flowmap/atlas.py:functions","flowmap/graphs/python.py:signature"],["flowmap/atlas.py:merges","flowmap/diagrams.py:Diagrams.component"],["flowmap/atlas.py:merges","flowmap/diagrams.py:short"],["flowmap/atlas.py:overlay","flowmap/atlas.py:step_keys"],["flowmap/atlas.py:overlay","flowmap/diagrams.py:Diagrams._forward"],["flowmap/atlas.py:overlay","flowmap/diagrams.py:short"],["flowmap/atlas.py:overlay","flowmap/lens.py:changed_lines"],["flowmap/atlas.py:overlay","flowmap/lens.py:defs"],["flowmap/atlas.py:overlay","flowmap/lens.py:endpoint_set"],["flowmap/atlas.py:overlay","flowmap/lens.py:symbols_at"],["flowmap/atlas.py:step_code","flowmap/diagrams.py:short"],["flowmap/diagrams.py:Diagrams.component","flowmap/diagrams.py:short"],["flowmap/diagrams.py:Diagrams.system","flowmap/diagrams.py:Diagrams._forward_avoiding"],["flowmap/lens.py:symbols_at","flowmap/lens.py:defs"]],"hidden":2,"also":["Graph.callers","builder_for","endpoints","git","graph_at","load","out","show"]},"s:new:run-mapping-passes/write-pass-brief":{"id":"s:new:run-mapping-passes/write-pass-brief","key":"new:run-mapping-passes/write-pass-brief","flow":"flow:new:run-mapping-passes","name":"Maintainer writes one brief per independent pass (run id + bottom-up/top-down method)","actor":"user","evidence":"agreed","endpoints":["CLI flowmap brief"],"writes":["docs/flowmap/runs/<run-id>.brief.md"],"ui":[],"handlers":["f:brief.py"],"roots":["flowmap/brief.py:__main__"],"fns":["flowmap/brief.py:__main__","flowmap/brief.py:main","flowmap/brief.py:vocabulary_text"],"calls":[["flowmap/brief.py:__main__","flowmap/brief.py:main"],["flowmap/brief.py:main","flowmap/brief.py:vocabulary_text"]],"hidden":0,"also":["load","out","root"]},"s:new:run-mapping-passes/reconcile-runs":{"id":"s:new:run-mapping-passes/reconcile-runs","key":"new:run-mapping-passes/reconcile-runs","flow":"flow:new:run-mapping-passes","name":"Maintainer votes the passes into one map with evidence levels and a list of open questions","actor":"user","evidence":"agreed","endpoints":["CLI flowmap reconcile"],"writes":["docs/flowmap/MAP.md","docs/flowmap/QUESTIONS.md","docs/flowmap/map.json"],"ui":[],"handlers":["f:reconcile.py"],"roots":["flowmap/reconcile.py:__main__"],"fns":["flowmap/reconcile.py:__main__","flowmap/reconcile.py:main","flowmap/reconcile.py:UnionFind.find","flowmap/reconcile.py:UnionFind.groups","flowmap/reconcile.py:UnionFind.union","flowmap/reconcile.py:canonical_new_flows","flowmap/reconcile.py:jaccard","flowmap/reconcile.py:tested_endpoints","flowmap/reconcile.py:write_map_md","flowmap/reconcile.py:write_questions_md","flowmap/reconcile.py:path_regex"],"calls":[["flowmap/reconcile.py:__main__","flowmap/reconcile.py:main"],["flowmap/reconcile.py:main","flowmap/reconcile.py:UnionFind.find"],["flowmap/reconcile.py:main","flowmap/reconcile.py:UnionFind.groups"],["flowmap/reconcile.py:main","flowmap/reconcile.py:UnionFind.union"],["flowmap/reconcile.py:main","flowmap/reconcile.py:canonical_new_flows"],["flowmap/reconcile.py:main","flowmap/reconcile.py:jaccard"],["flowmap/reconcile.py:main","flowmap/reconcile.py:tested_endpoints"],["flowmap/reconcile.py:main","flowmap/reconcile.py:write_map_md"],["flowmap/reconcile.py:main","flowmap/reconcile.py:write_questions_md"],["flowmap/reconcile.py:UnionFind.groups","flowmap/reconcile.py:UnionFind.find"],["flowmap/reconcile.py:UnionFind.union","flowmap/reconcile.py:UnionFind.find"],["flowmap/reconcile.py:canonical_new_flows","flowmap/reconcile.py:UnionFind.find"],["flowmap/reconcile.py:canonical_new_flows","flowmap/reconcile.py:UnionFind.groups"],["flowmap/reconcile.py:canonical_new_flows","flowmap/reconcile.py:UnionFind.union"],["flowmap/reconcile.py:canonical_new_flows","flowmap/reconcile.py:jaccard"],["flowmap/reconcile.py:tested_endpoints","flowmap/reconcile.py:path_regex"]],"hidden":0,"also":["load"]},"s:new:run-mapping-passes/verify-pass-citations":{"id":"s:new:run-mapping-passes/verify-pass-citations","key":"new:run-mapping-passes/verify-pass-citations","flow":"flow:new:run-mapping-passes","name":"Maintainer checks each pass's anchors exist and every entry point is placed","actor":"user","evidence":"agreed","endpoints":["CLI flowmap verify"],"writes":[],"ui":[],"handlers":["f:verify.py"],"roots":["flowmap/verify.py:__main__"],"fns":["flowmap/verify.py:__main__","flowmap/verify.py:verify","flowmap/verify.py:anchor_ok","flowmap/verify.py:endpoints_in","flowmap/verify.py:_text"],"calls":[["flowmap/verify.py:__main__","flowmap/verify.py:verify"],["flowmap/verify.py:verify","flowmap/verify.py:anchor_ok"],["flowmap/verify.py:verify","flowmap/verify.py:endpoints_in"],["flowmap/verify.py:anchor_ok","flowmap/verify.py:_text"]],"hidden":0,"also":["out"]}},"files":{"f:inventory.py":{"id":"f:inventory.py","label":"inventory.py","path":"flowmap/inventory.py","fns":["flowmap/inventory.py:__main__"],"steps":["s:new:discover-entry-points/list-entry-points"],"depth":0},"f:diagrams.py":{"id":"f:diagrams.py","label":"diagrams.py","path":"flowmap/diagrams.py","fns":["flowmap/diagrams.py:__main__","flowmap/diagrams.py:Diagrams.write","flowmap/diagrams.py:Diagrams.flow","flowmap/diagrams.py:Diagrams.step","flowmap/diagrams.py:Diagrams.system","flowmap/diagrams.py:label","flowmap/diagrams.py:nid","flowmap/diagrams.py:short","flowmap/diagrams.py:Diagrams._forward_avoiding","flowmap/diagrams.py:Diagrams.component","flowmap/diagrams.py:Diagrams._forward"],"steps":["s:new:review-change-on-map/build-atlas","s:new:review-change-on-map/generate-diagrams"],"depth":1},"f:lens.py":{"id":"f:lens.py","label":"lens.py","path":"flowmap/lens.py","fns":["flowmap/lens.py:__main__","flowmap/lens.py:main","flowmap/lens.py:analyse","flowmap/lens.py:analyse.hits","flowmap/lens.py:analyse.listing","flowmap/lens.py:blind_spots","flowmap/lens.py:changed_lines","flowmap/lens.py:cosmetic","flowmap/lens.py:defs","flowmap/lens.py:endpoint_set","flowmap/lens.py:importers","flowmap/lens.py:reach_diff","flowmap/lens.py:symbols_at","flowmap/lens.py:rb_symbols","flowmap/lens.py:ts_symbols"],"steps":["s:new:review-change-on-map/build-atlas","s:new:review-change-on-map/lens-place-change"],"depth":1},"f:graphs/codegraph.py":{"id":"f:graphs/codegraph.py","label":"graphs/codegraph.py","path":"flowmap/graphs/codegraph.py","fns":["flowmap/graphs/codegraph.py:hint","flowmap/graphs/codegraph.py:outline","flowmap/graphs/codegraph.py:symbols","flowmap/graphs/codegraph.py:doc","flowmap/graphs/codegraph.py:signature"],"steps":["s:new:review-change-on-map/build-atlas","s:new:review-change-on-map/callgraph-impact","s:new:review-change-on-map/lens-place-change"],"depth":3},"f:graphs/python.py":{"id":"f:graphs/python.py","label":"graphs/python.py","path":"flowmap/graphs/python.py","fns":["flowmap/graphs/python.py:same","flowmap/graphs/python.py:symbols","flowmap/graphs/python.py:doc","flowmap/graphs/python.py:signature"],"steps":["s:new:review-change-on-map/build-atlas","s:new:review-change-on-map/lens-place-change"],"depth":2},"f:callgraph.py":{"id":"f:callgraph.py","label":"callgraph.py","path":"flowmap/callgraph.py","fns":["flowmap/callgraph.py:Graph.callees","flowmap/callgraph.py:Graph.edge_set","flowmap/callgraph.py:__main__","flowmap/callgraph.py:classify","flowmap/callgraph.py:impact","flowmap/callgraph.py:endpoint_flows"],"steps":["s:new:review-change-on-map/callgraph-impact","s:new:review-change-on-map/lens-place-change"],"depth":2},"f:atlas.py":{"id":"f:atlas.py","label":"atlas.py","path":"flowmap/atlas.py","fns":["flowmap/atlas.py:__main__","flowmap/atlas.py:build","flowmap/atlas.py:data","flowmap/atlas.py:functions","flowmap/atlas.py:merges","flowmap/atlas.py:overlay","flowmap/atlas.py:split_votes","flowmap/atlas.py:step_code","flowmap/atlas.py:step_keys"],"steps":["s:new:review-change-on-map/build-atlas"],"depth":0},"f:brief.py":{"id":"f:brief.py","label":"brief.py","path":"flowmap/brief.py","fns":["flowmap/brief.py:__main__","flowmap/brief.py:main","flowmap/brief.py:vocabulary_text"],"steps":["s:new:run-mapping-passes/write-pass-brief"],"depth":0},"f:reconcile.py":{"id":"f:reconcile.py","label":"reconcile.py","path":"flowmap/reconcile.py","fns":["flowmap/reconcile.py:__main__","flowmap/reconcile.py:main","flowmap/reconcile.py:UnionFind.find","flowmap/reconcile.py:UnionFind.groups","flowmap/reconcile.py:UnionFind.union","flowmap/reconcile.py:canonical_new_flows","flowmap/reconcile.py:jaccard","flowmap/reconcile.py:tested_endpoints","flowmap/reconcile.py:write_map_md","flowmap/reconcile.py:write_questions_md","flowmap/reconcile.py:path_regex"],"steps":["s:new:run-mapping-passes/reconcile-runs"],"depth":0},"f:verify.py":{"id":"f:verify.py","label":"verify.py","path":"flowmap/verify.py","fns":["flowmap/verify.py:__main__","flowmap/verify.py:verify","flowmap/verify.py:anchor_ok","flowmap/verify.py:endpoints_in","flowmap/verify.py:_text"],"steps":["s:new:run-mapping-passes/verify-pass-citations"],"depth":0}},"fns":{"flowmap/inventory.py:__main__":{"id":"flowmap/inventory.py:__main__","sym":"__main__","file":"f:inventory.py","lines":[30,39],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/inventory.py#L30-L39"},"flowmap/diagrams.py:__main__":{"id":"flowmap/diagrams.py:__main__","sym":"__main__","file":"f:diagrams.py","lines":[276,277],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L276-L277"},"flowmap/diagrams.py:Diagrams.write":{"id":"flowmap/diagrams.py:Diagrams.write","sym":"Diagrams.write","file":"f:diagrams.py","sig":"self","lines":[217,273],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L217-L273"},"flowmap/diagrams.py:Diagrams.flow":{"id":"flowmap/diagrams.py:Diagrams.flow","sym":"Diagrams.flow","file":"f:diagrams.py","sig":"self, f","lines":[161,177],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L161-L177"},"flowmap/diagrams.py:Diagrams.step":{"id":"flowmap/diagrams.py:Diagrams.step","sym":"Diagrams.step","file":"f:diagrams.py","sig":"self, s","lines":[180,215],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L180-L215"},"flowmap/diagrams.py:Diagrams.system":{"id":"flowmap/diagrams.py:Diagrams.system","sym":"Diagrams.system","file":"f:diagrams.py","sig":"self","lines":[110,158],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L110-L158"},"flowmap/diagrams.py:label":{"id":"flowmap/diagrams.py:label","sym":"label","file":"f:diagrams.py","sig":"text, limit=60","lines":[48,50],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L48-L50"},"flowmap/diagrams.py:nid":{"id":"flowmap/diagrams.py:nid","sym":"nid","file":"f:diagrams.py","sig":"text","lines":[44,45],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L44-L45"},"flowmap/diagrams.py:short":{"id":"flowmap/diagrams.py:short","sym":"short","file":"f:diagrams.py","sig":"node","lines":[53,58],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L53-L58"},"flowmap/diagrams.py:Diagrams._forward_avoiding":{"id":"flowmap/diagrams.py:Diagrams._forward_avoiding","sym":"Diagrams._forward_avoiding","file":"f:diagrams.py","sig":"self, src, block","doc":"Forward reach that never passes through `block`.","lines":[89,97],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L89-L97"},"flowmap/lens.py:__main__":{"id":"flowmap/lens.py:__main__","sym":"__main__","file":"f:lens.py","lines":[483,485],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L483-L485"},"flowmap/lens.py:main":{"id":"flowmap/lens.py:main","sym":"main","file":"f:lens.py","sig":"base, head='HEAD', as_json=False","lines":[478,480],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L478-L480"},"flowmap/lens.py:analyse":{"id":"flowmap/lens.py:analyse","sym":"analyse","file":"f:lens.py","sig":"base, head='HEAD'","doc":"(facts, report lines) for base..head: the verdict, placement, reach and blind spots.","lines":[252,475],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L252-L475"},"flowmap/lens.py:analyse.hits":{"id":"flowmap/lens.py:analyse.hits","sym":"analyse.hits","file":"f:lens.py","sig":"anchor","lines":[277,280],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L277-L280"},"flowmap/lens.py:analyse.listing":{"id":"flowmap/lens.py:analyse.listing","sym":"analyse.listing","file":"f:lens.py","sig":"title, syms","lines":[407,419],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L407-L419"},"flowmap/lens.py:blind_spots":{"id":"flowmap/lens.py:blind_spots","sym":"blind_spots","file":"f:lens.py","sig":"files, code, tests, changed, new_symbols, reach_of, graphs_at, base_eps, head_eps","doc":"What this lens can't see in the change. Any of these means it must not say \"contained\".","lines":[202,249],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L202-L249"},"flowmap/lens.py:changed_lines":{"id":"flowmap/lens.py:changed_lines","sym":"changed_lines","file":"f:lens.py","sig":"base, head","doc":"rel -> (old_lines, new_lines) touched by the diff.","lines":[116,130],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L116-L130"},"flowmap/lens.py:cosmetic":{"id":"flowmap/lens.py:cosmetic","sym":"cosmetic","file":"f:lens.py","sig":"rel, sym, base_text, head_text","doc":"The edit to sym changes nothing at runtime (docstrings, comments, formatting).","lines":[109,113],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L109-L113"},"flowmap/lens.py:defs":{"id":"flowmap/lens.py:defs","sym":"defs","file":"f:lens.py","sig":"rel, text","doc":"[(start, end, name)] for any supported language: its graph builder's parser if it has one, else a regex outline.","lines":[80,90],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L80-L90"},"flowmap/lens.py:endpoint_set":{"id":"flowmap/lens.py:endpoint_set","sym":"endpoint_set","file":"f:lens.py","sig":"ref","lines":[157,164],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L157-L164"},"flowmap/lens.py:importers":{"id":"flowmap/lens.py:importers","sym":"importers","file":"f:lens.py","sig":"ref, rel","doc":"How many app files import this module: shared infrastructure the map may sit above.","lines":[133,151],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L133-L151"},"flowmap/lens.py:reach_diff":{"id":"flowmap/lens.py:reach_diff","sym":"reach_diff","file":"f:lens.py","sig":"old, new, old_eps, new_eps","doc":"How the call graph moved between two revisions.","lines":[173,199],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L173-L199"},"flowmap/lens.py:symbols_at":{"id":"flowmap/lens.py:symbols_at","sym":"symbols_at","file":"f:lens.py","sig":"rel, text, lines","lines":[93,106],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L93-L106"},"flowmap/graphs/codegraph.py:hint":{"id":"flowmap/graphs/codegraph.py:hint","sym":"hint","file":"f:graphs/codegraph.py","sig":"rels","doc":"What to install so `rels` get a call graph: '' when codegraph is here or wouldn't help.","lines":[98,100],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/codegraph.py#L98-L100"},"flowmap/graphs/python.py:same":{"id":"flowmap/graphs/python.py:same","sym":"same","file":"f:graphs/python.py","sig":"base_text, head_text, sym","doc":"True when `sym` changed only in docstrings, comments or formatting.","lines":[115,121],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/python.py#L115-L121"},"flowmap/graphs/codegraph.py:outline":{"id":"flowmap/graphs/codegraph.py:outline","sym":"outline","file":"f:graphs/codegraph.py","sig":"rel, text","doc":"Index `text` on its own if no build has seen it, so symbols/signature/doc can answer.","lines":[103,106],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/codegraph.py#L103-L106"},"flowmap/graphs/codegraph.py:symbols":{"id":"flowmap/graphs/codegraph.py:symbols","sym":"symbols","file":"f:graphs/codegraph.py","sig":"text","lines":[109,110],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/codegraph.py#L109-L110"},"flowmap/graphs/python.py:symbols":{"id":"flowmap/graphs/python.py:symbols","sym":"symbols","file":"f:graphs/python.py","sig":"text","doc":"[(start, end, 'Class.method' or 'fn')] innermost-last.","lines":[57,74],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/python.py#L57-L74"},"flowmap/lens.py:rb_symbols":{"id":"flowmap/lens.py:rb_symbols","sym":"rb_symbols","file":"f:lens.py","sig":"text","doc":"Ruby defs/classes/modules, closed by the `end` at the same indentation.","lines":[65,77],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L65-L77"},"flowmap/lens.py:ts_symbols":{"id":"flowmap/lens.py:ts_symbols","sym":"ts_symbols","file":"f:lens.py","sig":"text","doc":"Top-level-ish definitions; a definition runs until the next one starts.","lines":[51,62],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/lens.py#L51-L62"},"flowmap/callgraph.py:Graph.callees":{"id":"flowmap/callgraph.py:Graph.callees","sym":"Graph.callees","file":"f:callgraph.py","sig":"self, nid","doc":"Everything nid can transitively reach (forward BFS).","lines":[59,61],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/callgraph.py#L59-L61"},"flowmap/callgraph.py:Graph.edge_set":{"id":"flowmap/callgraph.py:Graph.edge_set","sym":"Graph.edge_set","file":"f:callgraph.py","sig":"self","lines":[73,74],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/callgraph.py#L73-L74"},"flowmap/callgraph.py:__main__":{"id":"flowmap/callgraph.py:__main__","sym":"__main__","file":"f:callgraph.py","lines":[127,157],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/callgraph.py#L127-L157"},"flowmap/callgraph.py:classify":{"id":"flowmap/callgraph.py:classify","sym":"classify","file":"f:callgraph.py","sig":"eps, defs, parsed","doc":"Can the graph walk from each entry point's handler? 'node': yes. 'not graphed': its file is outside the graph roots or no builder parses that language yet (expected, not a fault). 'broken': the file is parsed but has no such node, so the adapter and the builder spell the handler differently, and every reach number for that entry point is silently zero.","lines":[115,124],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/callgraph.py#L115-L124"},"flowmap/callgraph.py:impact":{"id":"flowmap/callgraph.py:impact","sym":"impact","file":"f:callgraph.py","sig":"graph, nid","doc":"Endpoints (and their flows) that can reach nid.","lines":[108,112],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/callgraph.py#L108-L112"},"flowmap/callgraph.py:endpoint_flows":{"id":"flowmap/callgraph.py:endpoint_flows","sym":"endpoint_flows","file":"f:callgraph.py","doc":"handler node id -> [(endpoint, flow id)] from inventory + map.","lines":[96,105],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/callgraph.py#L96-L105"},"flowmap/atlas.py:__main__":{"id":"flowmap/atlas.py:__main__","sym":"__main__","file":"f:atlas.py","lines":[224,227],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L224-L227"},"flowmap/atlas.py:build":{"id":"flowmap/atlas.py:build","sym":"build","file":"f:atlas.py","sig":"prs","lines":[214,221],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L214-L221"},"flowmap/atlas.py:data":{"id":"flowmap/atlas.py:data","sym":"data","file":"f:atlas.py","sig":"prs","doc":"Everything the atlas draws, as one dict (the canvas draws the same data another way).","lines":[181,211],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L181-L211"},"flowmap/atlas.py:functions":{"id":"flowmap/atlas.py:functions","sym":"functions","file":"f:atlas.py","sig":"d, ids","doc":"What each drawn function is: signature, first docstring paragraph, lines, and a link to those lines at this commit when the repo is on GitHub.","lines":[48,70],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L48-L70"},"flowmap/atlas.py:merges":{"id":"flowmap/atlas.py:merges","sym":"merges","file":"f:atlas.py","sig":"d, keys, limit=24","doc":"Where flows meet: code that steps of two or more flows run, one interchange per file. Only the first meeting counts: a function whose caller is reached by exactly the same steps sits below the merge, not at it (reach is transitive, so a caller's steps are a subset of its callee's; equal means they met already). Code reached from over half the entry points is plumbing (config, auth) and meets everything, so it is left out.","lines":[86,122],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L86-L122"},"flowmap/atlas.py:overlay":{"id":"flowmap/atlas.py:overlay","sym":"overlay","file":"f:atlas.py","sig":"d, spec, ms","lines":[134,178],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L134-L178"},"flowmap/atlas.py:split_votes":{"id":"flowmap/atlas.py:split_votes","sym":"split_votes","file":"f:atlas.py","lines":[125,131],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L125-L131"},"flowmap/atlas.py:step_code":{"id":"flowmap/atlas.py:step_code","sym":"step_code","file":"f:atlas.py","sig":"d, step","doc":"Breadth-first call graph from the step's handlers, as nodes + edges with depth.","lines":[26,45],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L26-L45"},"flowmap/atlas.py:step_keys":{"id":"flowmap/atlas.py:step_keys","sym":"step_keys","file":"f:atlas.py","sig":"the_map","doc":"Unique, stable key per step: flow/id, with a suffix when a flow repeats an id.","lines":[73,83],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/atlas.py#L73-L83"},"flowmap/diagrams.py:Diagrams.component":{"id":"flowmap/diagrams.py:Diagrams.component","sym":"Diagrams.component","file":"f:diagrams.py","sig":"self, node","doc":"Group code into components: a subpackage (scorers/, blocks/\u2026) or a module file.","lines":[100,108],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L100-L108"},"flowmap/graphs/codegraph.py:doc":{"id":"flowmap/graphs/codegraph.py:doc","sym":"doc","file":"f:graphs/codegraph.py","sig":"text, sym","lines":[117,118],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/codegraph.py#L117-L118"},"flowmap/graphs/codegraph.py:signature":{"id":"flowmap/graphs/codegraph.py:signature","sym":"signature","file":"f:graphs/codegraph.py","sig":"text, sym","lines":[113,114],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/codegraph.py#L113-L114"},"flowmap/graphs/python.py:doc":{"id":"flowmap/graphs/python.py:doc","sym":"doc","file":"f:graphs/python.py","sig":"text, sym","doc":"First paragraph of a def's or class's docstring: what the code says it does.","lines":[87,95],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/python.py#L87-L95"},"flowmap/graphs/python.py:signature":{"id":"flowmap/graphs/python.py:signature","sym":"signature","file":"f:graphs/python.py","sig":"text, sym","doc":"Argument list of a def, for spotting contract changes.","lines":[77,84],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/graphs/python.py#L77-L84"},"flowmap/diagrams.py:Diagrams._forward":{"id":"flowmap/diagrams.py:Diagrams._forward","sym":"Diagrams._forward","file":"f:diagrams.py","sig":"self, src","lines":[80,87],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/diagrams.py#L80-L87"},"flowmap/brief.py:__main__":{"id":"flowmap/brief.py:__main__","sym":"__main__","file":"f:brief.py","lines":[100,101],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/brief.py#L100-L101"},"flowmap/brief.py:main":{"id":"flowmap/brief.py:main","sym":"main","file":"f:brief.py","sig":"run_id, method","lines":[76,97],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/brief.py#L76-L97"},"flowmap/brief.py:vocabulary_text":{"id":"flowmap/brief.py:vocabulary_text","sym":"vocabulary_text","file":"f:brief.py","sig":"vocab","lines":[65,73],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/brief.py#L65-L73"},"flowmap/reconcile.py:__main__":{"id":"flowmap/reconcile.py:__main__","sym":"__main__","file":"f:reconcile.py","lines":[371,372],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L371-L372"},"flowmap/reconcile.py:main":{"id":"flowmap/reconcile.py:main","sym":"main","file":"f:reconcile.py","sig":"paths","lines":[114,297],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L114-L297"},"flowmap/reconcile.py:UnionFind.find":{"id":"flowmap/reconcile.py:UnionFind.find","sym":"UnionFind.find","file":"f:reconcile.py","sig":"self, x","lines":[42,47],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L42-L47"},"flowmap/reconcile.py:UnionFind.groups":{"id":"flowmap/reconcile.py:UnionFind.groups","sym":"UnionFind.groups","file":"f:reconcile.py","sig":"self, items","lines":[52,56],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L52-L56"},"flowmap/reconcile.py:UnionFind.union":{"id":"flowmap/reconcile.py:UnionFind.union","sym":"UnionFind.union","file":"f:reconcile.py","sig":"self, a, b","lines":[49,50],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L49-L50"},"flowmap/reconcile.py:canonical_new_flows":{"id":"flowmap/reconcile.py:canonical_new_flows","sym":"canonical_new_flows","file":"f:reconcile.py","sig":"runs","doc":"Runs invent `new:*` flows independently; merge ones covering the same endpoints.","lines":[59,81],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L59-L81"},"flowmap/reconcile.py:jaccard":{"id":"flowmap/reconcile.py:jaccard","sym":"jaccard","file":"f:reconcile.py","sig":"a, b","lines":[34,35],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L34-L35"},"flowmap/reconcile.py:tested_endpoints":{"id":"flowmap/reconcile.py:tested_endpoints","sym":"tested_endpoints","file":"f:reconcile.py","sig":"inventory, text=None","doc":"Entry points a test names: their concrete path, or an alias such as a Rails path helper (cheap, honest proxy). Test dirs come from flowmap.toml [code].tests.","lines":[91,111],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L91-L111"},"flowmap/reconcile.py:write_map_md":{"id":"flowmap/reconcile.py:write_map_md","sym":"write_map_md","file":"f:reconcile.py","sig":"m","lines":[300,322],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L300-L322"},"flowmap/reconcile.py:write_questions_md":{"id":"flowmap/reconcile.py:write_questions_md","sym":"write_questions_md","file":"f:reconcile.py","sig":"runs, m, contested, endpoint_flow, flow_status, handler, ties","lines":[325,368],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L325-L368"},"flowmap/reconcile.py:path_regex":{"id":"flowmap/reconcile.py:path_regex","sym":"path_regex","file":"f:reconcile.py","sig":"path","lines":[84,85],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/reconcile.py#L84-L85"},"flowmap/verify.py:__main__":{"id":"flowmap/verify.py:__main__","sym":"__main__","file":"f:verify.py","lines":[73,89],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/verify.py#L73-L89"},"flowmap/verify.py:verify":{"id":"flowmap/verify.py:verify","sym":"verify","file":"f:verify.py","sig":"run, inventory","lines":[54,70],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/verify.py#L54-L70"},"flowmap/verify.py:anchor_ok":{"id":"flowmap/verify.py:anchor_ok","sym":"anchor_ok","file":"f:verify.py","sig":"anchor","doc":"'path/to/file.py:symbol' or 'file.py:Class.method' -> (ok, reason).","lines":[29,45],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/verify.py#L29-L45"},"flowmap/verify.py:endpoints_in":{"id":"flowmap/verify.py:endpoints_in","sym":"endpoints_in","file":"f:verify.py","sig":"run","lines":[48,51],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/verify.py#L48-L51"},"flowmap/verify.py:_text":{"id":"flowmap/verify.py:_text","sym":"_text","file":"f:verify.py","sig":"rel","lines":[23,26],"url":"https://github.com/NelisVerhoef/Flowmap/blob/8675ccd0942d783d5e181290db1c35489266c958/flowmap/verify.py#L23-L26"}},"screens":{"u:flowmap/atlas.template":{"id":"u:flowmap/atlas.template","label":"atlas.template","path":"flowmap/atlas.template","parts":["codeFlow","paint","renderCore","renderLines","renderRail","select"]}},"data":{"d:docs/flowmap/inventory.json":{"id":"d:docs/flowmap/inventory.json","label":"inventory.json","parts":["docs/flowmap"],"path":"docs/flowmap/inventory.json"},"d:docs/flowmap/diagrams/<flow>.md":{"id":"d:docs/flowmap/diagrams/<flow>.md","label":"<flow>.md","parts":["docs/flowmap/diagrams"],"path":"docs/flowmap/diagrams/<flow>.md"},"d:docs/flowmap/diagrams/README.md":{"id":"d:docs/flowmap/diagrams/README.md","label":"README.md","parts":["docs/flowmap/diagrams"],"path":"docs/flowmap/diagrams/README.md"},"d:docs/flowmap/atlas.html":{"id":"d:docs/flowmap/atlas.html","label":"atlas.html","parts":["docs/flowmap"],"path":"docs/flowmap/atlas.html"},"d:docs/flowmap/runs/<run-id>.brief.md":{"id":"d:docs/flowmap/runs/<run-id>.brief.md","label":"<run-id>.brief.md","parts":["docs/flowmap/runs"],"path":"docs/flowmap/runs/<run-id>.brief.md"},"d:docs/flowmap/MAP.md":{"id":"d:docs/flowmap/MAP.md","label":"MAP.md","parts":["docs/flowmap"],"path":"docs/flowmap/MAP.md"},"d:docs/flowmap/QUESTIONS.md":{"id":"d:docs/flowmap/QUESTIONS.md","label":"QUESTIONS.md","parts":["docs/flowmap"],"path":"docs/flowmap/QUESTIONS.md"},"d:docs/flowmap/map.json":{"id":"d:docs/flowmap/map.json","label":"map.json","parts":["docs/flowmap"],"path":"docs/flowmap/map.json"}},"edges":[{"a":"s:new:discover-entry-points/list-entry-points","b":"f:inventory.py","kind":"entry","steps":["s:new:discover-entry-points/list-entry-points"],"w":1,"labels":["CLI flowmap inventory"]},{"a":"f:inventory.py","b":"d:docs/flowmap/inventory.json","kind":"writes","steps":["s:new:discover-entry-points/list-entry-points"],"w":1},{"a":"s:new:review-change-on-map/generate-diagrams","b":"f:diagrams.py","kind":"entry","steps":["s:new:review-change-on-map/generate-diagrams"],"w":1,"labels":["CLI flowmap diagrams"]},{"a":"f:diagrams.py","b":"d:docs/flowmap/diagrams/<flow>.md","kind":"writes","steps":["s:new:review-change-on-map/generate-diagrams"],"w":1},{"a":"f:diagrams.py","b":"d:docs/flowmap/diagrams/README.md","kind":"writes","steps":["s:new:review-change-on-map/generate-diagrams"],"w":1},{"a":"s:new:review-change-on-map/lens-place-change","b":"f:lens.py","kind":"entry","steps":["s:new:review-change-on-map/lens-place-change"],"w":1,"labels":["CLI flowmap lens"]},{"a":"f:lens.py","b":"f:graphs/codegraph.py","kind":"call","steps":["s:new:review-change-on-map/lens-place-change"],"w":3},{"a":"f:lens.py","b":"f:graphs/python.py","kind":"call","steps":["s:new:review-change-on-map/lens-place-change"],"w":2},{"a":"f:lens.py","b":"f:callgraph.py","kind":"call","steps":["s:new:review-change-on-map/lens-place-change"],"w":2},{"a":"s:new:review-change-on-map/callgraph-impact","b":"f:callgraph.py","kind":"entry","steps":["s:new:review-change-on-map/callgraph-impact"],"w":1,"labels":["CLI flowmap callgraph"]},{"a":"f:callgraph.py","b":"f:graphs/codegraph.py","kind":"call","steps":["s:new:review-change-on-map/callgraph-impact"],"w":1},{"a":"s:new:review-change-on-map/build-atlas","b":"f:atlas.py","kind":"entry","steps":["s:new:review-change-on-map/build-atlas"],"w":1,"labels":["CLI flowmap atlas"]},{"a":"f:atlas.py","b":"f:diagrams.py","kind":"call","steps":["s:new:review-change-on-map/build-atlas"],"w":8},{"a":"f:atlas.py","b":"f:graphs/codegraph.py","kind":"call","steps":["s:new:review-change-on-map/build-atlas"],"w":2},{"a":"f:atlas.py","b":"f:graphs/python.py","kind":"call","steps":["s:new:review-change-on-map/build-atlas"],"w":2},{"a":"f:atlas.py","b":"f:lens.py","kind":"call","steps":["s:new:review-change-on-map/build-atlas"],"w":4},{"a":"u:flowmap/atlas.template","b":"s:new:review-change-on-map/build-atlas","kind":"ui","steps":["s:new:review-change-on-map/build-atlas"],"w":6},{"a":"f:atlas.py","b":"d:docs/flowmap/atlas.html","kind":"writes","steps":["s:new:review-change-on-map/build-atlas"],"w":1},{"a":"s:new:run-mapping-passes/write-pass-brief","b":"f:brief.py","kind":"entry","steps":["s:new:run-mapping-passes/write-pass-brief"],"w":1,"labels":["CLI flowmap brief"]},{"a":"f:brief.py","b":"d:docs/flowmap/runs/<run-id>.brief.md","kind":"writes","steps":["s:new:run-mapping-passes/write-pass-brief"],"w":1},{"a":"s:new:run-mapping-passes/reconcile-runs","b":"f:reconcile.py","kind":"entry","steps":["s:new:run-mapping-passes/reconcile-runs"],"w":1,"labels":["CLI flowmap reconcile"]},{"a":"f:reconcile.py","b":"d:docs/flowmap/MAP.md","kind":"writes","steps":["s:new:run-mapping-passes/reconcile-runs"],"w":1},{"a":"f:reconcile.py","b":"d:docs/flowmap/QUESTIONS.md","kind":"writes","steps":["s:new:run-mapping-passes/reconcile-runs"],"w":1},{"a":"f:reconcile.py","b":"d:docs/flowmap/map.json","kind":"writes","steps":["s:new:run-mapping-passes/reconcile-runs"],"w":1},{"a":"s:new:run-mapping-passes/verify-pass-citations","b":"f:verify.py","kind":"entry","steps":["s:new:run-mapping-passes/verify-pass-citations"],"w":1,"labels":["CLI flowmap verify"]}],"plumbing":["analytics","auth","config","db","logging","sentry","serialisation","settings"],"commit":"8675ccd","changes":[{"id":"pr-16","title":"PR #16","range":"69be006..8675ccd","files":{"f:callgraph.py":{"kind":"changed","syms":["__main__"]},"f:lens.py":{"kind":"changed","syms":["analyse","blind_spots","defs"]},"f:graphs/codegraph.py":{"kind":"new","syms":["_part","build","doc","hint","outline","signature","symbols"]}},"steps":{"s:new:review-change-on-map/lens-place-change":{"kind":"direct","via":["defs"]},"s:new:review-change-on-map/callgraph-impact":{"kind":"direct","via":["__main__"]},"s:new:review-change-on-map/build-atlas":{"kind":"reach","via":["defs"]}},"off":[],"off_files":[],"changed":4,"new":7,"added_endpoints":[],"verdict":{"verdict":"blind","spreads_to":["CLI flowmap atlas","CLI flowmap callgraph","CLI flowmap change","CLI flowmap lens"],"blind":["module-level code changed (constants, config, router registration): `flowmap/graphs/__init__.py`, `flowmap/graphs/codegraph.py`","files outside the analysed code: `.claude-plugin/plugin.json`"]},"story":{"title":"The call graph covers TypeScript/JS, Ruby, Go, Java and more when codegraph is installed, and says to install it when it isn't","intent":"Reuse codegraph (github.com/colbymchenry/codegraph, a tree-sitter indexer for 20+ languages) so flowmap gives deterministic reach for languages other than Python, and recommend installing it strongly without forcing it.","delta":"A second call-graph builder now sits next to the Python one. When `codegraph` is on PATH, it indexes the graph files of every non-Python language at the revision being read and turns codegraph's SQLite graph into flowmap's `rel:Qual.name` nodes and call edges. Reach, the verdict, `callgraph check`, change pages and the atlas then cover that code. Without codegraph nothing changes: those files stay blind spots, but lens, `callgraph check` and the flowmap-build skill now name the install command. The Python builder, the graph format, adapters and map files are unchanged. Rails handlers still don't match codegraph's names (`index` vs `Admin.UsersController.index`), so Rails reach is still \"not yet\". lens calls this PR blind because `graphs/__init__.py` and `codegraph.py` gained module-level code (the builder list, the suffix and kind tables) and because of the plugin version bump.","url":"https://github.com/NelisVerhoef/Flowmap/pull/16","pr":"PR #16","no_longer":["A change to a TypeScript/JS or Ruby file always gets the blind-spot line \"code with no call graph (no builder for its language \u2026)\", so lens can't name what it reaches","The flowmap-build skill treats the call graph as Python-only (\"Python today\") and goes on without asking about other languages"],"chapters":[{"n":1,"title":"Non-Python code gets a call graph from codegraph's index","role":"core","before":"The only builder was graphs/python.py. Files in any other language had no nodes or edges: a Next.js route or a TS helper was \"not graphed\", and any change to one made lens say blind.","after":"`build` writes the files (plus tsconfig/jsconfig/package.json/go.mod at the root and up to two levels down) into a temp dir and runs `codegraph init --yes` with DO_NOT_TRACK=1 and CODEGRAPH_NO_DAEMON=1. `_part` then reads functions, methods, constructors, classes, structs, modules and components as nodes. `A::b` becomes `rel:A.b`. calls, instantiations and references become edges, and a class also reaches its constructor (`constructor`, `initialize`, `__init__`, `init`, `new`). extends/implements become bases, and files with parse errors are reported as unparsed. `symbols`, `signature` and `doc` answer from the outline recorded while building, since flowmap asks them with file text alone. Python files keep their own builder. When `codegraph init` exits non-zero, every file it was given is reported as unparsed, so lens says blind (\"could not parse \u2026\") instead of guessing. The builder reads codegraph's tables directly: a renamed column raises an error, and a renamed node kind would leave handlers out of the graph, which `flowmap callgraph check` reports as broken.","claim":"With codegraph installed, a TS/JS, Ruby, Go or Java change gets reach like a Python one.","why":"Reach is what lets a reviewer trust lens when it is quiet, and so far only Python repos had it. Rather than writing tree-sitter resolution in flowmap (a dependency, and a lot of resolver work per language), this reads a maintained indexer's output. Its node names already match what flowmap's adapters emit: all 36 handlers in a real Next.js app are nodes.","questions":["Rails: should the adapter emit class-qualified handlers (`users_controller.rb:Admin.UsersController.index`) so codegraph reach works, even though that renames handler ids in existing Rails maps?","Run `flowmap callgraph check` with codegraph on a TS or Go repo you know: are any handlers broken, and are the edges into shared helpers the ones you'd expect?","`build` runs codegraph twice per lens (base and head), about 1.2s each on 263 files. Is that acceptable on your largest repo, or should it reuse a `.codegraph/` index when the ref is the working tree?"],"verified":["test","ran","ran","looked"],"files":["f:graphs/codegraph.py"],"steps":["s:new:review-change-on-map/build-atlas","s:new:review-change-on-map/lens-place-change"],"outside":[]},{"n":2,"title":"lens and atlas name the method a change sits in, not its class","role":"supporting","before":"Callers place diff lines on definitions through `lens.defs`, and lens and `atlas --pr` do it before building any graph. An indexer outlines a file only once it has indexed it, so a change inside `InsurerRegistry.isSupported` came out as `InsurerRegistry` (the regex outline's top-level name).","after":"`lens.defs` asks a builder that has `outline` to index a text no build has seen, on its own (a single-file codegraph index), before reading its symbols. Every caller goes through `defs`: lens, `atlas --pr` and change facts. `analyse` also builds the base and head graphs first when there are graph roots, so changed files are outlined from those builds instead of one by one; it built both later anyway.","claim":"Reach is reported for the changed method itself.","why":"Reach is looked up by node id, and the class node doesn't carry the method's callers, so naming the class hid the endpoints that reach the method. The fix is in `defs` rather than in each caller because `atlas --pr` had the same order and never builds the base graph. Rather than giving `symbols()` a file path (changing the builder interface for Python too), the indexer gets an optional `outline(rel, text)`.","questions":["A single-file index can't resolve imports, but `outline` only reads definitions from it. Is any caller of `codegraph.signature` or `doc` reached with a text that no full build saw, where a missing signature would hide a contract change?","When codegraph fails on a file (exit code non-zero), `outline` retries every time `defs` asks for it. Worth caching the failure?"],"verified":["test","test","ran","not checked"],"files":["f:graphs/codegraph.py","f:lens.py"],"steps":["s:new:review-change-on-map/build-atlas","s:new:review-change-on-map/lens-place-change"],"outside":[]},{"n":3,"title":"Where codegraph is missing, flowmap says how to install it","role":"supporting","before":"Nothing told anyone a builder for other languages existed: the blind spot said \"no builder for its language\" and the skill said \"Python today\".","after":"When codegraph is absent and a file it would parse has no graph, lens's blind spot and `callgraph check`'s \"no builder for .ts\" end with \"(`npm i -g @colbymchenry/codegraph` gives these a call graph)\". The flowmap-build skill has a step 0: if the repo has non-Python code and no codegraph, stop, explain that reach will be blind there, and ask to install it. Carry on without it only if the user says so. README lists it under \"On a new machine\". The plugin version moves to 0.3.0 so installed copies update.","claim":"codegraph is strongly recommended at the moment its absence costs something, never installed behind anyone's back.","why":"Claude Code plugins can't declare npm dependencies. Forcing it would mean a hook running a global npm install on every teammate's machine, which changes their machine and runs third-party install scripts without asking. Rather than a SessionStart nudge in every session, the hint appears only where reach is actually missing: lens output, which pr-lens copies into PR summaries, and setup.","questions":["Should the install line pin the tested version (`@colbymchenry/codegraph@1.6.2`), given that the builder reads codegraph's database schema directly?","Is asking at build time enough, or do teammates who only review PRs (pr-lens) also need a nudge before their first lens?"],"verified":["test","ran","not checked"],"files":["f:callgraph.py","f:graphs/codegraph.py","f:lens.py"],"steps":["s:new:review-change-on-map/callgraph-impact","s:new:review-change-on-map/lens-place-change"],"outside":["skills/flowmap-build/SKILL.md","README.md",".claude-plugin/plugin.json"]}]}},{"id":"pr-15","title":"PR #15","range":"f72e78a..69be006","files":{},"steps":{},"off":["flowmap/change.py:facts","flowmap/change.py:lint_story","flowmap/change.py:main","flowmap/change.py:merge","flowmap/change.py:cite_in_diff","flowmap/change.py:hunk_lines","flowmap/change.py:problem"],"off_files":[{"id":"o:flowmap/change.py","path":"flowmap/change.py","label":"change.py","syms":["facts","lint_story","main","merge","cite_in_diff","hunk_lines","problem"],"new":false}],"changed":4,"new":3,"added_endpoints":[],"verdict":{"verdict":"blind","spreads_to":["CLI flowmap change"],"blind":["files outside the analysed code: `.claude-plugin/plugin.json`, `flowmap/change.template.html`"]},"story":{"title":"The story check names the field, the fix, and the line a cite must sit on","intent":"Make story problems something an agent can repair without weakening the story, and stop file:line cites from passing on any line of a changed file.","delta":"Only the flowmap change command moves. Its story check used to return sentences; each problem is now a record with a code, the story field it is about and a fix, and a new --check prints them as JSON without writing the page. A file:line cite now has to be a line the diff shows, at base or head. The facts, the page's layout, --link and its size budget are unchanged, and a story that passed before still passes unless it cited a line outside the diff.","url":"https://github.com/NelisVerhoef/flowmap/pull/15","pr":"PR #15","no_longer":["A no_longer cite of file:line passes whenever that file is in the diff, whatever the line (the old check, change.py line 290 at base)","Story problems are plain strings, on stderr and in the page data's lint list"],"chapters":[{"n":1,"title":"A cite of file:line must point at a line the diff shows","role":"core","before":"lint_story accepted a no_longer cite when its file part was a changed path or the whole cite was a map step; the line number was never read.","after":"cite_in_diff also requires a file:line or file:a-b cite to overlap a line some hunk of that file shows, old or new side, context included. A cite of file:symbol (anything not a number after the colon) still passes on the file alone. facts and the check share hunk_lines, so both count a hunk's lines the same way. facts now calls hunk_lines in place of the same two set comprehensions it had inline, so the facts it prints are unchanged.","claim":"A story can no longer say 'this line shows it' about a line the change never touched.","why":"The cite is what lets a reader trust a no_longer line without reading the diff; a cite that only names the file proves nothing about the claim. Rather than checking the line against the whole file at head, it checks against the hunks, because a no_longer claim is about what the change did. Context lines count so a cite on the line next to a removal still passes.","questions":["cite_in_diff accepts a line on either side; should a no_longer cite be held to the base side, since what is no longer true lived there?","A cite of file:symbol passes on the file alone, even when the symbol is not in the changed symbols; should it be checked against --facts symbols too?","Hunks carry 2 lines of context (hunks uses -U2); is a cite two lines from any change close enough to count?"],"verified":["test","ran","ran"],"files":["o:flowmap/change.py"],"steps":[],"outside":[]},{"n":2,"title":"Each story problem says which field it is about and how to fix it, and --check prints them as JSON","role":"supporting","before":"lint_story returned sentences; symbol and file problems were pooled across chapters into one line each; main printed them to stderr and the page listed them.","after":"Each problem is {code, subject, problem, fix} (problem() stores its text argument under problem), one per offending field (e.g. chapters[0].symbols, no_longer[1].cite). lint_story drops the claimed_syms and claimed_files arguments it no longer needs; merge, its only caller, changes just that call. --check prints {ok, story, problems} and exits 1 when any remain, writing nothing. stderr shows the problem with its subject and fix; the page shows the problem text.","claim":"An agent repairing a story gets the exact field and an allowed fix instead of a sentence to interpret.","why":"The pr-lens skill has the agent write the story and then repair it until --link prints. With sentences, the easiest way to pass was to delete the failing claim; a fix that says 'cite the line, or mark it not checked' points at the honest repair. Rather than a separate validator, it is the same lint the page and --link already use, so the three can't disagree.","questions":["Are the codes (story/cite-not-in-diff, story/test-not-at-head, \u2026) a contract other tools may match on, or free to rename?","--check exits before writing the page; is there a caller that expects --check to also refresh the HTML?"],"verified":["test","ran","not checked"],"files":["o:flowmap/change.py"],"steps":[],"outside":["flowmap/change.template.html"]},{"n":3,"title":"The skill bounds story repair: two rounds, and fix the claim rather than delete it","role":"supporting","before":"The skill said --link prints no link until the story passes, with no limit on attempts and nothing about how to repair.","after":"It points at --check, says a file:line cite must be a line the diff shows, and says to repair by citing, correcting or marking not checked, for two rounds, then stop and show the user. README lists --check; the plugin version moves to 0.2.3 so installs pick it up.","claim":"An agent stops looping on a story it can't back and doesn't buy a pass by dropping claims.","why":"Borrowed from archify, whose skill caps repair at two rounds and requires keeping the requested meaning while fixing. Without the rule the check is easy to game, and gaming it removes exactly the no_longer lines a reader most needs.","questions":["flowmap change is not on the map (no step's endpoints include CLI flowmap change); which flow should it join when the map is next rebuilt?","Is two rounds right for an agent that also has to fix questions and verified entries, or should the limit count per problem?"],"verified":["looked"],"files":[],"steps":[],"outside":["skills/pr-lens/SKILL.md","README.md",".claude-plugin/plugin.json"]}]}}]};
+const $ = s => document.querySelector(s);
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (k === "style") n.style.cssText = v;
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return n;
+}
+// story prose marks code with backticks: show it as code
+const md = s => String(s || "").split("`").map((part, i) => i % 2 ? el("code", { class: "mono", style: "font-size:.92em;background:var(--paper);padding:0 3px;border-radius:4px" }, part) : part);
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+
+const FLOWS = G.flows, STEPS = G.steps, FILES = G.files, DATA = G.data, SCREENS = G.screens, FNS = G.fns;
+const flowOf = Object.fromEntries(FLOWS.map(f => [f.id, f]));
+const ALL = { ...STEPS, ...FILES, ...DATA, ...SCREENS, ...flowOf };
+const short = s => s.split(":").pop();
+let OFF = {};
+
+// ---------- state ----------
+const total = Object.keys(STEPS).length;
+const S = {
+  view: "map",            // "map" | file id (inside a file)
+  expanded: new Set(total <= 12 ? FLOWS.map(f => f.id) : []),
+  sel: null,              // node id or "ch:<n>"
+  change: G.changes.length ? 0 : -1,
+  play: null,             // {flow, i}
+};
+const change = () => S.change >= 0 ? G.changes[S.change] : null;
+
+// ---------- geometry ----------
+const SIZE = { screen: [210, 66], flow: [300, 98], step: [276, 62], file: [236, 112], data: [200, 62] };
+const GAP_X = 100, GAP_Y = 14, FB_HEAD = 46, FB_PAD = 12, STEP_GAP = 8, FLOW_GAP = 18;
+
+function rep(id) {
+  // what stands for a node in the current view: a step of a collapsed flow is its flow
+  if (id.startsWith("s:")) { const f = STEPS[id].flow; return S.expanded.has(f) ? id : f; }
+  return id;
+}
+
+function layoutMap() {
+  const nodes = {}, boxes = [], heads = [];
+  // the left spine: flows, expanded into their steps or folded into one card
+  let y = 0;
+  for (const f of FLOWS) {
+    if (S.expanded.has(f.id)) {
+      const h = FB_HEAD + f.steps.length * (SIZE.step[1] + STEP_GAP) - STEP_GAP + FB_PAD;
+      boxes.push({ id: f.id, y, h });
+      f.steps.forEach((sid, i) => nodes[sid] = { id: sid, kind: "step", y: y + FB_HEAD + i * (SIZE.step[1] + STEP_GAP), h: SIZE.step[1], w: SIZE.step[0] });
+      y += h + FLOW_GAP;
+    } else {
+      nodes[f.id] = { id: f.id, kind: "flow", y, h: SIZE.flow[1], w: SIZE.flow[0] };
+      y += SIZE.flow[1] + FLOW_GAP;
+    }
+  }
+  // the wires between whatever is visible, merged
+  const wires = {};
+  for (const e of G.edges) {
+    if (e.kind === "ui" && !S.expanded.has(STEPS[e.b].flow)) continue;  // screens show with their steps
+    const a = rep(e.a), b = rep(e.b);
+    if (a === b) continue;
+    const k = a + "|" + b + "|" + e.kind;
+    const w = wires[k] || (wires[k] = { a, b, kind: e.kind, steps: new Set(), w: 0, labels: new Set() });
+    e.steps.forEach(s => w.steps.add(s)); w.w += e.w; (e.labels || []).forEach(l => w.labels.add(l));
+  }
+  const W = Object.values(wires);
+  const cy = n => n.y + n.h / 2;
+  const into = id => W.filter(w => w.b === id && nodes[w.a]);
+  const outof = id => W.filter(w => w.a === id && nodes[w.b]);
+  const place = (ids, kind, desired) => {
+    const [w, h] = SIZE[kind];
+    const want = ids.map(id => ({ id, d: desired(id) })).sort((p, q) => p.d - q.d || (p.id < q.id ? -1 : 1));
+    let floor = -Infinity;
+    const placed = want.map(({ id, d }) => { const top = Math.max(d - h / 2, floor); floor = top + h + GAP_Y; return { id, top }; });
+    // pull the column back up so it sits around what it serves, not below it
+    const drift = placed.reduce((s, p, i) => s + (p.top - (want[i].d - h / 2)), 0) / (placed.length || 1);
+    const shift = Math.min(drift, placed.length ? placed[0].top - Math.min(...want.map(p => p.d - h / 2)) : 0);
+    for (const p of placed) nodes[p.id] = { id: p.id, kind, y: p.top - Math.max(0, shift), h, w };
+  };
+  const bary = (id, side) => {
+    const ws = side === "in" ? into(id) : outof(id);
+    if (!ws.length) return null;
+    let s = 0, n = 0;
+    for (const w of ws) { const o = nodes[side === "in" ? w.a : w.b]; s += cy(o) * w.w; n += w.w; }
+    return s / n;
+  };
+  // screens sit left of the steps they start
+  const scr = Object.keys(SCREENS).filter(id => W.some(w => w.a === id));
+  // files by call depth, each placed beside what calls it
+  const depthMax = Math.max(0, ...Object.values(FILES).map(f => f.depth));
+  const layers = [...Array(depthMax + 1)].map((_, d) => Object.values(FILES).filter(f => f.depth === d).map(f => f.id));
+  for (const L of layers) place(L, "file", id => bary(id, "in") ?? 0);
+  const dat = Object.keys(DATA);
+  place(dat, "data", id => bary(id, "in") ?? 0);
+  const offs = change() ? change().off_files.map(o => o.id) : [];
+  if (offs.length) { OFF = Object.fromEntries(change().off_files.map(o => [o.id, o])); offs.forEach((id, i) => nodes[id] = { id, kind: "off", y: i * (SIZE.file[1] + GAP_Y), h: SIZE.file[1], w: SIZE.file[0] }); }
+  if (scr.length) place(scr, "screen", id => bary(id, "out") ?? 0);
+  // columns, left to right
+  const cols = [];
+  if (scr.length) cols.push({ name: "Screens", ids: scr, w: SIZE.screen[0] });
+  cols.push({ name: "Flows and steps", ids: [...FLOWS.filter(f => !S.expanded.has(f.id)).map(f => f.id), ...Object.keys(STEPS).filter(s => nodes[s])], w: SIZE.flow[0], spine: true });
+  layers.forEach((L, d) => cols.push({ name: d === 0 ? "Handlers" : d === 1 ? "Code they call" : "", ids: L, w: SIZE.file[0] }));
+  if (dat.length) cols.push({ name: "Data written", ids: dat, w: SIZE.data[0] });
+  if (offs.length) cols.push({ name: "Changed, not on the map", ids: offs, w: SIZE.file[0] });
+  let x = 0;
+  for (const c of cols) {
+    for (const id of c.ids) { const n = nodes[id]; n.x = x + (c.spine && n.kind === "step" ? (SIZE.flow[0] - SIZE.step[0]) / 2 : 0); }
+    if (c.spine) boxes.forEach(b => b.x = x);
+    heads.push({ x, name: c.name });
+    x += c.w + GAP_X;
+  }
+  const top = Math.min(0, ...Object.values(nodes).map(n => n.y));
+  return { nodes, wires: W, boxes, heads, top };
+}
+
+function layoutInside(fid) {
+  // one file opened up: callers on the left, its functions by call depth, what it calls on the right
+  const F = FILES[fid], mine = new Set(F.fns);
+  const calls = new Map();
+  for (const s of Object.values(STEPS)) for (const [a, b] of s.calls) calls.set(a + ">" + b, [a, b]);
+  const C = [...calls.values()];
+  const inner = C.filter(([a, b]) => mine.has(a) && mine.has(b) && a !== b);
+  const callers = {}, callees = {};
+  for (const [a, b] of C) {
+    if (!mine.has(a) && mine.has(b)) (callers[FNS[a].file] ||= new Set()).add(b);
+    if (mine.has(a) && !mine.has(b)) (callees[FNS[b].file] ||= new Set()).add(a);
+  }
+  for (const s of Object.values(STEPS)) for (const r of s.roots) if (mine.has(r)) (callers[s.id] ||= new Set()).add(r);
+  const writes = G.edges.filter(e => e.kind === "writes" && e.a === fid).map(e => e.b);
+  for (const d of writes) (callees[d] ||= new Set());
+  const entered = new Set(Object.values(callers).flatMap(s => [...s]));
+  const depth = {};
+  const q = F.fns.filter(n => entered.has(n) || !inner.some(([, b]) => b === n));
+  q.forEach(n => depth[n] = 0);
+  for (let i = 0; i < q.length; i++) for (const [a, b] of inner) if (a === q[i] && depth[b] == null) { depth[b] = depth[a] + 1; q.push(b); }
+  F.fns.forEach(n => depth[n] ??= 0);
+  const nodes = {}, W = [];
+  const PW = 230, FW = 230, FH = 62;
+  const colsN = Math.max(...Object.values(depth)) + 1;
+  const left = Object.keys(callers), right = Object.keys(callees);
+  left.forEach((id, i) => nodes["L:" + id] = { id: "L:" + id, ref: id, kind: "pill", x: 0, y: i * 54, w: PW, h: 36 });
+  for (let d = 0; d < colsN; d++) {
+    const ids = F.fns.filter(n => depth[n] === d);
+    ids.forEach((n, i) => nodes["F:" + n] = { id: "F:" + n, ref: n, kind: "fn", x: PW + 110 + d * (FW + 90), y: i * (FH + 16), w: FW, h: FH });
+  }
+  const rx = PW + 110 + colsN * (FW + 90) + 20;
+  right.forEach((id, i) => nodes["R:" + id] = { id: "R:" + id, ref: id, kind: "pill", x: rx, y: i * 54, w: PW, h: 36 });
+  for (const [id, set] of Object.entries(callers)) for (const n of set) W.push({ a: "L:" + id, b: "F:" + n, kind: id.startsWith("s:") ? "entry" : "call", steps: new Set(id.startsWith("s:") ? [id] : []), w: 1 });
+  for (const [a, b] of inner) W.push({ a: "F:" + a, b: "F:" + b, kind: "call", steps: new Set(), w: 1 });
+  for (const [id, set] of Object.entries(callees)) {
+    if (!set.size) W.push({ a: "F:" + F.fns[0], b: "R:" + id, kind: "writes", steps: new Set(), w: 1 });
+    for (const n of set) W.push({ a: "F:" + n, b: "R:" + id, kind: id.startsWith("d:") ? "writes" : "call", steps: new Set(), w: 1 });
+  }
+  // centre the columns on each other
+  const colH = xs => xs.length ? Math.max(...xs.map(n => n.y + n.h)) : 0;
+  const groups = {};
+  for (const n of Object.values(nodes)) (groups[n.x] ||= []).push(n);
+  const tallest = Math.max(...Object.values(groups).map(colH));
+  for (const g of Object.values(groups)) { const off = (tallest - colH(g)) / 2; g.forEach(n => n.y += off); }
+  const heads = [{ x: 0, name: "Used by" }, { x: PW + 110, name: "Inside " + F.label }, { x: rx, name: "Uses" }];
+  return { nodes, wires: W, boxes: [], heads, top: 0 };
+}
+
+// ---------- drawing ----------
+const world = $("#world"), wiresSvg = $("#wires"), stage = $("#stage");
+let L = null;
+
+function paintClass(id) {
+  const c = change();
+  if (!c) return "";
+  if (FILES[id]) { const p = c.files[id]; return p ? (p.kind === "new" ? " p-new" : " p-changed") : ""; }
+  if (STEPS[id]) { const p = c.steps[id]; return p ? (p.kind === "new" ? " p-newstep" : p.kind === "direct" ? " p-direct" : " p-reach") : ""; }
+  if (flowOf[id]) { return flowOf[id].steps.some(s => c.steps[s]) ? (flowOf[id].steps.some(s => c.steps[s] && c.steps[s].kind !== "reach") ? " p-direct" : " p-reach") : ""; }
+  return "";
+}
+function badges(id) {
+  const c = change();
+  if (!c || !c.story) return null;
+  const ns = c.story.chapters.filter(ch => ch.files.includes(id) || ch.steps.includes(id)).map(ch => ch.n);
+  return ns.length ? el("div", { class: "badges" }, ns.map(n => el("span", { class: "badge n", title: "Part " + n + " of the change" }, n))) : null;
+}
+
+function card(n) {
+  const id = n.id, common = { style: `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px`, "data-id": id };
+  const click = ev => { ev.stopPropagation(); select(id); };
+  if (n.kind === "flow") {
+    const f = flowOf[id], c = change(), hit = c ? f.steps.filter(s => c.steps[s]).length : 0;
+    return el("div", { ...common, class: "card flow" + paintClass(id), onclick: click, ondblclick: ev => { ev.stopPropagation(); toggleFlow(id, true); } },
+      el("div", { class: "kind" }, "Flow · " + f.steps.length + " steps", f.draft ? el("span", { class: "tag", title: "Proposed by the passes and not yet named in flowmap.toml" }, "draft name") : null,
+         hit ? el("span", { class: "tag", style: "color:var(--chg)" }, hit + " touched") : null),
+      el("div", { class: "title" }, f.title),
+      el("div", { class: "summary" }, f.summary),
+      badges(id));
+  }
+  if (n.kind === "step") {
+    const s = STEPS[id];
+    return el("div", { ...common, class: "card step" + paintClass(id), onclick: click, title: s.name },
+      el("div", { class: "title" }, s.name),
+      el("div", { class: "foot" }, el("span", { class: "ev " + s.evidence, title: "evidence: " + s.evidence }),
+        s.endpoints.length ? el("span", { class: "ep" }, s.endpoints[0] + (s.endpoints.length > 1 ? ` +${s.endpoints.length - 1}` : "")) : el("span", {}, "no entry point"),
+        el("span", {}, s.actor || "")),
+      badges(id));
+  }
+  if (n.kind === "file") {
+    const F = FILES[id], p = change() && change().files[id];
+    const shown = p ? p.syms.slice(0, 2) : F.fns.slice(0, 2).map(short);
+    return el("div", { ...common, class: "card file" + paintClass(id), onclick: click, ondblclick: ev => { ev.stopPropagation(); openInside(id); }, title: F.path + " — double-click to open" },
+      el("div", { class: "kind" }, el("i"), p ? (p.kind === "new" ? "new code" : "changed") : "code"),
+      el("div", { class: "title" }, F.label),
+      el("div", { class: "sub" }, `${F.fns.length} function${F.fns.length === 1 ? "" : "s"} · run by ${F.steps.length} step${F.steps.length === 1 ? "" : "s"}`),
+      el("div", { class: "fnlist" }, shown.map(s => el("span", {}, s + "()"))),
+      badges(id));
+  }
+  if (n.kind === "off") {
+    const o = OFF[id];
+    return el("div", { ...common, class: "card file off " + (o.new ? "p-new" : "p-changed"), onclick: click, title: o.path + " — no step on the map runs this file" },
+      el("div", { class: "kind" }, el("i"), o.new ? "new, off the map" : "changed, off the map"),
+      el("div", { class: "title" }, o.label),
+      el("div", { class: "sub" }, `${o.syms.length} function${o.syms.length === 1 ? "" : "s"} · no step runs it`),
+      el("div", { class: "fnlist" }, o.syms.slice(0, 2).map(s => el("span", {}, s + "()"))),
+      badges(id));
+  }
+  if (n.kind === "data") {
+    const D = DATA[id];
+    return el("div", { ...common, class: "card data", onclick: click, title: D.path },
+      el("div", { class: "kind" }, el("i"), "data"), el("div", { class: "title", style: "-webkit-line-clamp:1" }, D.label),
+      el("div", { class: "sub" }, D.parts.length ? D.parts.join(", ") : D.path !== D.label ? D.path : "written whole"));
+  }
+  if (n.kind === "screen") {
+    const U = SCREENS[id];
+    return el("div", { ...common, class: "card screen", onclick: click, title: U.path },
+      el("div", { class: "kind" }, el("i"), "screen"), el("div", { class: "title", style: "-webkit-line-clamp:1" }, U.label),
+      el("div", { class: "sub" }, U.parts.join(", ")));
+  }
+  if (n.kind === "fn") {
+    const f = FNS[n.ref], p = change() && change().files[S.view];
+    const painted = p && p.syms.includes(f.sym);
+    return el("div", { ...common, class: "card file" + (painted ? (p.kind === "new" ? " p-new" : " p-changed") : ""), onclick: ev => { ev.stopPropagation(); select(n.ref); } },
+      el("div", { class: "title" }, f.sym + "()"), el("div", { class: "sub" }, f.doc || (f.sig ? "(" + f.sig + ")" : "")));
+  }
+  if (n.kind === "pill") {
+    const r = ALL[n.ref];
+    const label = n.ref.startsWith("s:") ? "Step: " + r.name : r ? (r.label || r.title) : n.ref;
+    return el("div", { ...common, class: "pill", style: common.style + ";height:auto", title: label, onclick: ev => { ev.stopPropagation(); FILES[n.ref] ? openInside(n.ref) : (back(), select(n.ref)); } }, label);
+  }
+}
+
+function wirePath(a, b, ia, na, ib, nb) {
+  const ya = a.y + a.h * (na > 1 ? 0.2 + 0.6 * ia / (na - 1) : 0.5);
+  const yb = b.y + b.h * (nb > 1 ? 0.2 + 0.6 * ib / (nb - 1) : 0.5);
+  const x1 = a.x + a.w, x2 = b.x;
+  if (x2 > x1 + 10) { const dx = Math.max(36, (x2 - x1) * 0.5); return `M${x1} ${ya}C${x1 + dx} ${ya},${x2 - dx} ${yb},${x2} ${yb}`; }
+  // backwards (a cycle, or a call into an earlier column): loop out and come back in
+  const lift = Math.min(a.y, b.y) - 26;
+  return `M${x1} ${ya}C${x1 + 70} ${ya},${x1 + 70} ${lift},${(x1 + x2) / 2} ${lift}S${x2 - 70} ${yb},${x2} ${yb}`;
+}
+
+function draw() {
+  L = S.view === "map" ? layoutMap() : layoutInside(S.view);
+  world.querySelectorAll(".card,.flowbox,.colhead,.pill").forEach(n => n.remove());
+  wiresSvg.replaceChildren();
+  const off = -L.top + 40;
+  for (const n of Object.values(L.nodes)) n.y += off;
+  for (const b of L.boxes) {
+    const f = flowOf[b.id];
+    const box = el("div", { class: "flowbox", "data-id": b.id, style: `left:${b.x}px;top:${b.y + off}px;width:${SIZE.flow[0]}px;height:${b.h}px` },
+      el("div", { class: "fbhead", onclick: ev => { ev.stopPropagation(); select(b.id); } },
+        el("span", { class: "title" }, f.title),
+        el("button", { class: "icon-btn", title: "Play this flow", onclick: ev => { ev.stopPropagation(); play(b.id); } }, "▶"),
+        el("button", { class: "icon-btn", title: "Fold", onclick: ev => { ev.stopPropagation(); toggleFlow(b.id, false); } }, "−")));
+    world.append(box);
+  }
+  for (const h of L.heads) if (h.name) world.append(el("div", { class: "colhead", style: `left:${h.x}px;top:${off - 28}px` }, h.name));
+  // ports: spread each card's wires along its side, ordered by where the other end is
+  const outs = {}, ins = {};
+  for (const w of L.wires) { (outs[w.a] ||= []).push(w); (ins[w.b] ||= []).push(w); }
+  const cy = id => L.nodes[id].y + L.nodes[id].h / 2;
+  Object.values(outs).forEach(ws => ws.sort((p, q) => cy(p.b) - cy(q.b)));
+  Object.values(ins).forEach(ws => ws.sort((p, q) => cy(p.a) - cy(q.a)));
+  for (const w of L.wires) {
+    const a = L.nodes[w.a], b = L.nodes[w.b];
+    if (!a || !b) continue;
+    w.d = wirePath(a, b, outs[w.a].indexOf(w), outs[w.a].length, ins[w.b].indexOf(w), ins[w.b].length);
+    w.el = svgEl("path", { d: w.d, class: "w " + w.kind, "stroke-width": (1.2 + Math.min(2.4, Math.log2(w.w) * 0.5)).toFixed(2) });
+    if (w.labels && w.labels.size) { const t = svgEl("title", {}); t.textContent = [...w.labels].join("\n"); w.el.append(t); }
+    wiresSvg.append(w.el);
+  }
+  for (const n of Object.values(L.nodes)) world.append(card(n));
+  const maxX = Math.max(...Object.values(L.nodes).map(n => n.x + n.w)), maxY = Math.max(...Object.values(L.nodes).map(n => n.y + n.h));
+  wiresSvg.setAttribute("width", maxX + 40); wiresSvg.setAttribute("height", maxY + 40);
+  L.bounds = { w: maxX, h: maxY + 20 };
+  crumbs(); highlight(); panel(); writeHash();
+}
+
+// ---------- selection and highlight ----------
+function stepsOf(id) {
+  if (!id) return null;
+  if (id.startsWith("ch:")) { const ch = change().story.chapters[+id.slice(3) - 1]; return new Set([...ch.steps, ...ch.files.flatMap(f => FILES[f] ? FILES[f].steps : [])]); }
+  if (STEPS[id]) return new Set([id]);
+  if (flowOf[id]) return new Set(flowOf[id].steps);
+  if (FILES[id]) return new Set(FILES[id].steps);
+  if (DATA[id] || SCREENS[id]) return new Set(G.edges.filter(e => e.a === id || e.b === id).flatMap(e => e.steps));
+  if (FNS[id]) return new Set(Object.values(STEPS).filter(s => s.fns.includes(id)).map(s => s.id));
+  if (OFF[id]) return new Set();
+  return null;
+}
+function highlight() {
+  const H = stepsOf(S.sel);
+  world.classList.toggle("dim", !!H);
+  const lit = new Set();
+  for (const w of L.wires) {
+    const on = !!H && [...w.steps].some(s => H.has(s));
+    w.el && w.el.classList.toggle("hi", on);
+    if (on) { lit.add(w.a); lit.add(w.b); }
+  }
+  if (H) for (const s of H) { lit.add(rep(s)); lit.add(STEPS[s].flow); }
+  if (S.sel && S.sel.startsWith("ch:")) change().story.chapters[+S.sel.slice(3) - 1].files.forEach(f => lit.add(f));
+  world.querySelectorAll("[data-id]").forEach(n => {
+    const id = n.dataset.id, ref = id.replace(/^[LRF]:/, "");
+    n.classList.toggle("hi", lit.has(id) || lit.has(ref));
+    n.classList.toggle("sel", id === S.sel || ref === S.sel);
+  });
+  wiresSvg.querySelectorAll(".pulse").forEach(n => n.remove());
+  if (S.play && H) for (const w of L.wires) if (w.el && w.el.classList.contains("hi")) {
+    const c = svgEl("circle", { r: 4.5, class: "pulse" });
+    c.append(svgEl("animateMotion", { dur: "1.6s", repeatCount: "indefinite", path: w.d }));
+    wiresSvg.append(c);
+  }
+}
+function select(id) {
+  S.sel = S.sel === id && !S.play ? null : id;
+  if (S.play && !(STEPS[id] && STEPS[id].flow === S.play.flow)) stop();
+  highlight(); panel(); writeHash();
+}
+function toggleFlow(fid, open) {
+  open ? S.expanded.add(fid) : S.expanded.delete(fid);
+  S.sel = fid; draw(); fitTo([fid, ...flowOf[fid].steps]);
+}
+function openInside(fid) { stop(); S.view = fid; S.sel = null; draw(); fit(); }
+function back() { if (S.view !== "map") { const f = S.view; S.view = "map"; S.sel = f; draw(); fitTo([f]); } }
+
+// ---------- playback ----------
+function play(fid) {
+  S.expanded.add(fid); S.play = { flow: fid, i: 0 }; S.view = "map"; draw(); stepTo(0); fit();
+}
+function stepTo(i) {
+  const f = flowOf[S.play.flow]; i = Math.max(0, Math.min(f.steps.length - 1, i)); S.play.i = i;
+  const sid = f.steps[i]; S.sel = sid;
+  $("#flowbar").classList.add("on");
+  $("#fb-k").textContent = `${f.title} · step ${i + 1} of ${f.steps.length}`;
+  $("#fb-t").textContent = STEPS[sid].name;
+  highlight(); panel(); writeHash();
+}
+function stop() { if (!S.play) return; S.play = null; $("#flowbar").classList.remove("on"); highlight(); }
+$("#fb-prev").onclick = () => stepTo(S.play.i - 1);
+$("#fb-next").onclick = () => stepTo(S.play.i + 1);
+$("#fb-x").onclick = () => { stop(); panel(); };
+
+// ---------- side panel ----------
+const P = $("#panel");
+const link = (id, text) => el("div", { class: "rowlink", onclick: () => { if (S.view !== "map") { S.view = "map"; draw(); } select(id); centre(id); } }, text);
+const chip = (id, text) => el("span", { class: "chip", onclick: () => { if (S.view !== "map") { S.view = "map"; draw(); } select(id); centre(id); } }, text);
+
+function changeSummary(c) {
+  const out = [];
+  const v = c.verdict;
+  out.push(el("h3", {}, "The change"));
+  if (c.story && c.story.title) out.push(el("h2", {}, c.story.title));
+  out.push(el("p", {}, v ? el("span", { class: "verdict " + v.verdict }, v.verdict) : null, " ",
+    `${c.changed} changed and ${c.new} new functions · ${Object.keys(c.steps).length} steps touched`,
+    c.story && c.story.url ? [" · ", el("a", { class: "ext", href: c.story.url, target: "_blank", rel: "noopener" }, c.story.pr || "PR")] : null));
+  const landed = Object.keys(c.files).length, offN = c.off_files.length;
+  if (offN && !landed) out.push(el("p", { class: "q", style: "border-color:var(--chg)" }, el("b", {}, "Lands off the map. "), `Every changed file (${c.off_files.map(o => o.label).join(", ")}) is code no step on the map runs. Rebuild the map, or read this change from its diff.`));
+  else if (offN) out.push(el("p", { class: "q", style: "border-color:var(--chg)" }, `${offN} changed file${offN > 1 ? "s" : ""} the map doesn't cover: ${c.off_files.map(o => o.label).join(", ")}.`));
+  if (c.story && c.story.delta) out.push(el("p", { class: "lead" }, md(c.story.delta)));
+  if (v && v.blind && v.blind.length) out.push(el("h3", {}, "Can't see"), el("ul", {}, v.blind.map(b => el("li", {}, md(b)))));
+  if (c.story && c.story.no_longer.length) out.push(el("h3", {}, "No longer true"), ...c.story.no_longer.map(t => el("p", { class: "struck" }, md(t))));
+  if (c.story) {
+    out.push(el("h3", {}, "In " + c.story.chapters.length + " parts"));
+    for (const ch of c.story.chapters) out.push(el("div", { class: "rowlink", onclick: () => select("ch:" + ch.n) }, el("span", { class: "badge n", style: "box-shadow:none" }, ch.n), el("span", {}, ch.title, el("div", { class: "sub" }, ch.role + (ch.files.length ? " · " + ch.files.map(f => (FILES[f] || OFF[f] || { label: f.slice(2) }).label).join(", ") : "")))));
+  }
+  return out;
+}
+
+function legend() {
+  const c = change();
+  return [el("h3", {}, "How to read it"),
+    el("div", { class: "legend" },
+      el("div", {}, el("span", { class: "sw", style: "border:1.5px solid var(--k-flow);border-radius:7px" }), "A flow: what a user does. Click to light its path, double-click or ▶ to walk it"),
+      el("div", {}, el("span", { class: "sw" }), "A file of code; wires are calls, left to right. Double-click to open it"),
+      el("div", {}, el("span", { class: "sw", style: "border-style:dashed" }), "Data the steps write"),
+      c ? el("div", {}, el("span", { class: "sw", style: "background:var(--chg-soft);border:2px solid var(--chg)" }), "Code this change edits (green: new code)") : null,
+      c ? el("div", {}, el("span", { class: "sw", style: "box-shadow:inset 4px 0 0 var(--chg);border-color:var(--chg)" }), "A step that runs it (dashed: reaches it further down)") : null,
+      c && c.story ? el("div", {}, el("span", { class: "badge n", style: "box-shadow:none" }, "1"), "Which part of the change a card belongs to") : null)];
+}
+
+function callTree(s) {
+  const kids = {};
+  for (const [a, b] of s.calls) (kids[a] ||= []).push(b);
+  const seen = new Set();
+  const node = id => { const f = FNS[id]; if (seen.has(id)) return el("li", {}, f.sym + " …"); seen.add(id);
+    return el("li", {}, el("span", { title: id }, f.sym), el("span", { style: "color:var(--faint)" }, "  " + FILES[f.file].label), kids[id] ? el("ul", {}, kids[id].map(node)) : null); };
+  return el("div", { class: "calltree" }, el("ul", {}, s.roots.map(node)));
+}
+
+function panel() {
+  P.replaceChildren();
+  const id = S.sel, c = change();
+  if (!id && S.view !== "map") return filePanel(S.view, true);
+  if (!id) {
+    P.append(el("h2", {}, S.view === "map" ? "flowmap" : FILES[S.view].label),
+      el("p", { class: "lead" }, S.view === "map"
+        ? `${FLOWS.length} flows, ${Object.keys(STEPS).length} steps, ${Object.keys(FILES).length} files of code, ${Object.keys(DATA).length} kinds of data.` + (G.commit ? ` Built at ${G.commit}.` : "")
+        : "Its functions, laid out by who calls whom. Callers on the left, what it calls on the right."));
+    if (c) P.append(...changeSummary(c));
+    if (S.view === "map") {
+      P.append(el("h3", {}, "Flows"));
+      for (const f of FLOWS) P.append(el("div", { class: "rowlink", onclick: () => select(f.id) }, el("span", {}, el("b", {}, f.title), el("div", { class: "sub" }, f.steps.length + " steps · " + f.summary)),
+        el("button", { class: "icon-btn", title: "Play", onclick: ev => { ev.stopPropagation(); play(f.id); } }, "▶")));
+    }
+    P.append(...legend());
+    return;
+  }
+  if (id.startsWith("ch:")) {
+    const ch = c.story.chapters[+id.slice(3) - 1];
+    P.append(el("div", { class: "kind" }, `Part ${ch.n} of ${c.story.chapters.length} · ${ch.role}`), el("h2", {}, ch.title));
+    if (ch.claim) P.append(el("p", { class: "lead" }, md(ch.claim)));
+    P.append(el("div", { class: "ba" }, el("div", {}, el("b", {}, "Before"), md(ch.before)), el("div", {}, el("b", {}, "After"), md(ch.after))));
+    if (ch.why) P.append(el("p", {}, el("b", {}, "Why it matters. "), md(ch.why)));
+    if (ch.verified.length) P.append(el("p", { class: "sub", style: "white-space:normal" }, "Verified by: " + ch.verified.join(", ")));
+    if (ch.files.length || ch.outside.length) P.append(el("h3", {}, "Where it sits"), el("div", { class: "chips" }, ch.files.map(f => chip(f, (FILES[f] || OFF[f] || { label: f }).label)), ch.outside.map(f => el("span", { class: "chip", style: "cursor:default" }, f))));
+    if (ch.questions.length) P.append(el("h3", {}, "Questions"), ...ch.questions.map(q => el("div", { class: "q" }, md(q))));
+    const n = c.story.chapters.length;
+    P.append(el("p", {}, ch.n > 1 ? el("button", { class: "btn", onclick: () => select("ch:" + (ch.n - 1)) }, "← Part " + (ch.n - 1)) : null, " ", ch.n < n ? el("button", { class: "btn", onclick: () => select("ch:" + (ch.n + 1)) }, "Part " + (ch.n + 1) + " →") : null));
+    return;
+  }
+  const back_ = el("p", {}, el("button", { class: "btn", onclick: () => { stop(); S.sel = null; highlight(); panel(); writeHash(); } }, "← Overview"));
+  if (flowOf[id]) {
+    const f = flowOf[id];
+    P.append(back_, el("div", { class: "kind" }, "Flow"), el("h2", {}, f.title), el("p", { class: "lead" }, f.summary),
+      el("p", {}, el("button", { class: "btn", onclick: () => play(id) }, "▶ Walk through it"), " ", el("button", { class: "btn", onclick: () => toggleFlow(id, !S.expanded.has(id)) }, S.expanded.has(id) ? "Fold steps" : "Show steps")));
+    if (f.draft) P.append(el("p", { class: "sub", style: "white-space:normal" }, "Draft name: proposed by the mapping passes, not yet named in flowmap.toml."));
+    P.append(el("h3", {}, "Steps"), ...f.steps.map((s, i) => el("div", { class: "rowlink", onclick: () => { if (!S.expanded.has(id)) { S.expanded.add(id); draw(); } select(s); } }, el("span", { class: "n" }, i + 1), el("span", {}, STEPS[s].name))));
+    return;
+  }
+  if (STEPS[id]) {
+    const s = STEPS[id], p = c && c.steps[id];
+    P.append(back_, el("div", { class: "kind" }, flowOf[s.flow].title + " · step " + (flowOf[s.flow].steps.indexOf(id) + 1)), el("h2", {}, s.name));
+    if (p) P.append(el("p", { style: "color:var(--chg)" }, p.kind === "new" ? "New in this change" : p.kind === "direct" ? "Runs changed code: " : "Reaches changed code further down: ", p.via.join(", ")));
+    P.append(el("dl", { class: "kv" }, el("dt", {}, "Actor"), el("dd", {}, s.actor || "—"), el("dt", {}, "Evidence"), el("dd", {}, el("span", { class: "ev " + s.evidence }), " ", s.evidence),
+      el("dt", {}, "Entry"), el("dd", { class: "mono" }, s.endpoints.join(", ") || "—"),
+      s.ui.length ? [el("dt", {}, "Screen"), el("dd", {}, s.ui.map(u => u.split(":").pop()).join(", "))] : null,
+      s.writes.length ? [el("dt", {}, "Writes"), el("dd", {}, s.writes.join(", "))] : null));
+    if (s.roots.length) P.append(el("h3", {}, "What it runs"), callTree(s));
+    if (s.also.length) P.append(el("p", { class: "sub", style: "white-space:normal" }, "Also calls (shared plumbing, not drawn): " + s.also.join(", ")));
+    return;
+  }
+  if (FILES[id]) return filePanel(id, false);
+  if (DATA[id] || SCREENS[id]) {
+    const X = DATA[id] || SCREENS[id], ss = [...stepsOf(id)];
+    P.append(back_, el("div", { class: "kind" }, DATA[id] ? "Data" : "Screen"), el("h2", {}, X.label), el("p", { class: "sub" }, X.path));
+    if (DATA[id] && X.parts.length) P.append(el("p", {}, "Fields written: " + X.parts.join(", ")));
+    P.append(el("h3", {}, DATA[id] ? "Written by" : "Starts"), ...ss.map(s => link(s, STEPS[s].name)));
+    return;
+  }
+  if (OFF[id]) {
+    const o = OFF[id];
+    P.append(back_, el("div", { class: "kind" }, "Changed, not on the map"), el("h2", { class: "mono", style: "font-size:18px" }, o.label), el("p", { class: "sub" }, o.path),
+      el("p", {}, "No step on the map runs this file, so the canvas can't say which flows it affects. Either it is new behaviour the map hasn't caught up with, or it is code no entry point reaches."),
+      el("h3", {}, o.new ? "New" : "Changed"), el("div", { class: "chips" }, o.syms.map(s => el("span", { class: "chip", style: "cursor:default" }, s))));
+    return;
+  }
+  if (FNS[id]) {
+    const f = FNS[id];
+    P.append(el("p", {}, el("button", { class: "btn", onclick: () => { S.sel = null; highlight(); panel(); } }, "← " + FILES[f.file].label)), el("div", { class: "kind" }, "Function"), el("h2", { class: "mono", style: "font-size:18px" }, f.sym + "()"));
+    if (f.sig) P.append(el("p", { class: "mono sub" }, "(" + f.sig + ")"));
+    if (f.doc) P.append(el("p", {}, f.doc));
+    if (f.url) P.append(el("p", {}, el("a", { class: "ext", href: f.url, target: "_blank", rel: "noopener" }, "Read the code")));
+    P.append(el("h3", {}, "Run by"), ...[...stepsOf(id)].map(s => link(s, STEPS[s].name)));
+  }
+}
+
+function filePanel(id, inside) {
+  const F = FILES[id], c = change(), p = c && c.files[id];
+  const callers = G.edges.filter(e => e.kind === "call" && e.b === id).map(e => e.a);
+  const calls = G.edges.filter(e => e.kind === "call" && e.a === id).map(e => e.b);
+  const writes = G.edges.filter(e => e.kind === "writes" && e.a === id).map(e => e.b);
+  const byFlow = {};
+  F.steps.forEach(s => (byFlow[STEPS[s].flow] ||= []).push(s));
+  P.append(inside ? el("p", {}, el("button", { class: "btn", onclick: back }, "← Map")) : el("p", {}, el("button", { class: "btn", onclick: () => { stop(); S.sel = null; highlight(); panel(); writeHash(); } }, "← Overview")),
+    el("div", { class: "kind" }, "Code"), el("h2", { class: "mono", style: "font-size:18px" }, F.label), el("p", { class: "sub" }, F.path),
+    inside ? el("p", { class: "lead" }, "Its functions by who calls whom: callers on the left, what it calls on the right. Click a function to see which steps run it.")
+           : el("p", {}, el("button", { class: "btn", onclick: () => openInside(id) }, "Open it up →")));
+  if (p) P.append(el("p", { style: "color:var(--chg)" }, (p.kind === "new" ? "New: " : "Changed: ") + p.syms.join(", ")));
+  P.append(el("h3", {}, "Used by"), ...Object.entries(byFlow).map(([f, ss]) => el("div", {}, el("b", {}, flowOf[f].title), el("div", {}, ss.map(s => link(s, STEPS[s].name))))));
+  if (callers.length) P.append(el("div", { class: "chips", style: "margin-top:6px" }, callers.map(f => chip(f, FILES[f].label))));
+  P.append(el("h3", {}, "Inside"), el("div", { class: "calltree" }, el("ul", {}, F.fns.map(n => el("li", {}, FNS[n].url ? el("a", { class: "ext", href: FNS[n].url, target: "_blank", rel: "noopener" }, FNS[n].sym) : FNS[n].sym, FNS[n].doc ? el("div", { class: "sub", style: "font-family:var(--body);white-space:normal" }, FNS[n].doc) : null)))));
+  if (calls.length || writes.length) P.append(el("h3", {}, "Uses"), el("div", { class: "chips" }, calls.map(f => chip(f, FILES[f].label)), writes.map(d => chip(d, DATA[d].label))));
+  }
+
+function crumbs() {
+  const c = $("#crumbs"); c.replaceChildren();
+  if (S.view === "map") c.append(el("b", {}, "Map"));
+  else c.append(el("a", { onclick: back }, "Map"), " / ", el("b", { class: "mono" }, FILES[S.view].label));
+}
+
+// ---------- pan and zoom ----------
+let T = { x: 40, y: 20, k: 1 };
+const apply = () => { world.style.transform = `translate(${T.x}px,${T.y}px) scale(${T.k})`; world.classList.toggle("far", T.k < 0.55); };
+function fitBox(x0, y0, x1, y1, maxK = 1.1) {
+  const r = stage.getBoundingClientRect(), pad = 48;
+  const k = Math.min(maxK, (r.width - pad * 2) / (x1 - x0 || 1), (r.height - pad * 2) / (y1 - y0 || 1));
+  T = { k, x: (r.width - (x1 - x0) * k) / 2 - x0 * k, y: (r.height - (y1 - y0) * k) / 2 - y0 * k + 10 };
+  apply();
+}
+function fit() {
+  // whole picture when it reads; otherwise full width from the top, and scroll down
+  const r = stage.getBoundingClientRect(), pad = 48;
+  const kw = (r.width - pad * 2) / L.bounds.w, kh = (r.height - pad * 2) / L.bounds.h;
+  if (Math.min(kw, kh) >= 0.42) return fitBox(0, 0, L.bounds.w, L.bounds.h, 1);
+  const k = Math.min(1, Math.max(0.6, kw));
+  T = { k, x: kw >= k ? (r.width - L.bounds.w * k) / 2 : pad / 2, y: 12 }; apply();
+}
+function fitTo(ids, neighbours = true) {
+  const ns = ids.map(i => L.nodes[i] || L.boxes.find(b => b.id === i)).filter(Boolean);
+  if (!ns.length) return;
+  const lit = neighbours ? L.wires.filter(w => ids.includes(w.a) || ids.includes(w.b)).flatMap(w => [L.nodes[w.a], L.nodes[w.b]]) : [];
+  const all = [...ns.map(n => ({ x: n.x ?? 0, y: n.y, w: n.w ?? SIZE.flow[0], h: n.h })), ...lit];
+  fitBox(Math.min(...all.map(n => n.x)), Math.min(...all.map(n => n.y)) - 30, Math.max(...all.map(n => n.x + n.w)), Math.max(...all.map(n => n.y + n.h)), 1);
+}
+function centre(id) {
+  const n = L.nodes[rep(id)] || L.nodes[id]; if (!n) return;
+  const r = stage.getBoundingClientRect();
+  T.x = r.width / 2 - (n.x + n.w / 2) * T.k; T.y = r.height / 2 - (n.y + n.h / 2) * T.k; apply();
+}
+stage.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const r = stage.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  const k = Math.max(0.15, Math.min(2.5, T.k * Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0018))));
+  T.x = mx - (mx - T.x) * k / T.k; T.y = my - (my - T.y) * k / T.k; T.k = k; apply();
+}, { passive: false });
+let drag = null; const touches = new Map(); let pinch = null;
+stage.addEventListener("pointerdown", ev => { touches.set(ev.pointerId, ev); if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), k: T.k, x: T.x, y: T.y, mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 }; drag = null; } });
+stage.addEventListener("pointermove", ev => { if (!touches.has(ev.pointerId)) return; touches.set(ev.pointerId, ev); if (!pinch || touches.size < 2) return;
+  const [a, b] = [...touches.values()], r = stage.getBoundingClientRect(), d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  const k = Math.max(0.15, Math.min(2.5, pinch.k * d / pinch.d)), mx = pinch.mx - r.left, my = pinch.my - r.top;
+  T.k = k; T.x = mx - (mx - pinch.x) * k / pinch.k; T.y = my - (my - pinch.y) * k / pinch.k; apply(); });
+["pointerup", "pointercancel"].forEach(t => stage.addEventListener(t, ev => { touches.delete(ev.pointerId); if (touches.size < 2) pinch = null; }));
+stage.addEventListener("pointerdown", ev => { if (ev.target.closest(".card,.pill,.fbhead,.zoom,#flowbar")) return; drag = { x: ev.clientX, y: ev.clientY, tx: T.x, ty: T.y, moved: false }; stage.setPointerCapture(ev.pointerId); stage.classList.add("panning"); });
+stage.addEventListener("pointermove", ev => { if (!drag || pinch) return; const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true; T.x = drag.tx + dx; T.y = drag.ty + dy; apply(); });
+stage.addEventListener("pointerup", () => { if (drag && !drag.moved && S.sel && !S.play) { S.sel = null; highlight(); panel(); writeHash(); } drag = null; stage.classList.remove("panning"); });
+$("#z-in").onclick = () => { T.k = Math.min(2.5, T.k * 1.25); apply(); };
+$("#z-out").onclick = () => { T.k = Math.max(0.15, T.k / 1.25); apply(); };
+$("#z-fit").onclick = fit;
+
+// ---------- controls ----------
+const chSel = $("#change");
+chSel.append(el("option", { value: -1 }, "No change painted"), ...G.changes.map((c, i) => el("option", { value: i }, "Paint: " + (c.story && c.story.title ? c.title + " — " + c.story.title.slice(0, 48) + (c.story.title.length > 48 ? "…" : "") : c.title))));
+if (!G.changes.length) chSel.style.display = "none";
+chSel.onchange = () => { S.change = +chSel.value; S.sel = null; draw(); fitChange(); };
+$("#expand").onclick = () => { const all = S.expanded.size === FLOWS.length; S.expanded = new Set(all ? [] : FLOWS.map(f => f.id)); draw(); fit(); };
+const find = $("#find");
+find.addEventListener("keydown", ev => {
+  if (ev.key !== "Enter") return;
+  const q = find.value.trim().toLowerCase(); if (!q) return;
+  const hit = Object.values(STEPS).find(s => s.name.toLowerCase().includes(q) || s.endpoints.some(e => e.toLowerCase().includes(q)))
+    || Object.values(FILES).find(f => f.path.toLowerCase().includes(q) || f.fns.some(n => FNS[n].sym.toLowerCase().includes(q)))
+    || Object.values(DATA).find(d => d.label.toLowerCase().includes(q)) || FLOWS.find(f => f.title.toLowerCase().includes(q));
+  if (!hit) { find.style.borderColor = "var(--ev-bad)"; return; }
+  find.style.borderColor = "";
+  if (S.view !== "map") S.view = "map";
+  if (STEPS[hit.id]) S.expanded.add(STEPS[hit.id].flow);
+  draw(); select(hit.id); centre(hit.id);
+});
+document.addEventListener("keydown", ev => {
+  if (ev.target.matches("input,select")) return;
+  if (S.play && ev.key === "ArrowRight") stepTo(S.play.i + 1);
+  else if (S.play && ev.key === "ArrowLeft") stepTo(S.play.i - 1);
+  else if (ev.key === "Escape") { if (S.play) { stop(); panel(); } else if (S.sel) { S.sel = null; highlight(); panel(); writeHash(); } else back(); }
+  else if (ev.key === "Backspace") back();
+  else if (ev.key === "f" || ev.key === "F") fit();
+  else if (ev.key === "e" || ev.key === "E") $("#expand").click();
+  else if (ev.key === "/") { ev.preventDefault(); find.focus(); }
+});
+
+// ---------- the view lives in the URL ----------
+function writeHash() {
+  const p = new URLSearchParams();
+  if (S.view !== "map") p.set("in", S.view);
+  if (S.sel) p.set("s", S.sel);
+  if (S.change >= 0) p.set("c", S.change); else if (G.changes.length) p.set("c", -1);
+  if (S.expanded.size && S.expanded.size < FLOWS.length) p.set("x", [...S.expanded].map(f => f.slice(5)).join(","));
+  else if (S.expanded.size === FLOWS.length && total > 12) p.set("x", "all");
+  history.replaceState(null, "", "#" + p.toString());
+}
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.has("c")) S.change = Math.min(G.changes.length - 1, +p.get("c"));
+  if (p.has("x")) S.expanded = new Set(p.get("x") === "all" ? FLOWS.map(f => f.id) : p.get("x").split(",").map(f => "flow:" + f).filter(f => flowOf[f]));
+  if (p.has("in") && FILES[p.get("in")]) S.view = p.get("in");
+  if (p.has("s")) S.sel = p.get("s");
+}
+readHash();
+chSel.value = S.change;
+draw();
+const changeIds = () => { const c = change(); return c ? [...Object.keys(c.files), ...Object.keys(c.steps).map(rep), ...c.off_files.map(o => o.id)].filter(id => L.nodes[id]) : []; };
+const fitChange = () => change() && Object.keys(change().files).length ? fitTo(changeIds(), false) : fit();
+if (S.sel && L.nodes[rep(S.sel)]) fitTo([rep(S.sel)]); else fitChange();
+window.addEventListener("resize", () => fit());
+</script>
