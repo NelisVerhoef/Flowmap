@@ -174,10 +174,12 @@ def overlay(d, spec, ms):
     hit = [m["id"] for m in ms if changed & set().union(*(d._forward(n) for n in m["ids"]))]
     return {"id": re.sub(r"\W", "", title) or "pr", "title": title or rng, "range": rng,
             "steps": steps, "merges": hit, "changed": len(changed), "new": len(new),
-            "widest": [{"sym": s, "endpoints": n} for n, s in widest if n]}
+            "widest": [{"sym": s, "endpoints": n} for n, s in widest if n],
+            "changed_ids": sorted(changed), "new_ids": sorted(new), "added_endpoints": sorted(added_eps)}
 
 
-def build(prs):
+def data(prs):
+    """Everything the atlas draws, as one dict (the canvas draws the same data another way)."""
     d = Diagrams()
     d.system()  # fills d.matrix
     flows, comps, _ = d.matrix
@@ -205,13 +207,18 @@ def build(prs):
             })
         data["flows"].append({"id": f["id"], "summary": f["summary"], "steps": steps})
     data["functions"] = functions(d, {n["id"] for f in data["flows"] for s in f["steps"] if s["code"] for n in s["code"]["nodes"]})
-    commit = lens.git("rev-parse", "--short", "HEAD").strip()
-    data["commit"] = commit
+    data["commit"] = lens.git("rev-parse", "--short", "HEAD").strip()
+    return data
+
+
+def build(prs):
+    data_ = data(prs)
+    ms = data_["merges"]
     name = config.load().get("name") or ROOT.name.replace("-", " ").replace("_", " ").title()
     html = (TEMPLATE.read_text().replace("__ATLAS_NAME__", name.replace("<", "&lt;"))
-            .replace("/*__ATLAS_DATA__*/null", json.dumps(data, separators=(",", ":"))))
+            .replace("/*__ATLAS_DATA__*/null", json.dumps(data_, separators=(",", ":"))))
     OUT.write_text(html)
-    print(f"wrote {OUT.relative_to(ROOT)} ({len(html) // 1024} KB, {len(ms)} merges, {len(data['overlays'])} overlays)")
+    print(f"wrote {OUT.relative_to(ROOT)} ({len(html) // 1024} KB, {len(ms)} merges, {len(data_['overlays'])} overlays)")
 
 
 if __name__ == "__main__":

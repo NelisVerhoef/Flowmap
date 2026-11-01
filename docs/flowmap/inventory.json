@@ -3,17 +3,27 @@
   {
    "endpoint": "CLI flowmap atlas",
    "handler": "flowmap/atlas.py:__main__",
-   "line": 154
+   "line": 224
   },
   {
    "endpoint": "CLI flowmap brief",
    "handler": "flowmap/brief.py:__main__",
-   "line": 91
+   "line": 100
   },
   {
    "endpoint": "CLI flowmap callgraph",
    "handler": "flowmap/callgraph.py:__main__",
-   "line": 224
+   "line": 127
+  },
+  {
+   "endpoint": "CLI flowmap canvas",
+   "handler": "flowmap/canvas.py:__main__",
+   "line": 246
+  },
+  {
+   "endpoint": "CLI flowmap change",
+   "handler": "flowmap/change.py:__main__",
+   "line": 431
   },
   {
    "endpoint": "CLI flowmap diagrams",
@@ -28,17 +38,22 @@
   {
    "endpoint": "CLI flowmap lens",
    "handler": "flowmap/lens.py:__main__",
-   "line": 314
+   "line": 483
   },
   {
    "endpoint": "CLI flowmap reconcile",
    "handler": "flowmap/reconcile.py:__main__",
-   "line": 369
+   "line": 371
   },
   {
    "endpoint": "CLI flowmap verify",
    "handler": "flowmap/verify.py:__main__",
    "line": 73
+  },
+  {
+   "endpoint": "CLI flowmap viewer",
+   "handler": "flowmap/viewer.py:__main__",
+   "line": 29
   }
  ]
 }

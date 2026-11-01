@@ -1,0 +1,223 @@
+{
+  "title": "The map draws as one canvas a change is painted on, and flowmap's own map is current again",
+  "pr": "PR #17",
+  "url": "https://github.com/NelisVerhoef/Flowmap/pull/17",
+  "intent": "Prototype a left-to-right canvas of the map (flows, code, data) that a reviewer can learn by looking, paint a PR on it, and refresh flowmap's own stale map so the canvas has something current to show.",
+  "delta": "browse-the-map gains a step: `flowmap canvas` draws the map as one picture, files placed by call depth, and paints a change with its story's parts numbered on the cards. The atlas page and its command behave as before; atlas.data now builds the dict both pages draw. build-the-map's reconcile can adopt a proposed flow under a name of the user's own. flowmap's own map is rebuilt from four agreeing passes into three named flows. lens, the change page and its --link are unchanged. lens calls this blind: canvas.py has module-level constants, and the page template, bin/flowmap (which wires up the command) and flowmap.toml sit outside the analysed code, so read those in the diff.",
+  "no_longer": [
+    {
+      "was": "A vocabulary entry adopts a proposed flow only when its id equals the proposal's id without `new:`; renaming one, as QUESTIONS.md invites, leaves its steps under the old `new:` flow",
+      "cite": "flowmap/reconcile.py:canonical_new_flows",
+      "step": "build-the-map/reconcile-passes"
+    },
+    {
+      "was": "flowmap's own map has three unnamed draft flows and no step for `flowmap change` or `flowmap viewer`",
+      "cite": "docs/flowmap/map.json"
+    },
+    {
+      "was": "A PR overlay records how many functions a change touched, not which ones",
+      "cite": "flowmap/atlas.py:overlay"
+    }
+  ],
+  "chapters": [
+    {
+      "title": "The map draws as one left-to-right canvas, and a change is painted on it",
+      "role": "core",
+      "kind": "new capability",
+      "symbols": [
+        "flowmap/canvas.py:main",
+        "flowmap/canvas.py:graph",
+        "flowmap/canvas.py:graph.edge",
+        "flowmap/canvas.py:graph.walk",
+        "flowmap/canvas.py:paint",
+        "flowmap/canvas.py:paint.file_of",
+        "flowmap/canvas.py:screen_group",
+        "flowmap/canvas.py:data_label",
+        "flowmap/canvas.py:flow_title",
+        "flowmap/canvas.py:from_page",
+        "flowmap/canvas.py:__main__"
+      ],
+      "files": [
+        "flowmap/canvas.template.html",
+        "bin/flowmap",
+        "README.md",
+        "docs/flowmap/canvas.html",
+        "bench/fastapi-template/map/canvas.html"
+      ],
+      "before": "The map had two views: Mermaid diagrams and the atlas, which lists each flow's steps as a column of sentences. A change was read on the change page, a document whose only picture is a row of dots per flow.",
+      "after": "`flowmap canvas` writes docs/flowmap/canvas.html: screens, flows and steps, one card per file placed by call depth, and the data the steps write, wired left to right from the call graph. Click a flow to light its path, ▶ to walk it step by step, double-click a file to see its functions with callers left and callees right. `--change <name>=<base>..<head>` paints changed and new files, marks the steps that run them, numbers the story's parts on their cards, and gives changed code no step runs its own \"not on the map\" column. `--from <atlas.html>` redraws an existing atlas page's data. The paint comes from the atlas overlay (`atlas.overlay`); the verdict on the page comes from `lens.analyse`, which `canvas.main` also runs.",
+      "claim": "A reviewer sees where a change sits on a picture of the system instead of reading it.",
+      "why": "Whoever reviews a flowmap PR reads it here first. The atlas and change page never built a picture people could learn, so the reviewer fell back to the diff. Rather than inlining a full graph-layout library such as ELK into every page, the page does a small column layout itself, because positions follow the map's order and that keeps the picture the same between builds; the cost is wires that can cross.",
+      "verified": [
+        {
+          "how": "test",
+          "what": "tests/test_canvas.py:Graph"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_canvas.py:Paint"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_canvas.py:Page"
+        },
+        {
+          "how": "ran",
+          "what": "flowmap canvas on the FastAPI bench atlas and on this repo with PR #16 and #15 painted; opened each in Chromium (overview, walking Sign in, inside crud.py, PR #16 part 1, PR #15 off the map) with no page errors"
+        },
+        {
+          "how": "not checked",
+          "what": "touch pinch zoom on a real phone; dark theme"
+        }
+      ],
+      "questions": [
+        {
+          "q": "canvas paints changed code from `atlas.overlay`, which unlike `lens.analyse` doesn't skip docstring-only edits, so a file can be painted amber while the verdict ignores it. Should `canvas.main` take changed symbols from lens's facts instead?",
+          "why": "Three of the four mapping passes independently flagged the three changed-symbol detectors; this decides whether a page's paint and its verdict can disagree.",
+          "kind": "ask"
+        },
+        {
+          "q": "`canvas.from_page` scrapes `const DATA = …` out of a rendered atlas page. Should the atlas also write its data as JSON beside the page?",
+          "why": "Any edit to the atlas template's data line silently breaks `--from`.",
+          "kind": "ask"
+        },
+        {
+          "q": "Should the canvas become the page `flowmap change --link` opens, replacing the document-style change page?",
+          "why": "Decides whether the next PR moves the viewer to the canvas or keeps two change pages.",
+          "kind": "ask"
+        },
+        {
+          "q": "Open bench/fastapi-template/map/canvas.html, press ▶ on Sign in, then open docs/flowmap/canvas.html and paint PR #16: can you say where each lands without the diff?",
+          "why": "The point of the canvas is intuition; this is the test that matters.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "The atlas's data is built once, and an overlay names the functions a change touched",
+      "role": "supporting",
+      "kind": "refactor + data",
+      "symbols": [
+        "flowmap/atlas.py:data",
+        "flowmap/atlas.py:build",
+        "flowmap/atlas.py:overlay"
+      ],
+      "before": "`atlas.build` computed the atlas data and wrote the page in one function. A PR overlay carried counts of changed and new functions.",
+      "after": "`atlas.data` returns the dict and `atlas.build` writes the page from it, so the canvas draws the same data. An overlay also carries `changed_ids`, `new_ids` and `added_endpoints`, which the canvas paints; the atlas page ignores them.",
+      "claim": "One builder feeds both pages.",
+      "why": "Runs under `flowmap atlas` and `flowmap canvas`. Rather than a second copy of the step and merge logic in canvas.py, the canvas reuses the atlas's, because two copies would drift. The cost: `atlas.data` and `atlas.overlay` now sit under both pages, so a bug there breaks the atlas and the canvas together.",
+      "verified": [
+        {
+          "how": "ran",
+          "what": "flowmap atlas --pr 69be006..8675ccd=PR16 wrote docs/flowmap/atlas.html with 1 overlay; the committed page was restored after"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_merges.py:MergesTest"
+        }
+      ],
+      "questions": [
+        {
+          "q": "`atlas.data` still calls `Diagrams.system()` only to fill `d.matrix`. With two pages built on it, should that become a function that returns the matrix?",
+          "why": "Two passes flagged this hidden write; it now sits under both browse steps.",
+          "kind": "ask"
+        },
+        {
+          "q": "Diff a fresh `flowmap atlas` against the committed atlas.html: only the overlay keys and the map itself should differ.",
+          "why": "Confirms the split kept the atlas page's behaviour.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "A flow renamed when it is adopted keeps its steps",
+      "role": "supporting",
+      "kind": "fix",
+      "symbols": [
+        "flowmap/reconcile.py:canonical_new_flows",
+        "flowmap/reconcile.py:adopted_flows",
+        "flowmap/reconcile.py:write_questions_md"
+      ],
+      "files": [
+        "flowmap/config.py"
+      ],
+      "before": "reconcile adopted a proposed flow only when a vocabulary id equalled the proposal without `new:`. Renaming it in flowmap.toml, as QUESTIONS.md invites, left its steps under the `new:` flow.",
+      "after": "A vocabulary entry can name the proposal it adopts with `proposed = \"new:...\"` (one id or a list); any id in a merged proposal ties it to the user's name. The TOML block in QUESTIONS.md now writes that line, so a pasted block still works after renaming `id`. flowmap/config.py only gains the `proposed` line in its documented example.",
+      "claim": "Naming flows works the way QUESTIONS.md says it does.",
+      "why": "Runs once per map build, at the human step: whoever names the flows. Found while naming this repo's flows, whose chosen names differ from the proposals. Rather than pinning every entry point in decisions.json, which would mark each step \"confirmed\" when only its flow was named, the vocabulary says what it adopts.",
+      "verified": [
+        {
+          "how": "test",
+          "what": "tests/test_flow_names.py:FlowNames"
+        },
+        {
+          "how": "ran",
+          "what": "flowmap reconcile docs/flowmap/runs/??-?.json with the new vocabulary: 3 flows, 11 steps, 11 agreed, flows named build-the-map, browse-the-map, review-a-change"
+        }
+      ],
+      "questions": [
+        {
+          "q": "Should reconcile warn when a `proposed` names no proposal (a typo), instead of silently leaving the `new:` flow beside the empty vocabulary one?",
+          "why": "Decides whether a mistyped name fails loudly.",
+          "kind": "ask"
+        },
+        {
+          "q": "Paste QUESTIONS.md's TOML block, rename one `id`, reconcile: does the flow keep its steps?",
+          "why": "The path a new user takes.",
+          "kind": "check"
+        }
+      ]
+    },
+    {
+      "title": "flowmap's own map is current, with three named flows",
+      "role": "outside",
+      "kind": "map refresh",
+      "symbols": [],
+      "files": [
+        "docs/flowmap/map.json",
+        "docs/flowmap/MAP.md",
+        "docs/flowmap/QUESTIONS.md",
+        "docs/flowmap/decisions.json",
+        "flowmap.toml",
+        "docs/flowmap/inventory.json",
+        "docs/flowmap/atlas.html",
+        "tests/golden/lens-6d9eaff-770f1a7.md",
+        "tests/golden/change-facts-6d9eaff-770f1a7.json"
+      ],
+      "before": "The map was built 21 commits ago: 8 steps in 3 unnamed draft flows, with no step for `flowmap change`, `canvas` or `viewer`.",
+      "after": "11 entry points, 11 steps, all agreed by independent passes, in build-the-map, browse-the-map and review-a-change. lens's flow is pinned to review-a-change in decisions.json (the step itself is still \"agreed\": that grades how the passes grouped the step, not which flow it sits in). The goldens are regenerated: only step and flow placement and flow spread moved; the graph goldens did not. The anchors-lost test moved to its own fixture repo.",
+      "claim": "Change pages from here on land on a map that knows today's commands.",
+      "why": "Every later PR is placed on this map. On the old one, a change to change.py (PR #15) landed off the map entirely. The anchors-lost test cited functions deleted long ago; a fresh map can't cite them, so rather than rewriting its expected value to empty it now builds a repo whose map does.",
+      "verified": [
+        {
+          "how": "ran",
+          "what": "flowmap verify on all four passes: 0 bad citations, 0 entry points unplaced, exit 0"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_golden.py:GoldenTest"
+        },
+        {
+          "how": "test",
+          "what": "tests/test_change.py:FactsTest"
+        },
+        {
+          "how": "looked",
+          "what": "the change-facts golden: symbols, hunks and graph identical, only map-derived fields differ"
+        }
+      ],
+      "questions": [
+        {
+          "q": "lens is pinned to review-a-change against three of four passes, which put it under browse-the-map. Keep the pin?",
+          "why": "Decides whether a human pin should override a 3-of-4 vote here.",
+          "kind": "ask"
+        },
+        {
+          "q": "`bin/flowmap-pr-hook` runs `flowmap lens` on every push but is not an entry point: bin/ is outside `[code].graph` and the file has no .py. Map it in a follow-up?",
+          "why": "Until then, a change to the hook lands off the map.",
+          "kind": "ask"
+        }
+      ]
+    }
+  ]
+}

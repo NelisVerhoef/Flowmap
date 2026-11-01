@@ -8,19 +8,19 @@ Left: user flows (click to drill in), coloured by how much of the flow the map i
 flowchart TB
     subgraph flows["User flows"]
     direction LR
-        nnew_discover_entry_points["<b>new:discover-entry-points</b><br/>1 steps · 1 solid"]
-        nnew_review_change_on_map["<b>new:review-change-on-map</b><br/>4 steps · 4 solid"]
-        nnew_run_mapping_passes["<b>new:run-mapping-passes</b><br/>3 steps · 3 solid"]
+        nbuild_the_map["<b>build-the-map</b><br/>5 steps · 5 solid"]
+        nbrowse_the_map["<b>browse-the-map</b><br/>3 steps · 3 solid"]
+        nreview_a_change["<b>review-a-change</b><br/>3 steps · 3 solid"]
     end
     subgraph core["Core: the components most flows run through"]
     direction LR
     end
-    class nnew_discover_entry_points tested
-    click nnew_discover_entry_points "./new-discover-entry-points.md"
-    class nnew_review_change_on_map tested
-    click nnew_review_change_on_map "./new-review-change-on-map.md"
-    class nnew_run_mapping_passes tested
-    click nnew_run_mapping_passes "./new-run-mapping-passes.md"
+    class nbuild_the_map tested
+    click nbuild_the_map "./build-the-map.md"
+    class nbrowse_the_map tested
+    click nbrowse_the_map "./browse-the-map.md"
+    class nreview_a_change tested
+    click nreview_a_change "./review-a-change.md"
     classDef confirmed fill:#1f7a3d,stroke:#14532d,color:#fff
     classDef tested fill:#2f9e5a,stroke:#1f7a3d,color:#fff
     classDef agreed fill:#a7e3bd,stroke:#2f9e5a,color:#0b3d1f
@@ -36,7 +36,7 @@ A component many flows run through is where a change has the widest blast radius
 
 Every component two or more flows share. Cell = how many of the flow's steps reach it.
 
-| component | discover-entry-points | review-change-on-map | run-mapping-passes |
+| component | build-the-map | browse-the-map | review-a-change |
 |---|---|---|---|
 
 **workflow engine** = `executor.run_workflow` and everything only it reaches: .
@@ -45,6 +45,6 @@ Every component two or more flows share. Cell = how many of the flow's steps rea
 
 ## Flows
 
-- [new:discover-entry-points](./new-discover-entry-points.md) — Maintainer scans the repo being mapped and gets the list of every entry point, the join key for all later passes.
-- [new:review-change-on-map](./new-review-change-on-map.md) — See the map: flows, their steps and the code each step runs, as Mermaid diagrams and an interactive atlas page.
-- [new:run-mapping-passes](./new-run-mapping-passes.md) — Turn a repo into a first flow map: list its entry points, brief independent mapping passes, check each pass, and vote them into one map.
+- [build-the-map](./build-the-map.md) — Map a repo as flows -> steps -> code by agreement: list its entry points, hand briefs to independent passes, check their citations, and vote them into one map a human settles.
+- [browse-the-map](./browse-the-map.md) — See the settled map: Mermaid diagrams at system/flow/step zoom, the interactive atlas, and the left-to-right canvas of screens, steps, code and data.
+- [review-a-change](./review-a-change.md) — Turn a PR into a change page: chapters anchored to the map saying where it sits, what it changes, why, and what to ask, backed by facts and linkable from the PR body.

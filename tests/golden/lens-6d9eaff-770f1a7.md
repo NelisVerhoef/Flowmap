@@ -7,7 +7,7 @@
 - module-level code changed (constants, config, router registration): `flowmap/change.py`
 - files outside the analysed code: `bin/flowmap`, `flowmap/atlas.template.html`, `flowmap/change.template.html`
 
-11 files changed (3 app code, 0 tests, 8 other) · 21 code symbols changed · 4 map steps touched across 1 flows
+11 files changed (3 app code, 0 tests, 8 other) · 21 code symbols changed · 4 map steps touched across 3 flows
 
 ## Endpoint changes
 
@@ -15,22 +15,31 @@
 
 ## Flows and steps touched
 
-### new:review-change-on-map
-- **Maintainer generates Mermaid diagrams at system, flow and step zoom** (agreed, busy 12/2) — changed: `flowmap/callgraph.py:Graph.__init__`
-- **Reviewer places a base..head diff on the map (steps touched, call-graph reach, off-map code)** (agreed, busy 12/3) — changed: `flowmap/callgraph.py:Graph.__init__`, `flowmap/callgraph.py:Graph.callers`, `flowmap/lens.py:main`
-- **Developer asks which entry points and flows can reach a file:symbol** (agreed, busy 8/1) — changed: `flowmap/callgraph.py:Graph.__init__`, `flowmap/callgraph.py:Graph.callers`
-- **Maintainer builds the interactive atlas page and browses flows, steps and components** (agreed, busy 12/4) — changed: `flowmap/callgraph.py:Graph.__init__`
+### build-the-map
+- **Maintainer checks that every entry point's handler is a call-graph node** (agreed, busy 9/6) — changed: `flowmap/callgraph.py:Graph.__init__`
+
+### browse-the-map
+- **Maintainer generates Mermaid diagrams of the map at system, flow and step zoom** (agreed, busy 9/2) — changed: `flowmap/callgraph.py:Graph.__init__`
+
+### review-a-change
+- **Reviewer runs lens on base..head to get the verdict, touched steps, reach and blind spots** (agreed, busy 13/2) — changed: `flowmap/lens.py:graph_at`, `flowmap/lens.py:main`, `flowmap/lens.py:reach_diff`
+- **Author pulls the change's deterministic facts as JSON to write the story from** (agreed, busy 12/3) — changed: `flowmap/change.py:__main__`, `flowmap/change.py:facts`, `flowmap/change.py:hunks`, `flowmap/change.py:main`, `flowmap/change.py:signature`, `flowmap/lens.py:graph_at`, `flowmap/lens.py:reach_diff`
 
 ## Reach (call graph, deterministic)
 
-Changed backend code can execute under **4 steps in 1 flows**; 0 of those steps the map's own anchors did not show (hidden blast radius).
+Changed backend code can execute under **5 steps in 3 flows**; 1 of those steps the map's own anchors did not show (hidden blast radius).
 
 Widest-reaching **modified** code (new code only inherits its caller's reach):
 
-- `flowmap/callgraph.py:Graph.__init__` — reachable from 5 endpoints in 1 flows
-- `flowmap/callgraph.py:Graph` — reachable from 5 endpoints in 1 flows
-- `flowmap/callgraph.py:Graph.callers` — reachable from 4 endpoints in 1 flows
+- `flowmap/callgraph.py:Graph.__init__` — reachable from 5 endpoints in 3 flows
+- `flowmap/callgraph.py:Graph` — reachable from 5 endpoints in 3 flows
+- `flowmap/callgraph.py:Graph.callers` — reachable from 4 endpoints in 3 flows
 - `flowmap/lens.py:main` — reachable from 1 endpoints in 1 flows
+
+Steps reached but not anchored (look here):
+
+- **browse-the-map**
+  - Maintainer builds the interactive atlas page and browses flows, steps, merges and code — via `Graph.__init__`, `Graph.callers`, `Graph`
 
 ## Reach diff (call graph, base → head)
 
@@ -45,13 +54,13 @@ New code, or a gap in the map. Either way: where does it sit in a flow?
 
 **Modified** — existing code changed; shared modules first:
 
-- `flowmap/callgraph.py`: `Graph`
+- `flowmap/callgraph.py`: `Graph`, `Graph.callers`
 
 **New** — didn't exist before:
 
 - `flowmap/callgraph.py`: `Graph._closure`, `Graph.callees`, `Graph.edge_set`
-- `flowmap/change.py`: `__main__`, `auto_chapters`, `facts`, `facts.module`, `facts.node_for`, `file_kind`, `hunks`, `main`, `merge`, `signature`
-- `flowmap/lens.py`: `graph_at`, `main.listing`, `reach_diff`
+- `flowmap/change.py`: `auto_chapters`, `facts.module`, `facts.node_for`, `file_kind`, `merge`
+- `flowmap/lens.py`: `main.listing`
 
 ## Shape
 

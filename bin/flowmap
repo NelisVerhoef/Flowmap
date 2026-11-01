@@ -9,6 +9,7 @@ Run from inside the repo you're mapping (or set FLOWMAP_ROOT).
   flowmap reconcile <run.json>...       vote the passes into map.json, MAP.md, QUESTIONS.md
   flowmap diagrams                      Mermaid at system / flow / step zoom
   flowmap atlas [--pr base..head=label] the interactive map, optionally with PR overlays
+  flowmap canvas [--change name=b..h]   the map as one left-to-right picture; a change painted on it
   flowmap lens <base> [<head>] [--json] place a change on the map (verdict, flows, reach, blind spots)
   flowmap change <base> [<head>]        the change as chapters on the map: where, what, why, questions
   flowmap viewer <dir>                  the hosted change viewer, rendering --link links in the browser
@@ -51,7 +52,7 @@ py = project_python()
 if py:
     os.environ["FLOWMAP_REEXEC"] = "1"
     os.execv(py, [py, __file__, *sys.argv[1:]])
-COMMANDS = {"inventory", "brief", "verify", "reconcile", "diagrams", "atlas", "lens", "change", "viewer", "callgraph"}
+COMMANDS = {"inventory", "brief", "verify", "reconcile", "diagrams", "atlas", "canvas", "lens", "change", "viewer", "callgraph"}
 
 if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
     print(__doc__.strip())

@@ -1,17 +1,25 @@
 """The change page's facts are right, and the story can't claim what the facts don't back.
-Cases come from this repo's own history: PR #10 (4247d94..2559b22) and PR #4 (0d82693)."""
+Cases come from this repo's own history (PR #10, 4247d94..2559b22) and from small fixture repos."""
 
 import json
 import os
 import sys
 import unittest
 
-from tests.helpers import REPO, flowmap
+from tests.helpers import REPO, cli_app, commit, fixture_repo, flowmap
 
 sys.path.insert(0, str(REPO / "flowmap"))
 import change  # noqa: E402
 
 PR10 = ("4247d94", "2559b22")
+RUN_INLINED = '''
+    def main():
+        print("hi".upper())
+
+
+    if __name__ == "__main__":
+        main()
+'''
 
 
 class FactsTest(unittest.TestCase):
@@ -31,10 +39,16 @@ class FactsTest(unittest.TestCase):
             "flowmap/graphs/python.py:signature": ["flowmap/atlas.py:functions"]})
 
     def test_map_anchors_the_change_removed(self):
-        fx = json.loads(flowmap("change", "0d82693^", "0d82693", "--facts"))
-        gone = {a["anchor"] for a in fx["anchors_lost"]}
-        self.assertEqual(gone, {"flowmap/callgraph.py:Graph._collect", "flowmap/callgraph.py:Graph._link",
-                                "flowmap/callgraph.py:Graph._imports", "flowmap/lens.py:py_symbols"})
+        # its own repo and map, so the test doesn't depend on what this repo's live map cites
+        files = cli_app()
+        files["docs/flowmap/map.json"] = json.dumps({"runs": [], "flows": [{"id": "shout", "steps": [{
+            "id": "run", "name": "User runs the tool", "actor": "user", "endpoints": ["CLI tool run"], "ui": [],
+            "code_path": ["tool/run.py:main", "tool/helpers.py:shout"], "writes": [], "evidence": "agreed",
+            "busyness": {"hops": 2, "files": 2}, "runs": []}]}]}) + "\n"
+        root, base = fixture_repo(self, files)
+        head = commit(root, {"tool/run.py": RUN_INLINED, "tool/helpers.py": "VERSION = 1\n"})
+        fx = json.loads(flowmap("change", base, head, "--facts", root=root))
+        self.assertEqual(fx["anchors_lost"], [{"step": "shout/run", "anchor": "tool/helpers.py:shout"}])
 
 
 class LintTest(unittest.TestCase):
@@ -47,7 +61,7 @@ class LintTest(unittest.TestCase):
 
     def test_a_backed_story_passes(self):
         story = {"no_longer": [{"was": "Shared code is a chip band", "cite": "flowmap/atlas.template.html:120",
-                                "step": "new:review-change-on-map/build-atlas"}],
+                                "step": "browse-the-map/build-atlas"}],
                  "chapters": [{"title": "t", "symbols": ["flowmap/atlas.py:merges"], "files": ["flowmap/atlas.template.html"],
                                "verified": [{"how": "test", "what": "tests/test_merges.py:MergesTest"},
                                             {"how": "not checked", "what": "wire drawing"}]}]}
