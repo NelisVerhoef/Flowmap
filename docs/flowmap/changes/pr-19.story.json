@@ -1,0 +1,99 @@
+{
+ "title": "Every canvas card holds its text inside its border",
+ "pr": "PR #19",
+ "url": "https://github.com/NelisVerhoef/Flowmap/pull/19",
+ "intent": "Stop text flowing out of the boxes on the canvas.",
+ "delta": "browse-the-map's draw-canvas step draws the same cards in boxes big enough to hold their text: screen, data, step, flow and function cards are taller, so the picture is a little taller and cards shift down, while their order and the wires between them stay as they were. The fix is a display problem: the map's content was right before and is right now. Separately, the two committed canvases are rebuilt, which brings in what #18 already changed and, for flowmap's own page, the code as it now stands. The change page and the map's text are unchanged, and the live viewer keeps the old template until it is redeployed.",
+ "no_longer": [
+  {
+   "was": "docs/flowmap/canvas.html is the #17 page, with #17's script and a map built at b50aa95",
+   "cite": "docs/flowmap/canvas.html"
+  }
+ ],
+ "chapters": [
+  {
+   "title": "Card heights fit the most a card can show",
+   "role": "core",
+   "kind": "bug fix",
+   "symbols": [],
+   "files": [
+    "flowmap/canvas.template.html"
+   ],
+   "before": "Cards had fixed heights smaller than their content and no clipping, because the number badges must stick out. On flowmap's map, text ran past the bottom of the padding area by 4px on steps, 9px on screens and 13px on data, and painted file cards lost their bottom padding.",
+   "after": "The small kind label no longer sits in a body-height line, which frees about 10px on every card that has one and lets file cards fit at their existing 112px. In the `SIZE` table of flowmap/canvas.template.html, screen and data cards are 76px, steps 74px and flows 102px; the function cards shown when a file is opened are 66px. A step's footer stays on one line and cuts a long actor name with an ellipsis, where before it could wrap out of the card. Titles keep the line limits they already had.",
+   "claim": "In every view measured in Chromium, text stays inside the card, including with a painted 2px border.",
+   "why": "Anyone reading the canvas reads these cards first, and text running through a border makes the picture look broken, though what it says stays correct. If the heights and the CSS drift apart again, the same cosmetic overflow returns; nothing else depends on them except where cards and wires are placed. Rather than measuring cards in the browser and laying out from that, because the layout needs heights before it draws and these don't depend on the font: titles have a set number of lines and line heights are relative to font size. Rather than clipping the card, because that would cut off the footer's last line and the badges.",
+   "verified": [
+    {
+     "how": "ran",
+     "what": "measured every card's content against its bottom padding in headless Chromium, before and after, on a page built from this template: flowmap's map unpainted and with PR #17 and #18 painted, flows expanded and folded, the view with canvas.py opened, and the bench map expanded and folded. Before, on flowmap's map: 4px over on steps, 9px on screens, 13px on data. After: no card over."
+    },
+    {
+     "how": "ran",
+     "what": "the same check on flowmap's expanded map with substitute fonts set in the page, standing in for the hosted viewer, which can't load web fonts. No card over."
+    },
+    {
+     "how": "ran",
+     "what": "python3 -m unittest discover -s tests: 72 pass, 3 skipped. None of them draw the page, so none would catch this returning."
+    },
+    {
+     "how": "not checked",
+     "what": "Safari and Firefox, and the page on the real hosted viewer, which has not been redeployed"
+    }
+   ],
+   "questions": [
+    {
+     "q": "The heights are constants in `SIZE` that must match the CSS by hand. Is a browser check in the tests worth adding, given none of them draw the page today?",
+     "why": "Decides whether the next card change can bring this back unnoticed.",
+     "kind": "ask"
+    },
+    {
+     "q": "Number badges on a step still sit close to the end of the title's first line. Paint PR #17 on the canvas and look at the steps carrying badges: is that acceptable?",
+     "why": "Decides whether a follow-up moves the badges or narrows the title.",
+     "kind": "check"
+    },
+    {
+     "q": "Open a page built from this branch in Safari: does a two-line step title still fit its card?",
+     "why": "Only Chromium was measured, and the title clamp uses -webkit-line-clamp.",
+     "kind": "check"
+    }
+   ]
+  },
+  {
+   "title": "The committed canvases catch up with the template and the code",
+   "role": "supporting",
+   "kind": "rebuilt page",
+   "symbols": [],
+   "files": [
+    "docs/flowmap/canvas.html",
+    "bench/fastapi-template/map/canvas.html"
+   ],
+   "before": "Both committed pages held #17's template, without #18's fragment loading. flowmap's own page also held a map built at b50aa95, with PR #17 painted over a range ending at HEAD.",
+   "after": "Both hold this template, so most of their diff is #18's loading script rather than this fix. The bench page's map is unchanged apart from now carrying its name. flowmap's own page holds the code as of 1ef3af7, the fix's commit, so it shows what #18 already merged: three call wires between canvas.py, change.py and viewer.py, and viewer.py's helpers on the draw-canvas, build-viewer and pull-change-facts steps. It still paints PR #17 and PR #16, with #17's range now pinned to 8675ccd..fa2f189.",
+   "claim": "Opening either committed canvas shows the fix, and everything else that differs was already merged in #18.",
+   "why": "#18 changed the template without rebuilding these pages, so any rebuild brings its changes in; keeping them out would mean pages no command can produce. The three wires come from code already at base, so this PR's own facts rightly show no call edges added.",
+   "verified": [
+    {
+     "how": "ran",
+     "what": "flowmap's rebuilt page in headless Chromium: drew 37 cards, none over, both paints in the menu"
+    },
+    {
+     "how": "looked",
+     "what": "compared the embedded data of both pages, old and new: on flowmap's page 3 wires added and none removed, and 3 steps and 4 files changed; on the bench page only the name differs"
+    }
+   ],
+   "questions": [
+    {
+     "q": "PR #18 isn't among the paints on this page, since I kept the two it had. Should a rebuild always paint the latest PR?",
+     "why": "Decides what readers see first when they open the committed page.",
+     "kind": "ask"
+    },
+    {
+     "q": "The README's map link carries its own copy of the data and opens the hosted viewer's template. After the next viewer deploy, does it draw with the new card heights?",
+     "why": "It is the first canvas most readers will open.",
+     "kind": "check"
+    }
+   ]
+  }
+ ]
+}

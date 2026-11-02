@@ -79,6 +79,7 @@ main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
 .card.sel { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
 .dim .card:not(.hi):not(.sel), .dim .flowbox:not(.hi) > .fbhead { opacity: .28; }
 .kind { display: inline-flex; align-items: center; gap: 6px; font: 600 10.5px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.card .kind { display: flex; }  /* inline-flex would sit in a body-height line box and push the card's text down */
 .kind i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .title { font-weight: 600; font-size: 14px; line-height: 1.3; margin-top: 4px; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
 .sub { color: var(--muted); font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -90,7 +91,8 @@ main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
 .card.file .title { font-family: var(--mono); font-size: 13.5px; -webkit-line-clamp: 1; }
 .card.step { border-radius: 10px; padding: 8px 11px; }
 .card.step .title { -webkit-line-clamp: 2; font-weight: 500; font-size: 13px; margin-top: 0; }
-.card.step .foot { display: flex; gap: 6px; align-items: center; margin-top: 5px; color: var(--muted); font-size: 11.5px; min-width: 0; }
+.card.step .foot { display: flex; gap: 6px; align-items: center; margin-top: 5px; color: var(--muted); font-size: 11.5px; min-width: 0; white-space: nowrap; }
+.card.step .foot span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .ep { font: 500 11px/1.2 var(--mono); background: var(--paper); border-radius: 5px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
 .ev { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .ev.confirmed, .ev.tested, .ev.agreed { background: var(--ev-good); }
@@ -258,7 +260,8 @@ const S = {
 const change = () => S.change >= 0 ? G.changes[S.change] : null;
 
 // ---------- geometry ----------
-const SIZE = { screen: [210, 66], flow: [300, 98], step: [276, 62], file: [236, 112], data: [200, 62] };
+// heights hold the most a card can show (clamped text, a painted 2px border); the layout needs them fixed
+const SIZE = { screen: [210, 76], flow: [300, 102], step: [276, 74], file: [236, 112], data: [200, 76] };
 const GAP_X = 100, GAP_Y = 14, FB_HEAD = 46, FB_PAD = 12, STEP_GAP = 8, FLOW_GAP = 18;
 
 function rep(id) {
@@ -364,7 +367,7 @@ function layoutInside(fid) {
   for (let i = 0; i < q.length; i++) for (const [a, b] of inner) if (a === q[i] && depth[b] == null) { depth[b] = depth[a] + 1; q.push(b); }
   F.fns.forEach(n => depth[n] ??= 0);
   const nodes = {}, W = [];
-  const PW = 230, FW = 230, FH = 62;
+  const PW = 230, FW = 230, FH = 66;
   const colsN = Math.max(...Object.values(depth)) + 1;
   const left = Object.keys(callers), right = Object.keys(callees);
   left.forEach((id, i) => nodes["L:" + id] = { id: "L:" + id, ref: id, kind: "pill", x: 0, y: i * 54, w: PW, h: 36 });
