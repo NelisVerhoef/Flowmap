@@ -4,11 +4,12 @@ Screens on the left, then the flows and their steps, then the code they run (one
 placed by call depth), then the data they write. A flow is a path on it; a change is paint on it.
 The same picture serves the map, a flow and a change, so every PR is read on a map you know.
 
-    flowmap canvas [--change <name>=<base>..<head> ...] [--from <atlas.html>] [--out <path>]
+    flowmap canvas [--change <name>=<base>..<head> ...] [--from <atlas.html>] [--out <path>] [--link]
 
 --change paints a change and, when docs/flowmap/changes/<name>.story.json exists, numbers its
 chapters on the cards they touch. --from draws an existing atlas page's data instead of building
-it (a map whose source isn't checked out here, like the bench's).
+it (a map whose source isn't checked out here, like the bench's). --link also prints a link to the
+hosted viewer that carries the map in its fragment, so it renders in any browser without publishing it.
 """
 
 import argparse
@@ -19,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
+from viewer import BUDGET, link, locked, viewer_url  # noqa: E402
 
 TEMPLATE = Path(__file__).with_name("canvas.template.html")
 UI_EXT = (".tsx", ".jsx", ".vue", ".svelte", ".ts", ".js", ".html", ".erb", ".astro")
@@ -201,12 +203,18 @@ def from_page(path):
     return json.loads(m.group(1))
 
 
+def viewer_html():
+    """The page with no data in it: it reads a link's fragment."""
+    return locked(TEMPLATE.read_text()).replace("__CANVAS_NAME__", "flowmap")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     ap.add_argument("--change", action="append", default=[], help="<name>=<base>..<head>")
     ap.add_argument("--from", dest="src", help="draw this atlas page's data instead of building it")
     ap.add_argument("--name", help="map name (default: flowmap.toml's name, or the repo's)")
     ap.add_argument("--out", help="default: <out>/canvas.html")
+    ap.add_argument("--link", action="store_true", help="also print a viewer link carrying the map")
     args = ap.parse_args()
     changes = []
     for spec in args.change:
@@ -225,6 +233,7 @@ def main():
         atlas = atlas_mod.data([f"{rng}={name}" for name, rng in changes])
         name = args.name or config.load().get("name") or config.root().name.replace("-", " ").replace("_", " ").title()
     g = graph(atlas)
+    g["name"] = name
     g["changes"] = []
     for (cname, rng), ov in zip(changes, atlas.get("overlays", [])):
         story_path = config.out() / "changes" / f"{cname}.story.json"
@@ -240,7 +249,14 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
     print(f"wrote {out} ({len(html) // 1024} KB: {len(g['flows'])} flows, {len(g['steps'])} steps, "
-          f"{len(g['files'])} files, {len(g['data'])} data, {len(g['screens'])} screens, {len(g['changes'])} changes)")
+          f"{len(g['files'])} files, {len(g['data'])} data, {len(g['screens'])} screens, {len(g['changes'])} changes)",
+          file=sys.stderr if args.link else sys.stdout)  # with --link, stdout is just the link
+    if args.link:
+        url = link(g, viewer_url().rsplit("/", 1)[0] + "/canvas.html")
+        if len(url) > BUDGET:
+            print(f"warning: the link is {len(url) // 1000}K characters, too long for a PR body; "
+                  f"it still opens in a browser", file=sys.stderr)
+        print(url)
 
 
 if __name__ == "__main__":

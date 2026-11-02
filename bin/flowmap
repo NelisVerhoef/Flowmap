@@ -9,10 +9,10 @@ Run from inside the repo you're mapping (or set FLOWMAP_ROOT).
   flowmap reconcile <run.json>...       vote the passes into map.json, MAP.md, QUESTIONS.md
   flowmap diagrams                      Mermaid at system / flow / step zoom
   flowmap atlas [--pr base..head=label] the interactive map, optionally with PR overlays
-  flowmap canvas [--change name=b..h]   the map as one left-to-right picture; a change painted on it
+  flowmap canvas [--change name=b..h]   the map as one left-to-right picture; a change painted on it; --link
   flowmap lens <base> [<head>] [--json] place a change on the map (verdict, flows, reach, blind spots)
   flowmap change <base> [<head>]        the change as chapters on the map: where, what, why, questions
-  flowmap viewer <dir>                  the hosted change viewer, rendering --link links in the browser
+  flowmap viewer <dir>                  the hosted viewer, rendering --link links in the browser
   flowmap callgraph impact <file:sym>   which entry points can reach a symbol
   flowmap callgraph check               is every entry point's handler a call-graph node?
 

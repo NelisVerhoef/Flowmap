@@ -15,13 +15,10 @@ Story format: see STORY in the /pr-lens skill.
 """
 
 import argparse
-import base64
 import json
 import math
-import os
 import re
 import sys
-import zlib
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -30,6 +27,7 @@ import config  # noqa: E402
 import graphs  # noqa: E402
 import lens  # noqa: E402
 from atlas import step_keys  # noqa: E402
+from viewer import BUDGET, link, locked, viewer_url  # noqa: E402
 
 ROOT = config.root()
 TEMPLATE = Path(__file__).with_name("change.template.html")
@@ -341,26 +339,9 @@ def lint_story(fx, story, chapters, known):
     return out
 
 
-VIEWER = "https://flowmap.testabl.ai/v1/change.html"  # public; the data stays in the fragment
-
-
 def viewer_html():
-    """The page with no data in it: it reads a link's fragment or a dropped file. No fonts or other
-    requests, and a CSP that forbids any, so a reader can see their data stays in the tab."""
-    csp = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; "
-           "base-uri 'none'; form-action 'none'")
-    return re.sub(r"<!--fonts-->.*?<!--/fonts-->", f'<meta http-equiv="Content-Security-Policy" content="{csp}">',
-                  TEMPLATE.read_text(), count=1, flags=re.S).replace("__TITLE__", "flowmap change")
-
-
-def link(data, viewer):
-    """The viewer URL with the data in its fragment: #v1.<base64url of raw-deflated JSON>."""
-    z = zlib.compressobj(9, zlib.DEFLATED, -15)
-    packed = z.compress(json.dumps(data, separators=(",", ":")).encode()) + z.flush()
-    return f"{viewer}#v1.{base64.urlsafe_b64encode(packed).rstrip(b'=').decode()}"
-
-
-BUDGET = 60000  # a PR body holds 65536 characters; leave room for the prose around the link
+    """The page with no data in it: it reads a link's fragment or a dropped file."""
+    return locked(TEMPLATE.read_text()).replace("__TITLE__", "flowmap change")
 
 
 def fitted_link(data, viewer):
@@ -412,7 +393,7 @@ def main():
           f"{', story ' + str(story_path.relative_to(ROOT) if story_path.is_relative_to(ROOT) else story_path) if story else ', no story'})",
           file=sys.stderr if a.link else sys.stdout)  # with --link, stdout is just the link
     if a.link:
-        viewer = os.environ.get("FLOWMAP_VIEWER") or config.load().get("viewer") or VIEWER
+        viewer = viewer_url()
         if data["lint"]:
             sys.exit("no link: fix the story problems above first")
         url, dropped = fitted_link(data, viewer)

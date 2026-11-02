@@ -1,0 +1,690 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The map opens in the browser from a link, with nothing published, and the README starts with what flowmap is for</title>
+<!--fonts--><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><!--/fonts-->
+<style>
+/* Layout: overview first, one part at a time, evidence on demand. The left rail is the whole
+   change (its parts, then the flows they land on); the pane shows one part: before -> after, why,
+   what to ask. Proof, ripple and code stay folded until asked for. */
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6676;
+  --rule: #cdd4dc;
+  --line: #9aa6b4;
+  --accent: #2e5bff;
+  --accent-soft: rgba(46, 91, 255, .12);
+  --core: #2e5bff;
+  --support: #0f7c86;
+  --refactor: #6b7686;
+  --outside: #b7791f;
+  --gain: #1e8a4c;
+  --loss: #c8423b;
+  --code-bg: #f6f8fa;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+    --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+    --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+    --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f141a; --surface: #161d26; --ink: #e6ebf1; --muted: #93a0b0; --rule: #2a3441;
+  --line: #4a5666; --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, .16);
+  --core: #7c9cff; --support: #3cc0cb; --refactor: #93a0b0; --outside: #f0b429;
+  --gain: #3fbf78; --loss: #ef6b63; --code-bg: #10161d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { padding: 24px 16px 96px; max-width: 1240px; margin: 0 auto; display: grid; gap: 22px; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+p code, li code, dd code, h2 code { background: var(--accent-soft); padding: 0 .3em; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { text-wrap: balance; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+.core { --role: var(--core); } .supporting { --role: var(--support); } .refactor { --role: var(--refactor); }
+.outside, .unassigned, .off-map { --role: var(--outside); }
+
+/* header: which change; the overview pane says what it does */
+header { display: grid; gap: 6px; max-width: 80ch; }
+header h1 { font: 800 clamp(24px, 3.4vw, 34px)/1.08 var(--display); font-stretch: 74%; margin: 0; }
+.range { color: var(--muted); font-size: 13px; }
+.range a { color: inherit; }
+.delta { font-size: 18px; line-height: 1.55; margin: 0; max-width: 68ch; }
+/* the lens verdict: the first thing to know, its reasons one click away */
+.verdict { justify-self: start; max-width: 80ch; font-size: 14px; }
+.verdict summary { cursor: pointer; }
+.verdict summary b { margin-right: 8px; }
+.verdict b { font: 700 11px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 2px 7px; color: var(--surface); }
+.verdict.contained b { background: var(--gain); } .verdict.spreads b { background: var(--outside); } .verdict.blind b { background: var(--loss); }
+.verdict ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.lint { justify-self: start; max-width: 80ch; font-size: 13px; border: 1px solid var(--loss); border-radius: 8px; padding: 8px 12px; }
+.lint ul { margin: 4px 0 0; padding-left: 18px; }
+.was { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
+.was s { text-decoration-color: var(--loss); text-decoration-thickness: 1px; }
+.was small, .kept small { color: var(--muted); font-size: 12px; }
+.kept { margin: 0; font-size: 14px; max-width: 72ch; }
+.shape { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.shape li { background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; }
+.shape b { font-variant-numeric: tabular-nums; }
+
+/* rail + pane */
+.body { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .body { grid-template-columns: minmax(0, 1fr); } }
+.rail { display: grid; gap: 18px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-bottom: 8px; }
+@media (max-width: 900px) { .rail { position: static; max-height: none; } }
+.rail section { display: grid; gap: 8px; }
+
+/* the parts, as a table of contents */
+.toc { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.toc button { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 8px 10px;
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 2px 10px; cursor: pointer; }
+.toc button:hover { background: var(--surface); }
+.toc button[aria-current="true"] { background: var(--surface); border-color: var(--rule); box-shadow: inset 3px 0 0 var(--role); }
+.toc .n { grid-row: span 2; font: 700 12px/20px var(--mono); text-align: center; border-radius: 6px; height: 20px; color: var(--surface); background: var(--role); }
+.toc .t { font-weight: 500; font-size: 13.5px; line-height: 1.35; }
+.toc .w { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.toc .ov .n { background: var(--ink); }
+.toc .minor .t { font-weight: 400; color: var(--muted); }
+
+/* the map: flows as lines, the selected part's stops lit, the others faint */
+.flow { display: grid; gap: 2px; }
+.flow h3 { font: 700 12.5px/1.2 var(--display); font-stretch: 80%; margin: 6px 0 2px; letter-spacing: .02em; }
+.stops { list-style: none; margin: 0; padding: 0; position: relative; display: grid; }
+.stops::before { content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px; width: 2px; background: var(--line); }
+.stop { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: start; width: 100%;
+  text-align: left; background: none; border: 0; border-radius: 6px; padding: 3px 4px 3px 0; font-size: 12.5px; line-height: 1.3; color: var(--muted); }
+button.stop { cursor: pointer; }
+button.stop:hover { background: var(--surface); }
+.stop .dot { width: 12px; height: 12px; margin: 1px 2px; border-radius: 50%; background: var(--paper); border: 2px solid var(--line); position: relative; z-index: 1; }
+.stop.touched { color: var(--ink); }
+.stop.touched .dot { border-color: var(--role); }
+.stop.lit { font-weight: 600; }
+.stop.lit .dot { background: var(--sel, var(--role)); border-color: var(--sel, var(--role)); box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--sel, var(--role)); }
+.stop .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stop.lit .nm { -webkit-line-clamp: unset; }
+/* the overview's map: each touched flow as a line of stops, the parts that run each stop under it */
+.lanes { display: grid; gap: 14px; }
+.lane { display: grid; gap: 6px; }
+.lane h3 { font: 700 13px/1.2 var(--display); font-stretch: 80%; margin: 0; letter-spacing: .02em; }
+.lane ol { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(120px, 1fr); overflow-x: auto; }
+.lane li { position: relative; display: grid; gap: 6px; align-content: start; padding: 0 8px 4px 0; font-size: 12px; line-height: 1.3; color: var(--muted); }
+.lane li::before { content: ""; position: absolute; top: 6px; left: 0; right: 0; height: 2px; background: var(--line); }
+.lane li:first-child::before { left: 6px; } .lane li:last-child::before { right: calc(100% - 8px); }
+.lane .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line); position: relative; }
+.lane li.touched { color: var(--ink); }
+.lane li.touched .dot { background: var(--role); border-color: var(--role); }
+.lane .refs { display: flex; flex-wrap: wrap; gap: 4px; }
+.ref { font: 600 11px/1 var(--mono); border-radius: 999px; padding: 3px 7px; border: 1px solid var(--role); color: var(--role); background: var(--surface); cursor: pointer; }
+.ref:hover { background: var(--accent-soft); }
+.quiet-flows { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+.folded { font-size: 12px; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+
+/* the pane: one part */
+.pane { background: var(--surface); border: 1px solid var(--rule); border-top: 4px solid var(--role); border-radius: 12px;
+  padding: 22px 24px; display: grid; gap: 18px; min-width: 0; }
+.ch-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.num { font: 700 12px var(--mono); color: var(--surface); background: var(--role); border-radius: 6px; padding: 2px 8px; }
+.tag { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--role); }
+.kind { font-size: 12px; color: var(--muted); }
+.pane h2 { font: 750 clamp(21px, 2.6vw, 28px)/1.15 var(--display); font-stretch: 80%; margin: 4px 0 0; }
+.claim { margin: 0; font-size: 16px; color: var(--muted); max-width: 70ch; }
+.pane:focus { outline: none; }
+.runs { margin: 0; font-size: 13px; color: var(--muted); }
+.runs b { color: var(--ink); font-weight: 500; }
+
+.ba { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+@media (max-width: 720px) { .ba { grid-template-columns: minmax(0, 1fr); } }
+.ba > div { background: var(--surface); padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.ba .after { background: var(--paper); }
+.ba p { margin: 0; font-size: 14px; }
+.tree { margin: 0; overflow-x: auto; background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; font: 12px/1.6 var(--mono); padding: 8px 0; }
+.tree span { display: block; padding: 0 12px; white-space: pre; min-width: max-content; }
+.tree .add { color: var(--gain); } .tree .rem { color: var(--loss); } .tree .from, .tree i { color: var(--muted); font-style: normal; }
+.verified { margin: 0; font-size: 13px; color: var(--muted); }
+.verified .how { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--gain); }
+.verified .how.no { color: var(--outside); }
+.why { margin: 0; max-width: 72ch; padding-left: 12px; border-left: 3px solid var(--role); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+
+.qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.q { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.q input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+.q label { display: grid; gap: 3px; cursor: pointer; }
+.q .qtext { font-weight: 500; }
+.q .qwhy { color: var(--muted); font-size: 13px; }
+.qkind { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .08em; border-radius: 4px; padding: 1px 6px; margin-right: 6px; white-space: nowrap; }
+.qkind.ask { background: var(--accent-soft); color: var(--accent); }
+.qkind.check, .qkind.graph { background: var(--paper); color: var(--muted); border: 1px solid var(--rule); }
+.qkind.graph { color: var(--support); }
+
+/* evidence, folded */
+.more { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.more details { border-bottom: 1px solid var(--rule); }
+.more summary { cursor: pointer; padding: 10px 2px; font-size: 14px; font-weight: 500; display: flex; gap: 10px; align-items: baseline; }
+.more summary small { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.more details > div { padding: 2px 2px 14px; display: grid; gap: 10px; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 12.5px; }
+.rows li { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.mark { font-family: var(--body); font-size: 11px; font-weight: 600; flex: none; width: 80px; }
+.mark.add { color: var(--gain); } .mark.rem { color: var(--loss); } .mark.no { color: var(--outside); } .mark.yes { color: var(--gain); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 11.5px/1 var(--mono); border: 1px solid var(--rule); background: var(--paper); border-radius: 999px; padding: 4px 9px; cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--role); color: var(--role); background: var(--surface); }
+.chip i { font-style: normal; color: var(--muted); margin-left: 4px; }
+.hunk { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+[hidden] { display: none !important; }
+.hunk .hh { font: 11.5px var(--mono); color: var(--muted); padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.hunk pre { margin: 0; overflow-x: auto; background: var(--code-bg); font: 12px/1.5 var(--mono); padding: 6px 0; }
+.hunk pre span { display: block; padding: 0 10px; white-space: pre; min-width: max-content; }
+.hunk .a { background: rgba(30, 138, 76, .13); } .hunk .r { background: rgba(200, 66, 59, .13); }
+
+.step-nav { display: flex; justify-content: space-between; gap: 12px; }
+.step-nav button { background: none; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left;
+  display: grid; gap: 1px; max-width: 48%; font-size: 13px; }
+.step-nav button:hover { border-color: var(--accent); }
+.step-nav button[data-dir="1"] { text-align: right; margin-left: auto; }
+.step-nav small { color: var(--muted); font-size: 11.5px; }
+.keys { font-size: 12px; color: var(--muted); margin: 0; }
+kbd { font: 11px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--surface); }
+
+/* the review tray: ticked questions, ready to paste */
+.tray { position: fixed; inset: auto 0 0 0; background: var(--surface); border-top: 1px solid var(--rule); box-shadow: 0 -6px 18px rgba(0,0,0,.06); z-index: 5; }
+.tray-in { max-width: 1240px; margin: 0 auto; padding: 10px 16px; display: grid; gap: 10px; }
+.tray .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tray .count { font-weight: 600; }
+.tray textarea { width: 100%; min-height: 140px; font: 13px/1.5 var(--mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 8px; padding: 10px; resize: vertical; }
+button.primary { font: 600 14px var(--body); background: var(--accent); color: var(--surface); border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+button.ghost { background: none; border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); }
+
+/* viewer mode: no data in the page or the link, so ask for a file */
+.drop { background: var(--surface); border: 2px dashed var(--rule); border-radius: 12px; padding: 32px 20px; display: grid; gap: 10px; justify-items: start; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h1 { font: 800 28px/1.1 var(--display); font-stretch: 74%; margin: 0; }
+.drop p { margin: 0; max-width: 68ch; color: var(--muted); }
+.drop .err { color: var(--loss); }
+</style>
+
+<div class="wrap">
+  <header id="top"></header>
+  <div class="body">
+    <nav class="rail" aria-label="The change">
+      <section><h2 class="label" id="toc-h"></h2><p class="folded">Core first, then what it needs; refactors and files off the map last.</p><ol class="toc" id="toc"></ol></section>
+      <section id="rail-map"><h2 class="label">Where it lands</h2><div id="map"></div></section>
+      <p class="folded" id="folded"></p>
+    </nav>
+    <main class="pane" id="pane" tabindex="-1"></main>
+  </div>
+</div>
+<aside class="tray" aria-label="Review note">
+  <div class="tray-in">
+    <div class="row">
+      <span><span class="count" id="count"></span> <span class="status">ticked for the author</span></span>
+      <button class="ghost" id="peek" type="button" aria-expanded="false" aria-controls="note">Show</button>
+      <button class="primary" id="copy" type="button">Copy questions</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+    <textarea id="note" aria-label="Review note" readonly hidden></textarea>
+  </div>
+</aside>
+
+<script type="module">
+// The data is embedded by `flowmap change`, or, in the hosted viewer, carried in the link's fragment
+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server; failing both,
+// the reader drops a change page or its JSON. Either way it is read here and goes nowhere else.
+const EMBEDDED = {"facts":{"base":"fa2f189440d5930ade2d56c693e85c89d5de7da9","head":"be781057667f6d6d88c93551aae460af25cbc02b","base_sha":"fa2f189","head_sha":"be78105","name":"flowmap","map":[{"id":"build-the-map","steps":[{"key":"build-the-map/list-entry-points","name":"Maintainer lists every entry point the repo exposes into inventory.json","endpoints":["CLI flowmap inventory"],"evidence":"agreed"},{"key":"build-the-map/check-handlers-are-nodes","name":"Maintainer checks that every entry point's handler is a call-graph node","endpoints":["CLI flowmap callgraph"],"evidence":"agreed"},{"key":"build-the-map/write-pass-briefs","name":"Maintainer writes one brief per independent mapping pass (bottom-up or top-down)","endpoints":["CLI flowmap brief"],"evidence":"agreed"},{"key":"build-the-map/verify-pass","name":"Agent running a pass checks that every cited anchor exists and every entry point is placed","endpoints":["CLI flowmap verify"],"evidence":"agreed"},{"key":"build-the-map/reconcile-passes","name":"Maintainer votes the passes into one map with evidence levels and a list of open questions","endpoints":["CLI flowmap reconcile"],"evidence":"agreed"}]},{"id":"browse-the-map","steps":[{"key":"browse-the-map/generate-diagrams","name":"Maintainer generates Mermaid diagrams of the map at system, flow and step zoom","endpoints":["CLI flowmap diagrams"],"evidence":"agreed"},{"key":"browse-the-map/build-atlas","name":"Maintainer builds the interactive atlas page and browses flows, steps, merges and code","endpoints":["CLI flowmap atlas"],"evidence":"agreed"},{"key":"browse-the-map/draw-canvas","name":"Maintainer draws the map as one left-to-right canvas, or redraws it from an existing atlas page","endpoints":["CLI flowmap canvas"],"evidence":"agreed"}]},{"id":"review-a-change","steps":[{"key":"review-a-change/run-lens","name":"Reviewer runs lens on base..head to get the verdict, touched steps, reach and blind spots","endpoints":["CLI flowmap lens"],"evidence":"agreed"},{"key":"review-a-change/pull-change-facts","name":"Author pulls the change's deterministic facts as JSON to write the story from","endpoints":["CLI flowmap change"],"evidence":"agreed"},{"key":"review-a-change/build-viewer","name":"Maintainer builds the empty hosted viewer page to deploy on a static host","endpoints":["CLI flowmap viewer"],"evidence":"agreed"}]}],"files":[{"path":".claude-plugin/plugin.json","kind":"outside","added":1,"removed":1},{"path":"README.md","kind":"doc","added":104,"removed":129},{"path":"bin/flowmap","kind":"outside","added":2,"removed":2},{"path":"flowmap/canvas.py","kind":"code","added":19,"removed":3},{"path":"flowmap/canvas.template.html","kind":"outside","added":35,"removed":7},{"path":"flowmap/change.py","kind":"code","added":4,"removed":23},{"path":"flowmap/viewer.py","kind":"code","added":43,"removed":10},{"path":"tests/test_canvas.py","kind":"test","added":23,"removed":1}],"symbols":[{"id":"flowmap/canvas.py:viewer_html","file":"flowmap/canvas.py","sym":"viewer_html","status":"new","contract":false,"signature":[null,""],"steps":["review-a-change/build-viewer"],"witness":{"review-a-change/build-viewer":["flowmap/viewer.py:__main__","flowmap/viewer.py:main","flowmap/canvas.py:viewer_html"]},"callers":[{"id":"flowmap/viewer.py:main","edited":true}],"kept_calls":0},{"id":"flowmap/canvas.py:main","file":"flowmap/canvas.py","sym":"main","status":"modified","contract":false,"signature":null,"steps":["browse-the-map/draw-canvas"],"witness":{"browse-the-map/draw-canvas":["flowmap/canvas.py:__main__","flowmap/canvas.py:main"]},"callers":[{"id":"flowmap/canvas.py:__main__","edited":false}],"kept_calls":8},{"id":"flowmap/change.py:link","file":"flowmap/change.py","sym":"link","status":"deleted","contract":false,"signature":["data, viewer",null],"steps":[],"witness":{},"callers":[{"id":"flowmap/change.py:fitted_link","edited":false}],"kept_calls":0},{"id":"flowmap/change.py:viewer_html","file":"flowmap/change.py","sym":"viewer_html","status":"modified","contract":false,"signature":null,"steps":["review-a-change/build-viewer"],"witness":{"review-a-change/build-viewer":["flowmap/viewer.py:__main__","flowmap/viewer.py:main","flowmap/change.py:viewer_html"]},"callers":[{"id":"flowmap/viewer.py:main","edited":true}],"kept_calls":0},{"id":"flowmap/change.py:main","file":"flowmap/change.py","sym":"main","status":"modified","contract":false,"signature":null,"steps":["review-a-change/pull-change-facts"],"witness":{"review-a-change/pull-change-facts":["flowmap/change.py:__main__","flowmap/change.py:main"]},"callers":[{"id":"flowmap/change.py:__main__","edited":false}],"kept_calls":4},{"id":"flowmap/viewer.py:locked","file":"flowmap/viewer.py","sym":"locked","status":"new","contract":false,"signature":[null,"html"],"steps":["review-a-change/build-viewer"],"witness":{"review-a-change/build-viewer":["flowmap/viewer.py:__main__","flowmap/viewer.py:main","flowmap/change.py:viewer_html","flowmap/viewer.py:locked"]},"callers":[{"id":"flowmap/canvas.py:viewer_html","edited":true},{"id":"flowmap/change.py:viewer_html","edited":true}],"kept_calls":0},{"id":"flowmap/viewer.py:link","file":"flowmap/viewer.py","sym":"link","status":"new","contract":false,"signature":[null,"data, viewer"],"steps":["browse-the-map/draw-canvas","review-a-change/pull-change-facts"],"witness":{"browse-the-map/draw-canvas":["flowmap/canvas.py:__main__","flowmap/canvas.py:main","flowmap/viewer.py:link"]},"callers":[{"id":"flowmap/canvas.py:main","edited":true},{"id":"flowmap/change.py:fitted_link","edited":false}],"kept_calls":0},{"id":"flowmap/viewer.py:viewer_url","file":"flowmap/viewer.py","sym":"viewer_url","status":"new","contract":false,"signature":[null,""],"steps":["browse-the-map/draw-canvas","review-a-change/pull-change-facts"],"witness":{"browse-the-map/draw-canvas":["flowmap/canvas.py:__main__","flowmap/canvas.py:main","flowmap/viewer.py:viewer_url"]},"callers":[{"id":"flowmap/canvas.py:main","edited":true},{"id":"flowmap/change.py:main","edited":true}],"kept_calls":0},{"id":"flowmap/viewer.py:main","file":"flowmap/viewer.py","sym":"main","status":"modified","contract":false,"signature":null,"steps":["review-a-change/build-viewer"],"witness":{"review-a-change/build-viewer":["flowmap/viewer.py:__main__","flowmap/viewer.py:main"]},"callers":[{"id":"flowmap/viewer.py:__main__","edited":false}],"kept_calls":1}],"endpoints":{"added":[],"removed":[],"total":11},"reach":{"gained":{},"lost":{},"cause":{"gained":{},"lost":{}}},"anchors_lost":[],"edges":{"added":[["flowmap/canvas.py:main","flowmap/viewer.py:link"],["flowmap/canvas.py:main","flowmap/viewer.py:viewer_url"],["flowmap/canvas.py:viewer_html","flowmap/viewer.py:locked"],["flowmap/change.py:fitted_link","flowmap/viewer.py:link"],["flowmap/change.py:main","flowmap/viewer.py:viewer_url"],["flowmap/change.py:viewer_html","flowmap/viewer.py:locked"],["flowmap/viewer.py:main","flowmap/canvas.py:viewer_html"],["flowmap/viewer.py:viewer_url","flowmap/config.py:load"]],"removed":[["flowmap/change.py:fitted_link","flowmap/change.py:link"],["flowmap/change.py:main","flowmap/config.py:load"]]},"modules":{"added":[["flowmap/canvas.py","flowmap/viewer.py"],["flowmap/change.py","flowmap/viewer.py"],["flowmap/viewer.py","flowmap/canvas.py"],["flowmap/viewer.py","flowmap/config.py"]],"removed":[]},"verdict":{"verdict":"blind","blind":["module-level code changed (constants, config, router registration): `flowmap/change.py`, `flowmap/viewer.py`","files outside the analysed code: `.claude-plugin/plugin.json`, `bin/flowmap`, `flowmap/canvas.template.html`"],"spreads_to":["CLI flowmap canvas","CLI flowmap change","CLI flowmap viewer"]},"flow_share":{"review-a-change":7,"browse-the-map":3,"(off-map)":1},"flow_entropy":1.24,"tests":{"configured":false,"changed":["tests/test_canvas.py"]},"hunks":[{"file":".claude-plugin/plugin.json","old":1,"new":1,"ctx":"","lines":[" {","   \"name\": \"flowmap\",","-  \"version\": \"0.3.0\",","+  \"version\": \"0.4.0\",","   \"description\": \"Map a codebase as user flows -> steps -> code by agreement between independent passes, and review PRs by where they land on that map.\",","   \"author\": {"],"symbols":[]},{"file":"README.md","old":1,"new":1,"ctx":"","lines":[" # flowmap"," ","-Map a codebase as **user flows \u2192 steps \u2192 code**, by agreement between independent passes,","-and review changes by where they land on that map instead of by reading diffs first.","+When agents write the code, it's easy to lose track of what your system does. flowmap is there","+so you keep understanding it, and each change to it, well enough to stay in the loop and take part","+in the decisions."," ","-The tools live anywhere; run them from inside the repo you're mapping (or set","-`FLOWMAP_ROOT`). Output goes to `docs/flowmap/` in that repo unless `flowmap.toml` says otherwise.","-Python 3.11+, no dependencies.","+It works by giving you a map of the system in terms of what users do, then showing every change","+on that map before you read its diff:"," ","-## Supported stacks","+- **The map** describes a codebase as **user flows \u2192 steps \u2192 code**. Independent agent passes map","+  the repo separately, flowmap checks their citations against the code and votes them into one","+  map, and what they disagree on comes to you as questions.","+- **The lens** places a change on the map: the flows it touches, what it can reach by the static","+  call graph, and a verdict: *contained*, *spreads*, or *blind* when it can't see.","+- **The change page** tells a PR as chapters on the map: where it lands, what it changes, why, and","+  what to ask the author."," ","-| stack | entry points come from | call graph (deterministic reach) |","-|---|---|---|","-| FastAPI | `@router.<verb>` + `include_router` prefixes | yes (Python AST) |","-| Rails | `bin/rails routes` (or a saved dump), actions resolved through concerns and parent controllers | not yet: the map and anchor matching work; codegraph parses Ruby, but names an action `Admin.UsersController.index` where this adapter says `index` |","-| Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `\"use server\"` actions | yes, with [codegraph](https://github.com/colbymchenry/codegraph) on PATH |","-| React SPA | its backend's entry points; top-down passes start from its router | via the backend |","-| anything else | `pattern`: a regex for its registrations (`@app.get(...)`, `@server.tool`, `app.get(\"/x\", show)`), written into `flowmap.toml` at setup; the handler is the definition it sits on. `list` for registries no regex finds | yes for Python, including defs built in factory functions |","-| Python CLI | `if __name__ == \"__main__\"` scripts in a commands dir (`CLI <prog> <cmd>`), or one `main` script | yes (the `__main__` block is a node, so runpy/importlib dispatch still has reach) |","+This is flowmap's own map, with PR #17 painted on it. Click a flow to light its path, \u25b6 to walk it","+step by step, or double-click a file to see its functions:","+","+![The canvas: flows and steps on the left, the code they run in the middle, PR #17's changed files highlighted and numbered, and the change's summary on the right](docs/images/canvas.png)","+","+And this is that PR's change page, which you can [open in your browser][pr-17]:","+","+![The change page for PR #17: the verdict, the change in four parts, and what is no longer true](docs/images/change-page.png)"," ","-## On a new machine","+To try it yourself, [open the map in your browser][map]; it runs in the tab, with nothing to install.","+There is also a text version in [`MAP.md`](docs/flowmap/MAP.md)."," ","-Python 3.11+ and `git`. For a call graph of anything but Python (TypeScript/JS, Ruby, Go, Java,","-\u2026), also [codegraph](https://github.com/colbymchenry/codegraph): `npm i -g @colbymchenry/codegraph`.","-Without it, lens says *blind* for that code instead of naming what it reaches. In Claude Code,","-inside any session:","+## Install","+","+You need Python 3.11+ and `git`. For a call graph of anything but Python, also install","+[codegraph](https://github.com/colbymchenry/codegraph) with `npm i -g @colbymchenry/codegraph`;","+without it, lens says *blind* for that code.","+","+In Claude Code:"," "," ```"],"symbols":[]},{"file":"README.md","old":31,"new":41,"ctx":"inside any session:","lines":[" ```"," ","-Claude Code clones over SSH when `ssh -T git@github.com` works, else over HTTPS; on a machine","-without a GitHub SSH key, `export CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` skips the probe.","+This adds `flowmap` to Claude Code's PATH, along with two skills: `/flowmap:flowmap-build` and","+`/flowmap:pr-lens`. On a machine without a GitHub SSH key,","+`export CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` skips the SSH probe."," ","-For `flowmap` in your own terminal too (the plugin's copy is only on Claude Code's PATH):","+In your own terminal:"," "," ```bash"],"symbols":[]},{"file":"README.md","old":42,"new":53,"ctx":"flowmap                          # prints the command list","lines":[" ```"," ","-To update: `git pull` in the clone, and `/plugin marketplace update flowmap` in Claude Code.","-The plugin only refreshes when `version` in `.claude-plugin/plugin.json` changes, so bump it","-on each release. The change viewer at `flowmap.testabl.ai` needs nothing on the machine.","+To update, run `git pull` in the clone and `/plugin marketplace update flowmap` in Claude Code."," ","-## First time in a repo","+To have teammates prompted to install the plugin, commit this to your repo's","+`.claude/settings.json`:"," ","-```bash","-export PATH=\"/path/to/flowmap/bin:$PATH\"","-cd your-repo","+```json","+{","+  \"extraKnownMarketplaces\": {","+    \"flowmap\": { \"source\": { \"source\": \"github\", \"repo\": \"NelisVerhoef/flowmap\" } }","+  },","+  \"enabledPlugins\": { \"flowmap@flowmap\": true }","+}","+```"," ","-# 1. optional: flowmap.toml (no file = auto-detect adapters + discovery mode)","-#    Rails: save routes once where the app boots:  bin/rails routes > tmp/routes.txt","-#    and set routes_file = \"tmp/routes.txt\" under [[entry]] adapter = \"rails\"","+## Map a repo"," ","+In Claude Code, `/flowmap:flowmap-build` runs the whole build and hands you the questions to","+decide. By hand, from inside the repo:","+","+```bash"," flowmap inventory                 # every entry point -> docs/flowmap/inventory.json","-for r in \"bu-1 bottom-up\" \"bu-2 bottom-up\" \"td-1 top-down\" \"td-2 top-down\"; do","-  flowmap brief $r                # writes docs/flowmap/runs/<id>.brief.md","-done","-# 2. hand each brief to an agent (\"Read <brief> and follow it exactly\"), two models if you can","+flowmap brief bu-1 bottom-up      # writes docs/flowmap/runs/bu-1.brief.md","+flowmap brief bu-2 bottom-up","+flowmap brief td-1 top-down","+flowmap brief td-2 top-down","+# hand each brief to an agent (\"Read <brief> and follow it exactly\"), two models if you can"," flowmap verify docs/flowmap/runs/*.json"," flowmap reconcile docs/flowmap/runs/??-?.json","-# 3. read docs/flowmap/QUESTIONS.md: name the proposed flows, paste them into flowmap.toml,","-#    answer split votes in docs/flowmap/decisions.json, then reconcile again","+# read docs/flowmap/QUESTIONS.md: name the proposed flows in flowmap.toml, answer split votes","+# in docs/flowmap/decisions.json, then reconcile again"," flowmap diagrams                  # Mermaid at three zoom levels"," flowmap atlas                     # the interactive map (docs/flowmap/atlas.html)"," flowmap canvas                    # the map as one picture (docs/flowmap/canvas.html)","+flowmap canvas --link             # also print a link that renders it"," ```"," ","-The canvas reads left to right: screens, the flows and their steps, the files they run (placed by","-call depth), the data they write. Click a flow to light its path, \u25b6 to walk it step by step,","-double-click a file to see its functions, callers on the left and callees on the right.","+`flowmap.toml` is optional: without it, flowmap auto-detects adapters and the passes propose the","+flows. The docstring in `flowmap/config.py` lists the main keys.","+","+## Review a change"," ","-## Every PR","+`/flowmap:pr-lens` turns lens output into before\u2192after per step and the questions to ask. By hand:"," "," ```bash","-flowmap lens <base> <head>                       # placement, reach, reach diff, off-map code","-flowmap atlas --pr '<base>..<head>=PR #123'      # paint it on the map","-flowmap change <base> <head> --name pr-123      # the change as chapters on the map (docs/flowmap/changes/)","-flowmap change <base> <head> --name pr-123 --check   # the story's unbacked claims as JSON: code, field, fix","-flowmap canvas --change pr-123=<base>..<head>   # paint it on the canvas, the story's parts numbered on their cards","+flowmap lens <base> <head>                           # placement, reach, reach diff, off-map code","+flowmap change <base> <head> --name pr-123           # the change page (docs/flowmap/changes/)","+flowmap change <base> <head> --name pr-123 --check   # the story's unbacked claims, as JSON","+flowmap change <base> <head> --name pr-123 --link    # also print a link that renders the page","+flowmap atlas --pr '<base>..<head>=PR #123'          # paint the change on the atlas","+flowmap canvas --change pr-123=<base>..<head>        # paint the change on the canvas"," ```"," ","-GitHub shows committed HTML as source, not as a page. Add `--link` to also print a link that","-renders the page in a browser without publishing it anywhere: the page's data rides in the link's","-`#` fragment, which browsers never send to a server, and a hosted viewer (`flowmap viewer <dir>`,","-one static file with no network access) renders it in the tab. It defaults to","-`https://flowmap.testabl.ai/v1/change.html`, deployed from `fjall/flowmap/`; point `viewer` in","-`flowmap.toml` at your own copy to use that instead. A PR body holds about 60 KB of link; past that, the link leaves out diff","-text (non-code files first) and the page says so. If even that is too big, `--link` prints a line","-to paste instead, saying to drop the committed page on the viewer.","-","-## With Claude Code","-","-This repo is also a Claude Code plugin with two skills:","+GitHub shows committed HTML as source, so `--link` carries the page or map in the link's `#`","+fragment, which browsers never send to a server. The static viewer at `flowmap.testabl.ai` renders it in the","+tab, and nothing is published. To use your own copy, build it with `flowmap viewer <dir>` and set","+`viewer` in `flowmap.toml` to its `change.html`. Links are limited to about 60 KB to fit a PR body; past that, they","+leave out diff text and the page says so."," ","-- **flowmap-build** \u2014 runs the whole build: inventory, four independent passes as parallel","-  agents, verify, reconcile, then hands you `QUESTIONS.md` to decide.","-- **pr-lens** \u2014 turns `flowmap lens` output into before\u2192after per step and the questions to","-  ask the author, without you reading the diff first.","+To have Claude Code post the lens summary on your PRs, copy the hook block from this repo's","+`.claude/settings.json` into yours, pointing at `bin/flowmap-pr-hook`. It runs after `git push` and","+`gh pr create`, and keeps one comment per PR up to date."," ","-### Install","-","-```","-/plugin marketplace add NelisVerhoef/flowmap","-/plugin install flowmap@flowmap","-```","-","-While the plugin is enabled, `bin/flowmap` is on the Bash tool's PATH, so the skills (and you,","-inside Claude Code) just run `flowmap ...`. The skills show up as `/flowmap:flowmap-build` and","-`/flowmap:pr-lens`.","-","-To have teammates prompted to install it when they open your repo, commit this to the repo's","-`.claude/settings.json`:","+## Supported stacks"," ","-```json","-{","-  \"extraKnownMarketplaces\": {","-    \"flowmap\": { \"source\": { \"source\": \"github\", \"repo\": \"NelisVerhoef/flowmap\" } }","-  },","-  \"enabledPlugins\": { \"flowmap@flowmap\": true }","-}","-```","+| stack | entry points come from | call graph |","+|---|---|---|","+| FastAPI | `@router.<verb>` + `include_router` prefixes | built in |","+| Python CLI | `__main__` scripts in a commands dir, or one `main` script | built in |","+| Next.js | file tree: `app/**/route.ts`, `page.tsx`, `pages/**`, `\"use server\"` actions | codegraph |","+| Rails | `bin/rails routes` or a saved dump | not yet: codegraph and the adapter name actions differently |","+| React SPA | its backend's entry points; top-down passes start from its router | via the backend |","+| anything else | `pattern`: a regex for its registrations in `flowmap.toml`, or `list` for registries a regex can't find | built in for Python, else codegraph |"," ","-Without the plugin system: clone this repo, put its `bin/` on PATH, and copy `skills/*` into","-the target repo's `.claude/skills/`.","+Most new stacks only need a `pattern` entry, which the `flowmap-build` skill writes during setup.","+For what a regex can't express, add an adapter (contract in `flowmap/adapters/__init__.py`) and its","+guidance in `STACK` in `flowmap/brief.py`. For a language neither call-graph builder covers, add a","+builder (contract in `flowmap/graphs/__init__.py`); `flowmap callgraph check` must then report 0","+broken."," ","-### PR hook","+## Does it tell the truth?"," ","-`.claude/settings.json` runs `bin/flowmap-pr-hook` after every `git push` and `gh pr create` in a","-Claude Code session. When the branch has an open PR and the repo has a map, it runs `flowmap lens`","-on the PR and hands the output to Claude, which writes the pr-lens summary and posts it as one PR","-comment (`flowmap-pr-hook post <pr> <file>` edits that comment on later pushes instead of adding","-another). It stays silent otherwise, and runs once per head commit. Copy the hook block into","-another repo's `.claude/settings.json`, pointing at this repo's `bin/flowmap-pr-hook`, to use it there.","+The claim is that a reviewer can trust lens when it is quiet, not that it finds more bugs.","+[`bench/`](bench/README.md) plants 26 changes with known effects in the FastAPI full-stack template","+and checks lens against independent ground truth. 16 of the 20 changes that break production pass","+the template's CI. Lens says *contained* on none of the 20 and flags 50 of 55 affected endpoints.","+An LLM review with flowmap was right on 13 of 13 subtle cases, but so was one without it on the 8","+it ran. Full numbers are in [`RESULTS.md`](bench/fastapi-template/RESULTS.md)."," ","-## Does it tell the truth?","+## Development"," ","-`bench/` plants 26 changes with known effects in the FastAPI full-stack template and checks what","-lens says against the app's own tests, a seeded production database and runtime reach. 16 of the","-20 changes that break production pass the template's CI. lens as first shipped said nothing","-about existing code on 4 of those and crashed on 1. After the fixes it found (they are in lens","-now), it says *contained* on none of them and flags 50 of 55 affected endpoints. An LLM review","-with flowmap was right on 13 of 13 subtle cases, but one without flowmap was right on all 8 it","-ran: the claim is a lens a reviewer can trust when it is quiet, not one that finds more bugs. Method and numbers:","-[`bench/README.md`](bench/README.md), [`bench/fastapi-template/RESULTS.md`](bench/fastapi-template/RESULTS.md).","-","-## flowmap.toml","-","-See the docstring in `flowmap/config.py`. The parts you own: `[[flows.vocabulary]]` (the flow names,","-the slow-moving top layer of the map), `plumbing` (components hidden from the system view)","-and `engine` (an optional hub to fold into one node).","-","-## Adding a stack","-","-Most stacks need no code: a `pattern` entry in `flowmap.toml` (see `flowmap/adapters/pattern.py`)","-turns a regex over the files that register entry points into endpoints, and the `flowmap-build`","-skill writes those rules when it sets a repo up. Write an adapter only for what a regex can't","-express: prefixes composed across files, names a framework derives.","-","-Write `flowmap/adapters/<name>.py` with `entries(spec, read) -> [{\"endpoint\", \"handler\", \"line\",","-\"aliases\"?}]`, register it in `adapters/__init__.py`, and add its guidance to `STACK` in","-`flowmap/brief.py`. The `endpoint` string is the join key between passes, so derive it from code,","-never from a model.","-","-For deterministic reach, the language also needs a call-graph builder. Python has its own","-(`graphs/python.py`); TypeScript/JS, Ruby, Go, Java, Kotlin, Swift, Rust, PHP, C# and more come","-from `graphs/codegraph.py` when `codegraph` is on PATH (`npm i -g @colbymchenry/codegraph`): it","-indexes the files at the revision being read and reads codegraph's SQLite graph. A new builder is `flowmap/graphs/<lang>.py`","-with `EXT`, `build(files, read)`, `symbols(text)` and `signature(text, sym)` (see","-`graphs/__init__.py`), registered in `BUILDERS`. Point `[code].graph` at its sources, then","-`flowmap callgraph check` must report 0 broken: every handler the adapter emits has to be a node","-the builder emits.","+Run the tests with `python3 -m unittest discover -s tests`. There are no Python dependencies. The","+plugin only refreshes when `version` in `.claude-plugin/plugin.json` changes, so bump it on each","+release. The hosted viewer deploys from `fjall/flowmap/`."," "," ## License"," "," Apache 2.0, see [LICENSE](LICENSE).","+","+[map]: https://flowmap.testabl.ai/v1/canvas.html#v1.7X1be9s4kuhf4ed5iL1LyZZky7b6MptNp3t6J-n0JJkzD0k-ixIhi2OK1JJUHM18_d9PXQAQIAFKStL27Dn70B2LBHEp1L0KhX8eLdL8vjyavPvnURIfTejnZLZJ0rhXLUVvFa2PwqM7sYVXzadVUqUCnv8nPg_gecDPy81qFRX4xctoHURBIdZ5EJUBjRT0vg_KSqzpj3kei2C2DaLbQoiVyKpJkCZlFSRVGcCvYhus8ySryjBYRlkczIpELMqgyoMki8VawP-yKlhHZSmgyXwp5nc4jaQI5kkVVUmewWP88GNeCXyzgg_h6zyjqcLUlptVlAWlqGAlZR_njlMDaByVNhBOcV49mlOP54SNG21oBj2caiqKshcVopfBCl1N74ukEj2ceo9X5WjzURTJYkuNHG8LMc-zeZJyLzDIh_AoLqJFdTRZRGkpfgutHS0A9qK9pc3Hek_phXNT3wh-zlCL8f0keCmKVZTEQZzAXkarMoiqoNwCNFenOP4pwjX4R56vQvoWACiKaF4lHwW0TCO5T_gqFYuqV-W9IrldVsE8yj4C6uSLoJwDjuCG0haFjDv4URxVUXPrrGWd3ooMRgN4q9kxOO1GDF2ajOs1gPa-x7PphnQhPibivhf15oAIt0KDuv1cwfo1vQFs1G9qYL_dFBm8-fU1Y65qA0h_Kyb4Yw2ABGhn82VewGZAG7lnQRltk-w2uF-KAgAO25EgId0vI6Qv2Q892DLw6Q2OUd6FwSya30F3QJsL2KaSGqRJdhfNUhEsinxFw8C0Znm8bUC_sdLTYpP1Utg6Amvz5XqTpvLvHg3lbMWbg89E0QL_Bz36P_cg24ncrH0I3MH3nO1w4328M4tWglghtIX_REEsDvgbkPfW5HIEUeKV4tM6B4rmLU-yj9AoL7b9v5d5Bh0CkPICetyUAIvwCCAFbHCOYxAbjfFZFqvVvjt69uJnYr2IE7ozBCLxIGoS5_PyVLY5bQwIDTcJNIJ_FWfDTxaTut2auivynAdsd7TeTm5ugD9kNzfYcpHt124epWkph05iWOXR5AzWn5Y5fl4vMjzKN9URz-Dow28HMGYfMnRwchdOdDQ_DDWoI5BwSIotBHlSBnKIICmRFQB4esDP1ssAR_tC1MDeqDMLNby7r5v7dt9s0LX77nah-_0cuHMJQtH3PlmtAQa-t2rtN6zzGBj2pdP5EH5mD3LC3u8PW5CbUH6i5vgh7l4of4v4VtyADIcHhJeiuFnkhYUh4RGNdBNV-s8FKBz4YgkNJN25CK6t3vgozaUIuUjM1e4w2mKcJuWPegjWSEiGIgkfrlFi4iDB8SyvqnzV26yDvACxuO7F-X128oVERgN38F4QleXptygwk_j7PrXur2I_D-YWHgpUL7uor90mbL_DN67nH_N5NNukoKncVOJT5Sao_UcwieDwsd24n-ZRvFs-mJq2D1FtbdyFonaLPZDz6S2iHex2hmgXMeK1RQAYM6CKsYoHugFpD6iPtTUIEAvrNJoTDn4JmvJK9hME3NaHg_ptFxI6GoWOl3JWrlcMnJv8zvlWr_PGwiVjWD_6HjY3E4UPnPjBn1qrcn_dDZZOwvFx9pbZ6aOXVkM30TiaHcbW0bYvSXfmDmwT_z6ploHCfbAtP4qUiSdiTwMYljnw_-C_N6Ikh8EXUo5eTgeTf_n0V2Tqof30L399_ubtz69-eeN4B__tUMb1uD5CNBt00aK7Xeh-32DO1ru_ZgDOH0G-9hfwv92tbot8sy53t9vgX75mYKDnWQJUfJOJe6kVeZr-PZrPo8I7Mdg44Lo3pjLkbEd7DGBa36zi7jYaxTpaRnG-xmE7Z76OquVNIW7FJzfLOnwLTe7xuRv8hX3I7f_CXhg5PqsTF-p8VkcKsT7r4xbafVYvFlJ-QQ8Wynr7OZyGuxFmT1rft7sDeMLv2uUuDP-sTncg_AF92qzna_S4kxD25bEmw-tQ86W6ssv3aygsu93ELje5s6GltDS96m2tRXVRtj3noJIoF652ooekYJDioj3pX6ip6Ln7FRXV5PRbfPK9QzHRLV4_f_rDy-emrXrUbIM7-YP6m0Y8aqkxRlunFmP21aHEOJuF-8xoRyPa5R1tcIPcgvnzp2WS0BfO_ut0xYt0E2PdiHAXukqjmUiRDhLEoBJskspNrWYQxkundqTGSaF2kwNpkz4u3XEqCrwEHIzEjmRUU0elVqK4FWxhzL_cJ8sL8BMove8vq1XaJjt-B3tGyzH2k1_AxqxTYED09QTn-qON265mBXrKipe0xh1NS5EKcmw2KFxNy0nees4dtN1uE-67ZniBwULX88Ummyv7r_Vy5V4wvMnBmk6jretVuU6T6oasU-drwJcbiSKdlDbPV2uwZjPTCUy-2PIUP9e-YECMdov1tlrmmXrtZEoHwNNkHXuC2vnJ7k046DO5PQd9ozbuoI_MLT3sQ73Z-3y2Aw2cXbjw14clh3bQRKJ3e1DIrjXskBwYirhn67z17Cb6mCdxkt2aL7WoaQY7bqT3wY5xcFg5vkmB4WOrmAMKOp7CcZHbpLJjIJY3mcUY_Yt8s0xus6jaFEIGw29AMFEwe7ua5WmJHThFnplY4BV5ZiOPyLObHCjy8OOyVjs5SuLKxAgxGlIIbp9UnAoQZeyWJi-2lpJfHI9UuRYe4ccNPNJPvmxbufKFLaxwObvaALeAfX9JAOxs6JN8ekqecKmacGestNUo3L1kH5-pP8BdvJF71n7LUWHXm3WUWHKJEzTwDeaKOF_wXzebIv2fL4ZrQCBkb5SW64AvPLnhdB8vgCkg2_H6PkrvnK85MeqG3Av-Xepj5PYmX_xOWsQhmGkHu_dC2r0-ceHzgR-qBIiDPmIq2OujBoEc-I1BO_-rV_2uetU-zM-g-UM_NfjBoZ8avOLzPiU-cuinFo9xf9yUBT7-87_q6-eor1EWpdtS_C6KLKVFfL4-6033rLXZjoxQZ3Ks2cDUZNs5tFKV5RRaUGQxgSbAL0GDDWZRKfr9pYgoL_ZWcIolcKg4mVchPNvMlyJWrptCRPMlu3YAmvB4nVdfGg6mNeyVRoEtfbqhfNelGbaahK1XUvY6hPfeH7vRXuGmGx3aCb5-vHAlA7sRxNVyL0x5uqkwjQa_Z4OHGzwpg1hUolglGRoyc5X2XAb_9ebVL4g-tIWc-I65qmT5fKmJw3PrMHE4Sfv0W5z89z5ThxqZO9ywO9R7t92hv-6yO9qNQt_4rhfmDjXeJFXF7OvO3SVy5v0NCSs7knkpkbUo_fMCbrspOxus8nhjq-6NBph-Kxmya4kg-O7sHIj67XKT3Wnu7X7tfoNpK-UNZaA635v8e6d9Vn8Wbar8Rp0rcLZISa5QEvkumPZBObKcynUzTGq7AUyKk8XC2WBd5LMUZKLb3DgAIS11ZV9cPfQjA40P_JQxfK-PdloCHRTnJ4w9O3ATzed9LAnq8z7WxHbw55oQD_3SINLP-fTwr0ziPvTbmvA9XzpZbpdl6uXGPrZx6NcGS-lY7W5GbXEdd087uJfFlj6rh5pvvfsctmei2s50fuFM5_9dbQVkGmr2X2opWKe6_Fqh1cynEDYa7aULumO-YrWutsEyx9yUQJoVFPUFJTAW6zTfom0RgRoYoaKIDQ09MIpXxLMPy7fWB9tqRfDbOCm-V4ixS_OT8kA1a2RoK9J2Z2hrwu_K0G43crEOr4vMnF-4Y_5OnpTjcURPhvYBc7PSpA-b9n6fenbk3d4wcaz53RcAzMlCPvwG5MgneYDqGif5FB02HqskjslR4zEmZ0lKax7mO9r_qN8B567x-KdY46BnuAz7JFo9e-txPfvG48bsG2__ZY6q7anI-cHYeTR9t3Fdw3xEMNfnjmp460c1rI1HDTgbb37nA0leiLQPlDURqz7ZUq-yflYv03zWWKf56l_20IsXROaBpiZwrAMHNXysxzWIGo8bUGq8_d8TCf-zTyR48clZssJEKjP9s8Yp82mNUvbTBkbZL__lskMPiEl1lLU4oGLFXonR9W4MaTd0ql69FfpRvQ_Go8YmGG_-X8_h-1r7VG_BgLbAEQMzdsP1tt4Y99vGHrkbNbbLH4n72qsemqvWgbv2kutXrfWar9yLNVu4V9pKePhdllknBJlaq3pmqqz1s5a-Wr_6KrlCXz8n6H94kozPGOxAiSbj3VnMxlI6tbFuKJ36maF0Gs-aSqfxymvHH5ag9Xn2v8t-_0pgO9RsYXaqgqw1aNWTGrD1kwZY6xefH3vdp0pSy77V8TuDTehnBpswnjXZhPHqXza09_9vWO5fOPq227XVhdNfRLJD8lJxHkm3_2hi1F_ztyKHNLQy8TyhAmxtVxdt_OTd6CwcXaPbtUACW1bVupycnt4m1XIzQy399BeRJuX_EcUyF4vTH5U7Is1np4touBhcXZ-fn8UX16OzKBbD-GI8H1-PxNXF_Oo6vojFZRxdn7om_YcXo7Pei9H10W_hDudTc-k-F5V_6U0_mVz6YHgZDi4uH2jx5iT-8ALG7r2Awb3L1761zuUbHjhevumS8ywfyBMeUz4QhkfCYB0VpZDnHuHNsyijIAGX3UJ1g1PgKXfIWavrj8ET5ENPJsEWSBJ_VPy1iOEZVrrEuWDplnxTlUksjP7JWY8Z91keyFgOT0jWh0mBcDYYmtiKKjgWn9ZiDiw3DHCMKFhEm7Q6gSFB0N6JDEbDntVovDDotoKZljhCuZlzJbEwKLmMYBQTJ9K1GdUcyrVIU3qiCpIhIxEFACCV1QS5OA3nVGWb1QzaLLCQEpW1sUvWlDAj_DD4hyjyvomDg4twMDx_HBwcXAAODs-9OCj9t50YqH28jH-1y7cT--gBbGJSo91z5fQJjuVeJAWfPDxhkILepICdxBYMz67CwWD4ODA8uwIYDoZeGDa83J2wbHnEGaZtR7kHtgxIha-I5kESYxHad8eqD3nKOolPPjBVa54c_DsejDHhej0OB2cXjwLW6zFA9ezChGrba96Epcuv7hcKpjNfI9IZrHjwQCtWE0AkOsPlDpzLJbXUu1SptPIylQbrWCKTHSjgN0mMR3jB-I-NlV-Ow-vLB1_3Jezy9aVz1c0whxcAzYYKFu3nfrBQWwMa44vwcvTg0BgDN74cmdBwxE-acHCGWPxIb8V21N6PwquH0gD1-LD5o96Lq2v3cmVEyL9YHTKSm60jSK6FatwPjeKw9fovzsPLs4df_8U5bPeZe_112MsPAjM0xlCwgmV-QHAzLS6eoCF9WuWnCxnp4JyWJ6iTPVHPnqFa2We28QQlynF-R-nkZZ6dmDJjeB2eXzw8MIfXvRfnF25gWlFCPzwbwURb9KoIYyd6GWA4vwovBg8PhnNQRi4GHhbi5KPN95p5NJmmY8Xk5NQbPwqH40fYeOAiw7G5YncstbluX8TVzzqbYV9lP19dhKOrh1q5OQmwoK9AZMDg3uU7dQdXMNmtPzSWzNuO7KJsWNGjwdmjAICsaBjcC4BGPLwTFK3YOQOlHVLvBE8p0kUYfDJ5wTA8v3wU8JwPgSte7gEcmQawJ3h00kATQHU2wR4gSiqxMvHoYhhePA4ZXQCYLsZ7gImzIPaEkkqZaAJJp1LsAaMoDEy99Pw6vHgcQjsH-XrhJzNXBkgnmNwpI9KF5U4n6QQXnonTGs1rPCDHml4whT4m_zaVF7MYpbDT7TdcyQjrQJTBHEPkWNyBTj9FKxFo0W-qNxfX4dXocZAUduBq5N0BlVjTCfU6-4YhbWTjdEK3gYaj83B08TgCD3Tm0YUXCK30oU5oOJKNGCyuLKRO-GirIgxQbfruF0Apw69VX_ITRAF2HmBydjlRF_lAh4WosLhvtaTiI1EWRGkSleyujPCz11GSltQiWIoUy7ofz5ciWofBEvG3CtZF_ml70g_e4o84KRClV_IeE7n8fpWv0uAd5jh86OM8StuLdv6AnsiGHD87b3ki_QlfnbvaSA3jHW3mi3Xu5spE9cEoHD0Wsg9Atx11oLsjw20P0DQy4kwANZPldrLcMFjhLUUZU0wYWJ5KdjXe4BmCjbzeKhUFkEgiTLk_Gl2BAj18HBCPrlCBHnpBbKcGdkK3mUUobfJmbqEHpswrSFp9m8TfT9HGrl1YATrtMLbAIQeg9XVeRinwBaMNhxwka8GgS36f0YcUk0BXMApAejPlHkQ8DY4j9ggXAr_EK5IEtgnuke3w5C0D_2ocXj8Ok7hCb6GfRRgJmp37ZLRTm2Q92m39mC7yy_D66lGgcQ2Wz_WVCQ1nzmcTFJ7EUL_Z28hMVdb-5TgcXj6UVWPMASx-9BrD2L6lN_JZuwDQSn1lMLQzYt3AqDV1EzKDS4DM6FEgM7hEyIx2QoZPju0DGJnu24CLSgLeBRbgWaaCMR6Eg8fBGRga9Is9cIZSl_eCjExybkBGpT7vhozlQrk6C4eDi0eBzNUZ4MzAUjLaqctNiLiSm_0sxMyoVlQyPA-Hw4fCBTUBIJEhKJowsHO5nI3tXatK1uaF6tRtxyqlqChKiy_gigcPv-IBrXjgXDGlmXsXLJPQeb0qI33HcqXNg2pKtVT2NBdMpIKKoaq8iPVpgmOqTsL3X9b1Gcn8xvHAEMrhQQHKyNZSQgZXAyCYhwcmjIvU4gZmnZvvhaiZvs9gtRL6vbAFJQ60Nw3ev1GGCWZCINCyQHUSJKD56ew74L5gBoIxmM_LquBbv4pIZl4QJEN9TUx2x9dqgk7Ir7AuO2wgWZErVAdRLdS3NyZUe-inpPoTQNsOezxYKK3eFYx62JG05pEI74boIxPSAa5PUHRtBZ79RggCXL4Dm7XeFbyFlB1NKyGqCd_fSrkrfB0wlr2_z1EfX-W6KcUlkSKoELe6-xRziVDVC15l6VYmNeFmYse4lfN8k1Ww21G9-fe0e1xXC3eIz0zSBafiUzSvZD9EXTwfvC41oAxKrouKq5eZVXSB6jGn20BfVRFl0Dr5yIlTkRzmSSl7imA5UVBuZqWgC4ewYz6-_6T8JhD_vQFjZSWgDxxoi_kHQZRC7zG6LJ4hmNRsyWGBzjgwGFO-JsC8Jpnv_9qsZgiEY1CIF8ktoPGmWp4QMiN85MWjxH9ougnlYGGtV0xAa1gzg-HwwTEWTRkY14my6qyOF2frwzyMtMbhni6sLddiDva6pXeMzkEju3p4Nop-PBjYuX7zQJIXBvapJYZD4yRTh_YxGF6Eg9EjiI8hJtyN3OKjPmnlX7VRyVWu2azt2rn7rJgyp_pPpLxq2WOWgnQqkzH1rcfYvM7vZKlNh6mDfw_wfErJt45RGrMV_h8_XPjf0HHGzej_jjOHe2n4ZjnchppvVcrdrevLq2sZ-D9hkIxFA13jpvsibg4sdB3N7zDh9bicg5QoytMwmOHhkvL0_WZ4NhyfkIs44KMBLCVaOWxXj2JLcBqbRda-c3XNHfAX6pXqJxftVbB2n-ljmKMLHhB-u7LSbC_DweChoOKYHWbbYsb3wAUd-yyeBzR2o264mMf_2kBhPPyRiF-rhCi1I0wIf0LZ2JRHjhUDlfI4kZeno8KOuFtGW6qOHufCCiNcXYbXFw8LZ71aEKzoFbuwk3FbZwTbObiOY4RdpwmM84ua7w3D4Xj0YLmycgbI-oaYADNyL9mZ_9E6GOlO_nAucwB218X1IyxzgIbXxbV7mfU5Tv9azbOe0vQyT3-6Vu30-A6ur8Ph2SPsNAwMIDjz7DQfVvUvXx1m5aXro63-ZavjvswsfiHZT4ceSPrLC7zkZ8FzvqYXXsGjokjkbaVsG5ABBFYOaPw5KO1JJU0IfBsGMvxAIk0aPylexlDqEAZugBWDH4SD8_OH34AL9CGen7vhz0eC_fBXR4ZVwCHJqm74g-UiFfuQq7FSVDlUpX3tGPNTBTq6lwL6npBeAApcnsZkLnJdNDpnI-6Jg8v7nJCHc5Vg6Q7Q5V-f4EXNfExPHm_BDjK58UUsbTky_WYNu2pwDvL2evwIVHKOUvbayuZpnAhupUA2DwzzHqlDnToB0jhyLNXqqIrCQB_94614i-WXuaLaX1-_YDUZIUb-LBl-W4DMXQncpT98HPS_xRrO43MAFJIVnhAGKYx3bcRUmPf7fiOX7MGyLNWCZSKZB6bGYWo_ZK0T1zJn2zqE7YKykVM8Onv4RWNO8ejMTe7GOX8_zVvFAGoval0fwE_99wZpc1XmqL67BgOBSH4JIND0ryVMV4DwTqfkqIE2-AjNA5GGdON6xS4cZMNNa-F8FJ5fPTyVno8An648wryukdAhzc1CClKcW7UV_KBdJPEj4Zapz3TgllEFYoc8V6UiDKGuq0d0SHawJ8MAj4WDCMD8AMJHJVC0lB2H48EjCFkw5ceDLsBQ_YtdgJFFMkzAqLoZfsBkYUCeErC_LWcRGNTDxxBlQzSn7eR2T7UPPzgaRUGk16hRKcQPEs7xZ070hr4q0Z9M_uiczskSW0E1g3jPCn2yyp9x-hQLhZ7-W78qPyneRI8CnsDJN8CeYA7A3XJZf1Sd3I1kE-VLBj2wb-UMheePQLUjZFtnHQqgLq6yQxE0irAYCqFZmsW_JQ3HxsV5OLh4DOzE80sDO226VSWkCQZHGRG_nW3ULdHhJRRXD-VdkONjfInE1YVrqU4L23rps6_r5fG-ohYYBniTx3dP_vT86Q9P0Ol68_cyz777MUpLkzefX14BHM4eHA6XVwgHmwDatVVauO8qv9LhXjHrvqgFD0DvHTyY0a1mAEseoOY7GLmX7HavNAvKeNwrjmWOxrDMs-uHX-YIvUgwsnuZ9pUm_vo4Ug9T1XJcK22iuuk4HIXD0SNsMRI3DOxZulHgpwMAVhkgCQa7NJAfGE4r8qmMybPOTonjv74OZnm8nYCgLKvgP__6w0_P34LuJqKPAqOaVJ4iYDdvlmc9ctKyE4DCPGzcl9EWnS_SikeR2w-OAeAhe3cx6VOFSUE6o0kKwhg1Q04AEB8pCyBit2_2hCZnCWaw-0cXj4HBaPePLjwYzHWYOihV1mkysgC6N23xSXpl6h2rKoyV8506Ve50o4C-kxlpMXzJDu0gVUbB65tqt5f8yIquXQCNXF48PHRhYMwsvPBWubCrNHcWuWheWcMwb11k01k-RKbQFXPQ2BG1ORdjMKx1VbzoS6jgJqwElc5ijlnV9AHom4jV_UYJhNGjFLugMgijDt6r6oTtYMF1OTGDExs1xvzoLJOCqCYQmYTk5bV8WvK-NpllEsWxiIPjHK_VzddrEZ8wpFf5R7xtLImfyPyTiXYVSw8kFbfn2wXIM8G368oP1fkBJCCaB35J57MyERW4n_C0H7zJ5RecwaJ9bOuoqJg9rSIMr1aczELvZeY8tpDcD92fls9yjNkQw4enLhgY0yGGXRggC8HtwgBdL87EgLqInB8DMssrMrgahoOrRxDGMDCA4qqTGHTJu13AMGrjmeAwS-b5AVIapYkU_vc4UpoZaV0gVEs6mREFXDcBs76ysio2eFkGJ0YR6eA9GxFTAtVSsNJwMB3lEYQmDIz5KD61T1cP7NJ86gqDSu8xag76wWsXDxhdhg8X0TGUBtAZGgEdV3VE__KtEoq8fruqoh8ASwu78AMZZEFdDzsJ8OqZknLcUKsLkmyeboDrnkyCY0A91qHR9wJqtJUcOx6F4_HDA3MMKsJ47AfmLjjaIDzEgmAwvvsntgfRnmJ1OHEvc1x_-8D8fyjzWkEcSYhafvDLcHz2COYlIODYY0-bVTb9kLNrccqEQLs-px-KMimkiuhSVAbjD7kM3sZioZlcUdUJwYSqxzHGICJicWRenAQ4KsZwcdg_mnrVRXj1CKC9BNbmc1XUBUr9gLVufGKvqVnWtJOzhUE73eapzK3BhJsVXsMZ4LUvfKoPr2GVWb1ZVYCQktoSUL-yvUCMtAskwlA25V-Hj6G_jK97L3zai13t1Q_uZlVYeXqyWSu2yyIzkhXYtJpQWrX8nFKqZXZyIy_BUk9Btn8jE93LyqpX2aiONxyNw-HFI2A2DIy5MB7cNorn-qFtVdjV4W6j6O4elm-ozdowuMvAYrWPJ9QGLmWKVeoZG8hxjs6DWTS_m2hPhBR48JMkWxYHvR55QQqxoFq_wXMq_ogHXGVGvEjBCCk3s7-LecX530vMZc-pZ8pgXySfTupan3wxbiHWER6Ql8pYsrILWF2Ho8dQxoaY3zMaXe-2A2XR4_2sQV0huW0T1sWTO-wCy0C6Cgfjx9BTx1hkc-wBjVXo2Q-URj1oWWukUSTaDwhsCdz6U0hmaymzZ8wMHIzSU-gKY_QquUnxFQpsIasnI4EcEPhoQtKUrGH6iwQvOvKIFiy8vLoIh9ePoNcNscjU8Nqj2aki2n6412W2ZairLrvdAW1OUGLKVuIUaNkCyCAcXg0fAyCYi2gXDXBcHuBPhtmvUqMjEWY8DB8sx9RIhMHggJ1h2rgOwb_UzhCIa4lY4uj6ERKcsL6RJ7vUrAXvj-vatxVaKU7qBkNXTLc2AUkEkqkCil6dLYalHNCVFpfyoN6TOn_M4g9noI6cPUIuDwyMealXbv7QCTzPVY_dwDN4xRcBj1NOpfuylRg1Oh-Go0fxSWCu3cj2SrQuGelIYeQGWqtTPzvSGCWElRyrxGqN2Ydcd8gC7CLPuFY7n8otBBWM0cdIn735VUas8mKG1UaibCtzfXEP4Ass4V0KIQsf0T6BdbmluiQo-qpo1kjzGD0CM8A0D9TD8EJfznlBgG8m9sEjBSe9Gd4GzYvEjBfO68Ss9wVfZYsC8UfW1gosYFa81CdXRQoykq4frmcg6bNjjs0WrbuY_LN0NZDTxPPI1NUWLKeX0dqcH0xQnTeP8QxL6bgXAtMd9GS7W7lua5Uv6ukY3-O1G3IhXd3iLO1xsdDR6bd4d00Sf9_nes1GqaX9Wtezdb1zTpi68s3aM0x79i-f_toxW_m2np1-cBAM5Vft0f_y1-dv3v786pc3HXOw2tQzaTw-aD7Wt-1ZoSXfhWn6fT0b49FBM9HftWehzs6dfotPvu-AkKOlgU_GMzcembcfuubo6L5jtq-fP_3h5fN9Zlu3rGdrPvvC2dZdtWfLjNTSOvwtmvxZPjxon40v27ORDLNrOmaTFiv-nAmZnzpmxP7F02_Rm_J998wcTQ3ss566d1T24J2pYwCacft6-HqK7XetW8Kac6JPjEm0u0ARxZHvybt_HkXo8915VXd4NHNdr8RxsyNqenTo3d_3R5OBXA599OzFz6qGo1HBHiQ-T7I1-GwP4SknSIcLys-aoRr-gHu4Z66Ujn1B5e13B8T0cDXEdl-UreZq3BWx7zydt253TZBamdtpDDo7QMPYe0u9M_TBx7wlW0HGLAi_L2gat213AUVe6eDdstZFy2pejbJ9-07NdXFz1_x0e3PjGmPPOhSuvTfLN7FDRm3oUg86tqE5fbVx97jpWaGDXZWhAxv2uDq6Cx_qdjVw7LFneyp2XVDac5KfMwVTM_uKU9hxm_CsWbFk7x0y-9mxN7JRDRVjvA4sQcFx9PUuRoYZnndMwV3S4nebynD3VMwqEr__PDrcJ7PdeCTnt0kOxJmRFwxd9sL-9OHAUi9l2LcDz1q-4r1Jow3lDuWIW9VgMEf0UedONHDMoGsE0yn5OUPscwW1udldbrDZ7q3ZD9naMBj5YdBpDu6Pbh1w77iOWW1DfSTJj2pddzp3IRq38U-mfU2uJgHD47__vJzX7nZSArW1KMEY-AA8_To3BDfQpTUVtxG1ezZeuPgH28sh0IGjB09hJwy9u7EHYjj4gt8Ika1q2Jhjejn0gTjR2gDHIG0a-NqDuH0qB2yrczh0t8hyjfhVlEXptkrm2BVm48A_XMMRA1B0x0h-e4ttMW6g9hIswShNyqiSF-oISpYjrOHqpJTXQvEeeI1YWQcrcADpfkKfDnmP1kVvcAkvZJGBo19fB3-gBwVxgMnR1fjyYj6P-_26VzpJRdd01-IQfqm94CwPDrsReFR54Lo4I8U-PtB195bR1NWL-yoc52UN9kUDPE6NmvUg0JExgJF5YJemsIopGIWSVOUgq9iAdcBeRvlViZvWeWfz7DkFhSRK_XO3FVivAjBV0DXDH5PoIEAhYDqVNP8Yakv1RnZK3ybEZScNgLfgrkFNoMkxo-ndB_rjRqIg_lSYMjkPqfvJYIQYENuX37g1vfBIlhDCKeo_j2apzOJfU7z8psrdVlTo6jT0uUZC2S90xadQQFf4KFIuIadyo47pxESUYSRZVXSlsgAYYr5Nyqog0j-ZBNNW_sFU0aaVqklsppTpnPDZTGTz5ekiglHWSU8pe6cNTWsaQsskU4IOf5o35xi_m2ojf85IoVIvFXd5K6u2cH1rWf1a1rzWJa8SWbeJKixxPF0O9YRPA5LrtwzmmwJvIA-iW6Yy_ATrTh39WuRVXm3XWIYXT3D2qrxXYB0tNZQ8hoX9HBN9hLIKFOKfvGEb4_SydhFG6lMRFRmWe0jz_I5q6dIc-SwqVpuWh0oLsShEuWzMGGCd8ngy-1JOBG9iL3O8SpQynuWC8MDXMr_H6H8sUowSH9nEFeCKS1k2rMYE2evUKB9OuMpgXgNuy0rYiCKwV3MuiEyH1ah6KS-BFmbsB2U84NkydYSTogjuMlj94K2ucU7pEtghFUAG4YR_z8QSD-lGWGt5kRfiG27cp_yHLL_ntG6ZdY9l0Wc5jI5dcVX0fmDxRTpaJymM9olYP-ZqyEtduKLaBrME4CnKQ7X7m5JqNmM1DTd-FQKHquS1UfkGOrgFfs3Fw5EHc83SagkPA74whpCpT_p9aKRS26CQmbx4GmqTSbrnb-SBQDpaQLxiEmjiJlxp8A3NKVStMhpHEWIYGAQcHN8vk_kSNhPQM9isZfFK2pQTk8b4YqwyqfxMhPJYkDPKIukyYQVzNRFnD8tQQQX4lDSOdWHqH1l-gyXyQH0Cfvm0fbcPbXTZ2ukcS4TLe3tKvPGd6m0zPqmrgp7QC0RrPGhM9wxNv-FLf3BzqbQcANt0FGOoCbW-UB1RZnrA1HnGLTqcmcayt0DdCtLCqyXVrkKM2WSMM4DVi0rWP8d9yHLqmA5DTG2DbBqYz5g7IdN_SkyItStdEQuzv2F3t7ooukHSXOQulkdCCTHwZOkRi1N5PgFUxIzsgU7u7WKwKgnKxdABcqhd5tQjFvVFlZtYgTHCEnHrPqcllpPgpShAU4i1X1njO_GOUK4Ag3MlXwWAIKrrsdPCc9C8qYQO6tIgAjGHXpcKxLP-hNB51iRbTFwGk29DaXJ84JdwTLJTznIuEPMW0A4mQOXqU2bfsLOIwEctDs02RODzc0xkyZ8yNBCDVhNKkVnEui5-ByvXxfbqCpQ0ckh8IOb6BsDDePN0xeu6CnY_eJYm8ztVmRKaUkFKQn--ou_9ZngxG-Mb1Hkxx5CwFybDad9xvpkBy5qrbnDCKOCE4PJ_GjlJzKiT1TQxXAEXzi95hv1g2pMWVsAW93dUMPD7fv9bPP_2_VQJL6VOEUGJe5Z5IeBWcecsx4nlmkJ96NCsV8DCjvECLyhEKcfAvU2QEZiHZTTtFnTrpixe8P4IqUxiFmz0-yOJjbQcAvq3tUcV1gA7wxSWBeITIDUypVqkYiFi2FKWtKyE4O2GZb193Fbxg-Mpdy5_T0_4SI_Uds3yF2Y_U_J_SbY_VSQ2lTiKevs0AL6a01IR1enwCCVNar2pxI3j81qaF9AhdT7xLglIiuNyC5BbAZ-Ff5AQF0SQCRVJxf7vl1s6TpPj4XU5RinxEikLOCAntyZ4DLSQd0SY-gihkyGPM-qJZXw9nbXI16hL5Js0Zq1PH5nRC1sIoA86ViOLW5DoC15HlAoKSAVcLgP5TRsHKK6oqce5gEBDswIlmbrS8vmLP7MuoQ7mI9vRu4LlRVDXW1H5BuZjsiMAJlV_mAk6xRKAeEuYmhZ5qq-yYAFUkApETAGQ_k4w_mu9sL4PYyaqeyw3xprYN1JTKOneCFYfqAfUtuZFzse3tV0pDdCPqvhqg0AYt2yEVMi1AZDdiQbm6eIq5V2yritw94gHizhB7YeyahdKA5wJLW0iJGfsPRUWzie3WV6QEO8Hb5a00zZmV9FdbZLxMRVJFzg5TJymk1sSWfGEp_peG61TZOHRGkaZkqIW_PD07dPgu4Dr1k-pxgmVGecUVpytJnE9q5qaida4-iVSEN8IVFJRVFix1tPwa5yO8b3cDUARvANVY1VDtZBa6ZSOrgJMC4FSRVVnUQKwV1bb1BKPONgrPO26n1kJZhMAvlRSAxjBG9gMACThe8YHZ31SsbZOAlITx6QeB0AJVMuHOQ3J_5RKESgNT1HoH6XBnywSQWY4VkVB35f1TxFlpH7iwVNBGeMftMvrneVI-nBA9EEq09RFh92MylCttMMvMxLdERXZD_rsvAWlbmgrdYRiUq4glTNPBKtKnj0EICtpYpw49KqVtX5XbtbrvKjYiam1PEn_xF-mdOfDBqnVuB2L77sCHR0seQNnwdBA7UeNjAqcofhyte1YXgdEh9ubWoCasqWb1QYoil7ghZlhfuKn9nyl6qYnRWxBFvLuvsIL5lsDkghaFQifypneJHGJrhV03OGfcnjbmaUZpjEa89pvDBgywCSjQ_XGFNKvAIrq_PRCCKCV2syuhS3dHc7mzdRyfMl5NZRaWwCCwELDHLcDjFcl5FE54quJ8LbxNL9N5rirmqZCc1GFwJOZ9ZqelLWkQ-sAekbg3ROri4GspbhHYTUJrH01tlGJHfI2oJ3LK6wBIAXKbEO8D1jKDBSLu9JkxpnFWqv8VmDLliC0pgCPUX6ThT-tL0kktef4ZMpWBegAC2w2jUESgaT7BFD9G5X0gfWyF0QRJ-Oc4vNYBYM5vHELFqu3Bkpzn8izf8CDldCUnFWt3SX_UqV9BFS-Lah11ImcLNq8Ep3xHjANF3KgkGqiJojsFwHUYMDMa4nx2kxWxxU-fL0Ei5oFKzY4qtngU_fNv4m--FdqTNru38XkareU6sDvqojs643ZZ5FKlqgvOLYdFkBtymGB88ws_02n_2JROb0XhufCZI8O1wsKXfKkWdODWUifDFly-lpl1HnQMT_p9_vvj6bBMd3vFvORM7TZT6gUHD5KEBTEGuK6X7wimwvzm247HJ-p_e2rly_4UiD83lo0Urhm11FFx4oldWPhQLSZ6TsmzfscjUNad-0MmibxVPsHT9kjj9442jx2wxLw6kuk6eyyLG6v9CYs5_UpAqEsTC78Cw_BFj6Pjn3dAzlZy2heL2NwZ5TR5Aig3FkkhzCQxQWWmxWeMCMP8b00mwzpzZ7KH0FWxlJDlism7yPebIhqLjvH5W16-P9M9sEEXducartKWwqsk4ysIDZsjMvrEEKxmCcliWPMiVRSjdk5Wuqsy5HMeM-h0QJoE8xnIhraAXIhIDGhB4dIlyWIgbMEParoqDG0xailulzT7D16-yVtGnvLawcrX2PncRRU23V-EpqWawldZHjHIDoLlQ5t0JepsYOqVm3N-QJ5IIP-FRHUwgPYjxrXQ8mqSCFCJA3r2U_YZFTbTJyrJnmfFoy82GbCVmj2w4Epqi6FV1GP1kPPawbcFeIJVVm7hqe95sFqNIcvETGDZeZwIKUZUPltPgmu1K0fWTByuWNDfdjT65ANleHIrlnpkjX552Bg3dkYBvBAevLQnqeQAvnuEuDEa7QFs0rGFxCn7HAH6D92IIhDTlbuQV_bqLj36HsFGkRZkjdbtmmQL6Gl1Ur5nZSSO74_4qm-P5owMwX9JRbsZmZdmEIiFMsWsdb2TBczT6hiH1CSnTD_vsXa6RlXh8N75zmHNpY6htYY6WPydJInVj_iGC3XTGT9lwvTqW7jBOWAcgSBlZQXZS9FdwbVxORai1WuvXWL5BO5Q5ADmsz6WW3zSlcA6YZ5RsYmu7RwR9i7klH1ljyOqOQph1kM3s13BKGJVqAFk-hwHClt8BMFefAq02EFjknUdlagk2CCY7KFL05oHtjFoo5uAqSSQqRb3-qxTkdsWHKxSAU-ocuJgEa-0Sqi1POf8DfSX4ruP4PZFwKFLWskJQi8tZhjZx-jdENzZlYHCGDE-SK-RJclDAUXpJCz-DMFxzpRuVZZkUcAD6aAnaIjxr81ecyUvm8RUj_4MzJJ9odl5NAx7PDeuugt8_xuyo7dqZnHh4q78tttAFCzDWmNdHFsZpL-hMJxdF2wDKxN36FP7EOfEHaqtWfyZC3pkskANrgfvCR1mrUj9uv1Nus_dujS-h8MVtsODION20zad07BfWKj60SFnVJv8Zc6JEZqarNx62CWP-sYF1ieMpFTVfbeOL4W0WLRu7w8WwyiS56L1cxMs2s1pxE__IapJkZq1LiZGjU2UqPG1zNxdjbu92WOlJ0aZSUldiU26TQYTlRSiaddn0jv6JFMKbnBomlUf4fOL1E3rhR6b-bTmqve6aweukhxyUlLgCOo0nKJBLMMHDpFd2QteY-p-TOLjKQgNR2ayAHJSlRst-5RA6UjYdc_n52g3ienc3f3h6U4XboynL52NpM6KRi6UoNDR0Lz75XgJFH55ibJkurmBjOdwtZbE9H3S4Tqg2jfxKCzpptb4Mz8D_GBjuwl44LgOfo-QCffrsWbeZGsq9P_ehMGrzezbRj8lIfBf0Uf2YtJF5yTMaEniWIA5RWZ-bocPRVLl48DddE8eSFA8JoZTq_RM2b0dmxkWczzdLZdAeVlxbaGCmoPFYjGXonOnIK0zU9owIHaOjz7d1Qebjeo25ygVFf7yiHOGEs0gm2Iocg5l7Km7_Q3sgYKKQG_0kEZlQyFqo_AvBdelPRWwCaDgoHeD-nSgN7mdahPJT091S7Eut6w8lpK5x0Ww_6kfQM8NipL_eBvCLupXj9dCAbvfn369k8hS1MEQGlojBJjFlKa48UBskO1UGVaI8GjUAM7DmdNCihJb3K06TFB9XvzlxeoLsk9xxBfbedMQTOb_GUTpX20PKbyTmkV9Oay4-jlAXCHZviKbA5JnByjmIZmSKaRHsGBFUJWGbiDcdiriKCvkQhUlmV9P2I5kdk9DBYsTcM5SVShEz2xGMikWFFrOrUqI_Un2jUM4cG6cOe090ghu1SRWU-VUJdbHZpblBerCDPtYnkXI5EXICpPspFS9TpK0vrebmnHcLVF6GW-tHaKTfvjKeHFNPgI-0P3M_XxBrnyGRYjzTE3oc8NuJAij8AUYVhKqPxtRfX-qJ3WhTdXEBSVI3vq4G7srrY4GvmaRBy0GSuZbIosuI4qGV-bBZgy1BOKHiwnlCJ1R8bY0ivPnA_Ri5F6s1p_bh7X2MrjGrfzuGoLJrI5J9rPyDtZ_Y3Se2SHdAkErQ9h1kPMY__aeyoCpO1zgysfG6VhkUkhj9D0Ky8Nf39Euyf3BvGBEFI5ieqbF956cBg4aSRnZgwNtMaoy9Hp4_dHEpPJEHx_xMC_Rd8MPFS8LyrvKE9gRhFhYqSase5IyPqlZlEEDgJX1LrE3kRzwt7uBCyavAIhek-aRyD7wY9EbmiQZNvGnCl3C_aAuRlsAPExvM79F6wz_feyvuUMMOANWNHpWo7DhEOjoZ9BxR63BtKgt4vuM6C9KxVPsuJ57Tgdc4djwHP4XbLWcfp39Ye8Y54kP5gKeEWAZvR5zq4GTJjMKQhDlIee3fvshDl6RBmXAWh2LPTIRDQkPZB10OttBaZ9Ib7-8Orml1dvb96-fvrsz98N6Jtnr354_tPrp7_-Cd7c_PD0-ctXv3w36AdTUsynzME5u0Xb6mGAacN5zGqULrIfctFpimLRM2xIPEOKFn0jXUAWZowyZvp0MplNZQBJCqan_dm0z5yLfZugsiWRDPhyorMoKI9OBZ5oo3XqH85CZggxOck0YD1V4LXGL9ToEFJ4uuUf5FdTDFG9kXHR6Uk_AEQCpaI8TdCjvqLFyDlgNpicA286QZxKRAeiKNQtBOhzKCgmgxEQeg3yYiqNGhxJ2zqSGYNJhH-V96bTW5pGMuVSKEc6ISDliJcJ-ue1ml3eyYsBaVacCofqC14GDSJZkjJP_E76IwCr0C0l6bGl1xB6TTFPDHUh4Af_EAXonqzC8A2CfJURqnJZIF37zbXX7JC0UJZQx8hk0S2OVMkgZP6JnMzwdt9uRAkLvWXhrRgHo6vJelgCBWwBpdsJ576Q01VmNRVRUgrOe8O9UrikWtFdEyTM7lV21kdRy3eZUaO1BZ201jJplJrCoCBKAMPyTmSmw4_Criaca20d-Jal6yMzI21fMiriw6wVUEpTZGqmdQBHqQ0kd1Lm3TrHDOiiZAXLDEb-9yYR6voq0CWjgrm17B7XUxIDxswmMw6jHHOmCVCIEsBOgeI6fIgBDeWHnm_VDqR5xRl58AXqkRisorCT4vonoYobcX1JtOEr1likpfGENmi9gYn9XDHnkTpXlOJXW6mTETBqJVlremKFJSxRso3G9Z6TTww-T7V0idZrInFmbU1HIilskzpsLtQA1D9zrR5GX8mtVo9zPMW4Y3kzr_XAYjbpVBBxg2r0YWygIF-org7LN7dLFaNnUMjxAiwYmRjZn6xnAkToNoHXm6wDqe9tvCXH9FtSr37K2dmKCVPooZ7wfeXZtl4nk4HcdpkUyLfck6grlxFmqrHMLusbiaDHJ7H0-LLzlGUwycJ6LtV9IsOVhNfHyK25Ujne2xFKHWjQH8o0bpj7cDxihghoI6O40Xwu1sRMsMEW_bxphAUgK1oe1ZOWG0zKHGq6EZr7ah6nU0ZKJiw26BbqUlbcIkUpXaEy9f-2i9XjfPtdMxmMhC4CLe0fWX_a1GJ1oZGJi4l3yN5JNstLMjrTGp7JBG2KV3B5bnmXCMaSFiTCcwqKF4TenM2JzrIpY5WeHifHgGa0LjDLE_eKR9Hyk1BTpqE_zbTLQkrdUiV9EgekQDim_kZSx0XOU8lgvw53sdv956wEwV68ZnfTtp-Ub3itGOKdU1CV9PJWyykbWxil-qSmgYItX0uDDIF9Yimj9fJZ_EdaQPJlwTiK7GnK3h9EzIj1AmXK8DkxgYSZZzpSBZwaxS5Yg5z7aogq6OMkVOCs86hLlcvaDzgCxen2bJLoHaPZTpRtb-6SkUHNtfPhtcrTJVXPOLxl0bY0ITgnW5MdMp9CmfaoanPqlVkmntU1CaBYaV7olpBDGXoI2gYzip9_Q8hEMV9K6-JAG2ATGJWmiNcSWOtEaDGaV2BIouFgqEN0M_WjeTDbskxL4vroBSvB9FilMWPG39agxyelOvNAa9c5GOrjZcJdaUevEhiRTADkblj3QoOfHItyE63oHMoT_EjuufY_mBtM525UymKdMV5nypubKynTVDNAyaSkGYlmmNYmiZTutzsmsKoFKkJAr2axQHaC0Ncmc34SShcRkz0bt5gijBwGJL6im2N9y8zJtCXwn1o0wtTFJr9UZgIwIlAJZIdWTYvEVVidMfmazPYkaUSmKUMT0M_w1xjGA2YFkO3AVhAfO1P0TVuJtaTxhID0L0T3oT4zsUpIsQ50f1LxXSIbi5o35KDg_ZvtZV6Q3kAqAK3_GO0EdVSFbQWAcr3oQlSUj8rmQ5UAFkwN5sX-FLBBAGCISHN9fScOBPPbkWG9K7XaXfapDon5gpeOfL6_EQgtf7uEZqhVXbJ15CUptdd9lwT8RbpJK4zLAwog24ksl1PDicNqHGY0aE8W-VBhfCBudHp4HVbvjzQvYceT_MT2K5kC52-tMEM0K1XCRFRbhIRHbNTJULO0mWTyiDFNdkY21MwnZXvm_aqECaO7n5D8_dHxNFsDtQS92-A_3GGJqQwx0EU3luvqBL2nPv_bMlKnn4OzSZAspBIHui0vxnaLyVOVRiykBJEdor6aRklmctR77H2mdolklFSGyzsbTfrBM2LlhicPz8xSUlp9wJhxrMyBTVIivzykqLMQ3h-9QuLE5PQVkZNQy244ZTFPhcJDZ_1R_wxFhTZIVR70Zh3jMQJDvll4oIMuOiojtJ9rlVNSDWVGIbrMOYnaOJweSiFQjzoTyyRTFIAYE83vagn5jGJrwTOEPy9FuVpjAdNDAw1QQ1uaiaBkRBUFUkmAghLJMfUCTQl5nuo2zWfA_gm15HboFAzQBVZgR-J8JDyVF0DdIsYuFfmydtjBIou4h-62re61JN902fDUNtPc36D3I8_e4M1wQbaJOa-Kp1PyOxZkS6oXsF6LCJ0VMvmX9TNWJoCVY97vVnEq1sGk2ayTWIoe-61508ks-_V1UG5g3ci7pXNAVJu1L83RDLyQ_2qtrhwQlBSrcO546qHa_xj0x_0hxkDYq6QvtPI7fzAHnrSGEjpbRdoLhEILRal0gldSDJLoERkqpGTPgX2gtpau3VXiGZ0lsHx07jJcTlgRzQQlXPN2SD2Yd55VUGzabd11HQCyqk0dJLYOKuRrZOcQ29OpMMwLT9_8-ecXLzjPxTwm5I9rc37Lh9_-Lw","+[pr-17]: https://flowmap.testabl.ai/v1/change.html#v1.3X2LctvGluCv9ChVI9ImqYct2aYtp7Sxs5u58WNsZ-5WURwSJEAREQggAChaV6N_3_PqRjcI8OHkpnLXqdhEo_v047xPn27cH8y8aZEf9O8PJl4eHPQPnp8_O5tO_eMXT0_9Z8-f-GfByfOT0xfH_uRk-uTs6fMXp-fn0xdnzw86B_PA86HFmX9--vzZqX_yZPbMOw5O_ODJ8dNnx15wDrBOzk-9E2hzfDKBFtjHKJ97ZT8CRgoFFBTG3gJHM4uS1cJLoQD_7g_uD0LscrIMI79bzIMuv8yLIM3p9U1wV31_FIV50Q3iIrvrpkkYw3QN_HcePMP_QaawVq6C2yC7U1RZUWUFUFQWpIkKvqZJHuQKChP46xYqJdld79c8iQFgEPsCvD84-OHnn5QMvax5MIRat6EfxFPs2rvOgsA_eOjUD3o6D6Y33bkX-1GQ5V0vC7px4gf1Y6fKOQzVK9ZncJgrAaPCXHlq6kVR9zrz0rlCiJvGjlWp5n5jX2VhEXRTL8-7kywMZvWDplq5SuJAUS2V4ghjP0hhPDB-BaDSML5WCEi1JklRJIvuMlVJpook7frJKm5vGj1B3W_ksHbh7I6GXo758hpHky3jGEfj8XjWl3wK0_GVF0_nMMDgK5ETrHsNSQEa0sibBv6m0fNQ9ht-FkyTeBpGvPgNxHKb4LIjWXMlJmhEA3a7Cou50j2qCAYf8TQ84hCVzFQCCFK_LYO8CJM43zQHM56GaQxxIszRWbLKg00s7VQ4ApQEmQdU5ocAzFvUT1XXytW7IFt4oa90dZwHLgGOEjCY30F_iw4NnGaL3at_JMli0_RM39uQ5I6dceYVkVc_anrPGIIymMC0CG8DRQ0AZ9cBjZCB5jSYvEMDhn8WQXYdMMKmW5ibB7Df0P3MW3WnXnzbMHR8n5cLy9wdBbOiWyTdLLyeF4pbd5CLs4Drh4WaZckCRs18Q2xmZrtZQNFQtlFXBm-DVdfrTkESEsQqeVVqHAG3d6Mgtmb5iWrAHOFVrvAdTE6hRuv1UIWBTAJ6Y30BvOuH06IDZUsQFL7GThZ40zljLwqRytKk2MhANIQtKKoOPV2CfOffXdbupSRbFiicsAZjiauBhvADILRFGOPqTxU1Q_T9x-cP73FiJKupRY6qjNC1ES-8znuOnBmDl3kbZwSLtLhT8yRHoSuYId6A0YIKiZI7RI8H4_VwRlhxo7TlTpsICcpnIMaYYlKvmCNBvL188-5tb4FS_AawCUV-MoUHz_ehVf-8AxNcJLf4-xgnLe0mAH1-NPNgZGnYBbEDuqAIjkjpEzn35sUiKoEmyyIPiZUF8POTkybQYXxUmkxN7U-t1idWaxh9rpsfvbv86ExNi1K_hHPy3AZ01gTpP395-_nLTx_ef94G7-lTC97Z8yZ4JBkqa1Q3ul1mWbvgNcCal9wFR3ScH6VZ9-RZL7ftw2bYp6dPdoHtB9MwR4W7HeLZTvBEeR3V0HHdctqDPHmyFaqrOLaT0pO9xuyYPduAnx6f7AW8Ipa2jv1sJ_BrHsOmAduM0AQQZ74d1IsXNt7OT5ugoVaDZe2ebIf59IU94dPzF9tgnu4yThvms-cbQRb-LsM8eWEv45ZRAsgdRnnmUNLpmS1XBFwPnJRNwvvkaQOxuOItvSthiCFXx4jnNQBEpjVDOH36bMsYBITWTd-ukAzAJJ6F15tmtQWA8SQ2wbCnZUsocACK_Og6iUCxH9mWUffcfxF4s1n32bPj2Yn3rEIB2K4E_-SJw0ovjpt6QKNtDbItRFy4p6dNkpWh4t-jGqS6UF6cNqygDYTlWTOQU4cJ64EgRkZomm0azdmxMxown_K7xSSJ8jKGU6X3PlTOIg9BoqlVzxEABQnQ1ETrbglADxaJH85C4lUglAJ9poP-zIvyACqF1zFUywBmDJZvafxvdsw2uD4wH_CT4yDnyFkzFOhjbZ6jEXii8WiEE62-o7Z1L3yv8OrK9VKAr3OA0Zog27TEAiXwMVRx0C-yZYC4uQlSpLAI0XNybLymxkFsQY9UM7iJg9UWtAwYL2lGS_uvip7dcKBhOEioLrlh9z4OZgvKNmDMDHgLynS9fx4__ZNxstvaW3D0gtKc1phgA0JSdEfXl9QW0LymuuL-fHDdUcLXHfa3L94ncdDRYQV62sQoO_OCXdFa93KyNQu_RppNS7QRJb-TwMvmFJ7urbzoZhecOLX3R0zcUT6ixJve_JXXn0P2nc2rtSN6NKxvxQ-ZC0VYRMEu-HFq74-fGQziXxIv1rz_JLwQj_YQIaNktrM4sxrsjx2E85eXWp2ta7UjgjS4b2acLFmMJP69nW-syt9gd6GR_xfGTDm7P0en6IFsW3Wpt_-C_1UWe8flrDGb9l3SfJoFQTy6zpJlusvSVurvv8RZEP1rqgJn5n-SMrDnsA0zVt09sLLZUfgnYMNduX0Nyp1tyW-iTeMR_bWp88804AN_N0Xn1P6Gle-oSUdhyArM-BD-irxJEP3lHaptBj2tx58kKzDUMaJl2wVfTu398bX618SKNet_KlbsqHjf85MU2lKANl_HTSWCzuiptvm9pszmbKQKkjZXthDlTLMGV877Crqcd7DeSRzCco5gfuVCbV_NjVjcoYvfgVZKvRiZdKvRwt8Rt7UNf2-A7y-O4Jo57466iiKrjQxuQVYDge2ArfqW_5-jq27Sfyy-zrDAyvq51ztUTXlkZtcKbcYiKbzooH9y8oAvvOkcAVxjLhJUuIfCCNOK6NfUW2L-dP3rB_jNiaH5iMsQOmptZ0iDvXccOoPdt4pmy3jKGZt7NeOMwv3amF2pfRrlaRQWI8pO3bMhkPuItoL3b3YT3O3Wm84OwVdvyrzPb2vYG82SbOVl_si7TUI_jK-_HdQ0WaRgvmLA_VtBcPbrTu1xb5vsldDtb6-oQ2273aypPZvacdU9m9qW9Tc15Sj7nk1d77-2cUWgNkuE_SJr-zXUpwIG37AvtFMjnTDSjxLP37dNsty7myxJdmyjWcCLvegub1q5naPJncGO5vz2lfmDbF1HC-6jk7ZomMZ2m1RMY6ONOqax1VYl09xys5bZ3K5ZzVTb7a5ndmm5q6LZCdYWTbMTjE2qpgrA0TVoFoIRvIyaTCY79rCW51DLo3VMtbWmDKrCJTg62Z3H0ZmfB5Tnj9kq9C9YnTyHLh2soSMakivvqxYMAux9MFM7isfTUaAGCjxyEFyHORj9yFztvhqvDXAsXkauJDmPcuRFQvFREGi2W-b5uAM1y0RyfLRzG63n2jzBMUUEUjCX_XxUJPWnTjp11nen6ezQAy8_HhLMgvX4DidVumcCMf-PG-HBqwQQ1j_unT_rcCYbwuAlBq_JN46UYAKHvHfK4I4ZgA0pfQ1Jeo1pd7gk82V8wy5Sc3YPDAfzIs86FNDhX9PiKwbmgplOMmlhMDQNph21yNt9aAW0yg6fwj9ZAL5lrO6vwBW7OujDcy9fTlrZ1cHV1d-vDjoKfsDfZGW18VjP1UGacTmVYRv6QUd-4mt8keEcCRg8Q4_K_nPFDiy-lnMzVwesIrBoHhZYILjCEljtljy28RVMVRfDzzbC77rwV8AheYGVBjAtcMCpL2xrXEUsiR8UiE8Vw_KoMFbcSoUzFQ8fAOjjPxpoZx2ozGsU-rweSQaKujrbyluaNLwhGTlyOpca8ibN2zgPJf93kSaIjVppxpTwGIvQsCxLeFz431s82FjM8bQWSRs6sUUnujr66BdKQdWik0ZE7dYBsRxomUCDmEqgIFMr767dY9CaJHx1obTuaLVNqaiRVlup7xRQfwSAewuvyMKvB06u6R-bYbmV006Pz4XTTo-f25zmrqrLXzQj6HxwRXABT8Oel-Ih2JbhudmAfw0Rr_lysfCyO11uHvmlwzoP5ZpJD9pEg-qwtuYRZcB9rHshCp0heVYGRi-Ibqln7muI1JvDM6oZXSnGSlYh_KLzy_CTBkUcCRbFIixgHKRVQc-3rvBQWDf1sjxgEdLt5nMgWn74P28v31wdtHugC8O0ZcDIIBkaT4x_a3qtqfDNPT62ZKLQzGP9fw0D6e5H0KdhJP1ikUvpaFCKuKFGGUp7mgrZJmjtt9q96wCHjK9gWChRP3348KWHz70soFPF8LrLg1c48rJ0ZJWSQC45ChU3dNX68vbdx58vv7ztofoeFcHXouVAGF1--fny8-j95bu3IwJX6fgVd_HvUfESemlXJa9V8-iRBvbm8svlaPToCGOX2BwVas9fLlIgSlgakJMBYMcrkiy_gIYd7qKP8NvtqsT8lh5GW7sg0B9--dLj-DKtCy6ZmWCagYRtzUAJZOBaqHusmwVgE4W3UD1pIZLaD6p1j0qJWqqjI3VyfPr0Qf3tfwHrYTlo3wc5wCslRLeHIoHywyG81w9tGJye_D-x99Hm7ll1_C6RWydXbdOIBOuxNmC0ULWl6GPWGV-MlumbE8iobuL6c8gpqCaw_lSr6UBgu6fZ-jMFZei8LwJGOB38xY8kG-lQLzyFmbZZzHsy8uHHHZ4cVi0cyRQ8MrruAOdNWp_vA1CTO7pzAU-wFvO2BYQUJQEhEuypSz6rTjc6YP4WDi4sXuL9DmQc0CUDGGngFzSXL1rt6rnnQXYbmPPaoLXLA_AaDvBGIlcYfPyEQFEy8NFaXOC7ZKlu4mRl1grp0bXr1aArJ-nUKxQXry9e4anp173eKzw3_Vr1er0hVqIz4K_K452vqRQcGvUKZ_h6qPsw8GiCeTlnD_f1V7hmtccyuXvrXKZc0wBibLmYBBmeREc35DE0SAt8FowjvnJefjrR3VMyWjZn6s-t46lqxFoIXh2tmegGdMKhD9B7LV7D1TzJARfJMpsi2uLDgm-XAHrAyYNpBFiIwht26siJO8yZOo21ROsSgn-eFcrLrkmdWUXipOjHzH4HthQ-0XxwnaNwouTVR0wMFOBQrYevezCfICtax5gInbWwSms0onDWqA01MnC4WC4LENZfaKnFyW9eX719enyqgWp9A7qnAgjvoSB_B-RxnZsp4u-Xn0Zv_-8XVF1XB70i_8qSG5Crf90uRa33cvC4C_2A5rDUlB8MlH4G2UR-gaucJdKVreTLuHJrFvqlphe7AMp6HBwAP3gWfm2Rmd531bGtpKfgkBdeFP6DdbLTlx0SboFYr5rhWjqB7CBxhC5oxheTzBM5Lr_A6IJEb_KjS38B_v0jXC_kaGxFRdJVG6UIRR50R4mcrUfksMjhmkjTwDIqWcWl4c4qycsKNG5gvD2KuaFCtlQWmu_wmqoNuifDXqZr9XBZTtqD46GuC9YlqiOq21YXF-qEB0RNT4doaKIVhwMWZOJg5SdY0vwDz_RKGQ8-FwMKhwjGdo4U1zKEUK6yhVeaQ-9XcKd4NIM-DF09VgOczrBNt3As1i2uZryLWYnDoLiYS0a13UEvZupVUil3SlqrKplcyiUOXnk_B4ZYULCFRV-NfwGu7gULL4zGmiiwSC1AfUUdrWVCufIGKaGCckATDZi8WpzRqlzWFnFaEgtbLfx1psPYEhpcdeu-AqleUsiRUAgsRm358bAyliAC-WoPVeYEht8sDCJ0MlcouYChwRdiGqya-tJE_qFm1dWnPZEWKYDq4r9H14dvA8JNX337jAg29ZavCIJXqGqyUHQyWRK83mg6eFECCgbDH6CSPXprIgaiuWHVjTKM0MzJNX8S-ioYc6-Oofgh_BNjEXNIhygK_uFRX6gBrPj9Q93_tv7HxcAWrQ3pdi6e0c-hPnp5UEBzbxkVLas5ED34wh76tR5SywR_TfAXvsUH7sT2f8FRojAIBYOOHxxXIbC8157n-y0Y3VqFFXqKj0Hc2C9QGOEk-lXPI7CHfnVAlUje0EDa1AsVth1TSTvaRDaWp-3AJ9xelCE4rgb6BGSPExq4Ce7WwgUmCGcrLV2hvRZzkgicFWMQn9MUiUhzVntAXYE5NCucAYCEQ2ElslWUoBM8q40orK0u4AcWACrwpHGlaK7DakWyti9ULoPm6AMJ2HsTgdDDJYrjx7V4nolhIAQreNGvW6-ZjG7Go8M4CnJTzfCoduyQeVwiyyA4duI9HErEMvpJhQy_j10_tOt6-RHDO8jSdl8zZMIyqhQSyxBV6h5k3KxFi7kzmFLU9o2oraWfDX-gh9hCgcuu9TPB2KiJTMVJgVj5cSCA6hFCC2Cq6HCagVK_YNtkAmmDJCG7ZhA3UogeL1aFx2EdZeFFdwyrdvgkPHPGjtBU5uKGrpMj6cK11NXy-HjyTGl7ARnEivwO1yMllCBFIr1ugCh6rbkJp9QvNkHSazzAlvULPINXswmSZZwPvKE9ISyZDDezDSzrzFP_Bs0njTinheN-aJPA44BPHSZxlksKUoqoWIZYdTBs10LPxGAADoQZLHuZbS_0LXuhMmTHumRvpd04fBBpoiNRhFXt_qZWS5E-S6YUvFuroeYvBqwjFZaOVFhWpAL9sOUBjRIfs0JLz8axwQq0cMnYzm5r9v1lYNo3MzCN2KqoSayEV2sTtjcSB81OmIYx3kQcK5s4-LLKTQRS4o4NdB3Z1eZ4XRtfMOdvxNwbAeXgzHdw5jfjTJBkzCELi43iFls1ouWNgxKQk_hQC-k7smLZ7QhzCcZRnEFbt9bdpMj5_TXXZIXGL9u69T0wYjpEWKt5OJ2bPQ3lJ3i5ZdEoYEvZioIYdFkpf4hzSdST70D0ImtcUkId4ZACGcCboW2vCb2JdVYaLx2x5LR1Zmt9DvFzbf69TdeCgTwtkowaCdlKASFeX2xnvy_L2luBuxuJFf1ir0y_nmu2doDs2F8Xxwha34Nr7WHe16nGinJ92N4p1SMpljm7XyUQxpIYLe4WWZ36344l0pcIjX7Q9EIf0EBFAEUWQBd21DFv50Z5UqnCRbRK6wYs01Np0YjwrBAt-Rv6JT447sl3VjganVa6v5I5FZ1R3LmmsABf3-nwMpgB3vRGPMfwOk4yyl7neNISxeP9g-0F4WWn4gPeetEyyFuunAWOxGVmf2-IYSCt39ckFYC3RSU284hGLVcMCye2KchzhFHNwVssvRJaPzMiKp_rrc2SKodr_i9mf7as-yLWJuOrV9wn4RJqdk_WFQsHH-xSajKIUbz4VTdqQQNj9sA1EMAw5XXIMIKF1sY0wFp5T7NYwCyAzU5kJup_1P3iYc2LnVud38_3X0B3iNTxHEgflNy81FPkLqMw_ZE8RnJvQMQsqsSCtjytFG_2lutMjY_b1bpmJ_tCT8EudecK6gXtZt6nYD60dtUxFuIMFxAQxrOExotNa8eLLgPViNcdArSN42FvmYINELTub_rqlgDfdOBHGBN0DRQB3UhANA-v2Vf3kyn_oB0z_rnMMNj2UI1y3dudm2BEX0eK6jJzCAnsTVL8yMhKCiRZwda-iSq5naBpg29xZvePHt26Zgtj49ayOdoPzvTZMpL5P1Rglx4-QA7cCTBkOxIEYvbRI1QsOnjj1NKFOACKL-oCElxsKADuH-rFf4OIG1YGnEbLxSSMrynSZVFYWW50os5mcCvq0lLzPVTjlLRr1trlkqH1GLLeaJPNRcE6bTTg7pfOZUS6D1akqiS-iJc8823ImB3Em6Xc72GuOzHbbrwdF_g1-29eBr1PULq5sczJ3Yg0UVWtkKC4Hhg6HdZrF2luq40fB9pYBs3xoxM6sAW9JHKjV1KNXZMXd7eoC5vUBLn1EBCP5CvRIn4tWii0aC5phyJNYVnXYnvH0UypdVoWIECgGkKqI82YaZPZjFauY4UDiMkoqhr6JMkxim_S7gz1aLqzE9WIRqG7liTjVSubnDWu6K4baY470mVQZ10cks9kr3qNaoNKDYG6hoDYWhj5bmF824F-tD3QdaTWeJ4oE2rHAettwbJ3xdKcHQcJdK5Je3chRXKR0jEy0DLehB0pKBonfKs93ndqZUiAk4Q7zriJjzx6FxQdcaRC2jwIohnycs5hIZUF5n7uxzKTEcuAKucJDqFClS0okCLZTbSUm2IppgMbbQQESMdE9gBYu2JdaudLVqw2JF6-k6Khk51avpaiYY3Gq-C3TkfCHAjcbLZe28xPZ47qEH8i3o0bfJFH4-k3RUFsIsZ_t3olkjULFjVmEt0D3If-ff7A6m0T-1qm3t0ib9J_dvATp4B1bXPVYFmouD2sZPnWipvSO5Lhrw1Uaqwte01yrNt2rYLrZoGQEU3pUDfQHlCLvGGDUh8GKBuS2nOaGc1XjcfieoUdNSXLAdQi3Ujc4gwWsxLU1FgGNW7EdFYatvdam9DyT7Ug4fwtjVIM22G9viVp25tR-z_IcUKzeZ3K26VTdEjKDslOIBBEKevhKjLE9bxyPS-K8Gm1b_xfS1WiG5ib3YG2-ncqqR9VzZ6EXnErS5d899ARLRqcFFibZlni1uBnXWHrfgr4rQHM0wGhS6xevBmM0a4jBXv0M428cGGDkAKrl9X8zq5Aj3v0YE7qk_D7TaD8ZmAQQn-zacZqQfgZ7tINfUsnZDkyuNXxlWTl9nNr91M22b0bI8anM8fVmLIS4JM59nJJA5Ys7XU5QnzOUuTeIi2b_dfJC78ZExfVerp0F-Sg7xyxU2aDkEKrK_Ii3UpUZFVJs2qNNNt1FHEyoihTxqE3TWNe7uKNU82tHqx2OyDPFqF9w9wPFc8Yj5RWk8D04dkWKudS6i4o7wnMFS-bzvGcDB3sUpiFTIlqV_e9R99fXT20X15dUXyPUt8Ihp133bY0BsrFhSPWMR0v-BpS2u89tn3oo4UnhzAw73CWLNGmrbr4lPyMyeR5a9HjzaWT9lrSGZ55tVwkMBQvTF5h7zK7Bk0UFx_xKWv5ATj2YYpceTEa-cl0NNKJTZz7RXGHFuqAdgkQo3AjTyBhWpQkdeKCeBRNuaDsrSAmHhTL7wK3jedBlMLL2mxSa8J1fSDOGFxeAIg8o9CIAMQNCjCMMcFtlyxORX72pt44bm_go71NZm9LZtNX9sk66Arf0qeR9FfnDp1E77o-gDDtKWjAr6D8tZ3ObIPJrimClfYInwgvL882SLasY4qQXk0DMkOwdo8rORTJYwfLPoOluaDqTlLVRcWwpxhKD9x4HYaEdut5HxaZm7Tfe4QN9B58hX_x-z_bKMGallbaLR4u9OkwGk0OqKIanZPWzeOzhhcHgXykiDFI6VeA5JfoXwFGDguTmV0kJpOYomDOiJkILyw5o0fXrq47c2dO50B4b9QSP69IR7xugdRpq890ckpdIuxXR_zGyCAD35FD4Nnq_tYcWp1yTEP1hHFGi8SnfF-zEHTyU4I-fBg1iaM73Zoytu3c6Ap0-RDX2sKYznp0smZAfkt8_XBxj-uArgupB41oUu-Mx-HWFdxy6kZe4wYRvP4dx29oEMgvdvagKR9oT0eC0y5HtqYlEWOIBSf4DxC70qTjBAb1yQ1t17raBLWnDqDJ3ECAgLl8pKwhwBOuMXX7YOXRl2E4AwzgWJqmhO9QlnGG-BVn40OnFEulS_nsEB0wN8o5D-M_MGWTV9zrVRiHDuqCKNLHvOQcdKuE4FQXB42NLOO69RlMaQ5yMae9mePN1Xr2m427nld8JJwsmwmuQ5iHdPwbaGVCqfWyDBNjWnsk6DHpftJmy4dSdOzuBSZbPYP-uZvX5pKTloQmHHz_6FFC0XeOQAhxNdidaMWV-JNvJlZf0wSYWiTIbOLL7Uq4ppQ_8Nw2ohhfMpQ1orRVm4a18zm2Hy7f_9d-B9k2HTMTaBvOmV3vdowN49p8hKK3uPHDrMUP-cWXbAm4IAYZJTf06DSqOZhWezQM6jYeBOvzsa_rwSFt99B5L9n40S_IpaEXJrblLg2KBw0EnRsGwkFm_QKFNZXz8T4Dm3eHGLrOP9YvhWzppfxuV85lAMmM6MTIaMS7w_omImuHmM3ahgNrO95h5F6AueXC-83Xen_bdUSdrZ9B-OMvPd_lpuL1Y3zWV5_4fPQLfTz6hT7Ix6nvN8EdhpsTciK8iA6g4DeX6Wu04NbIGSKQLWCOh_k0oVaYjM-H1ZZF0sVPWFKYzT1ePRhwisNtMvUmy8jL7obDLTmq38nXJS8qfemToJK1Jd-J-20Z4BmjkuMS_E40V8GEZ_CEAN1dMND9Lsberw5qOtQz58A8w_Aidkbo1gc51wbSAJ58PRIYXRpQTwj-KAuiAHQc_viVLWPsEPfbwMT2JGyCbWXvzOGDOgxWriokJD47FSTij_KIe819Qy3sveHEu06PDDGjM_uV0PirN8WdvlYQgqj7ta1eX6jj3pN-9X4Iynmc9ZYx-hWtLMRdMdxsyn6FX7-WwlSuNULLzr7gqDz1zIupNy5MvJUIGjUrdEK_8xbe30MT6VZsxh_AyS7AB9ZB1ZHZoqOW7d4iwTs9ksUCxkphUN7869o7_6x66o6LUarzzx_-Pvrw6c3bT_3qeWoZxCYAkoQ3Xy682KxIWPBHn-lbtYYvHJuIPhK9fX41ZjQ1bZr3Yzc3cJdhddQyxhNteJDFMFfo81kXNtdncvQWHK2aAfEmqnQymMntBmgfwjTWR0vGB5_J4CZttg7aNh3SlpxZhjUSZcoa3AwFOw0aZ5fLMHfiyeeaJ58__QaelIPcFPipsEolAWCMZPUq9F-PVfe1hSOFMXdKcSBhaeSXZ9fhT6CTNOubY0nYkOMdxgvn3WasMNb4HuNZWToFIwKQpSEQzAqdTsFTJSWgLsuMY7y2b2educGdGzPcambyilzOW2Pf8sDE1q5u2ZD4GNyWe46PWgMAMKwY-isvt019eGwP67LZBpqf1WOVNnA6bTXpDjcGLxUngRTzURZcB1_L6KWdjZAFdN8XkFnLvvAH_9wP_vth-Jh_P-ACwJvBfx_B08Hh-Ht4g0VBL8inXiqx0TZuZF4dtL7_t8HV1epoSLbbDjyxdgvzTtzw5Km-L-DJ2RObH9avB26xglzQlVt40VIA9Kg3_ahb_ij8iG_i7egUx06tUjOnuTR5rAkGaoOHygBTdZYJrt3sUAyM-_IYVT3OYfUPN8S2Z4eOMVKCw9AISOCbIEiZkfAYv2jD0O9Tro4-hMjX_15dHTL_gXiGyll-2KlTy7rf0i65d6-oMY7TdJ61njwF0Uo_XrRpLkMbpr1U4_FYx_yHu9BN7T3QeGkWOaF4_Rdb6H26NULfFJHrmyLk4oK1uxQoI4nTl6TbMrqHlabLDN015V2zvZ1m0MPHT-q7k2fwtMwieJwXRZr3j46uwbRdTpDJjt4HUZj_V5DNk2B29KPMBz_SfkTteOsGIYEPlxR3sLJe5TILGbAcK8XRtMRz4xQs9FnafJK0TOHAVgDHo9wjFSXJTYi3c3Fs0sPrHujqCJ4vUF4W5PPKvIErIu4vT6wTrcAlOZQsAr4dSi8L0E4-57siaC8J78dzbnJTuG655PuX99wJ1LF1exQFFBlZcpmFHGBVdTdp8BSqt0WQc4FqRtLQ5NB6bfJZT30xV1zRUXgEiG3RaMDfk2Du3VJiHO_FvpTgG20eYG6N9e16ijZNEuidDqrTtHrKucDuMC8vwCM8kSTEU9iao4kb2TJyzCC1zIOM0dOrp9IswK4KTtqeATMr-tA9YoqZXVthUKhY27KgomhahxdFX8BhLUW3Cyx7Qxl6y1gSNLiNHDYjb4ZCVH1l3EiilcqtiOYeRB0zpn70_Q8dZV1PqFqcrLQKgTwV2O0cYiaktG1OpS0WlYNoa7wikQ5W0_0mBV3JEcrdK-FshjRrthXp0r0Vfkzi4HLdwCFM5WuoooC3WC052q_Bb0svyh1_75BeIF2i7ULG1vglC2bEDuVnwmr95y9vP3_56cP7z70FmuK3fAIGOPk2yIWgMY-MiQPhg1YUaDQWvEQe2ux3iT0dwelvuyUeNTSvzDrpzenqASSqZcxkReeFrQt0dIoa6tGS-YmSxsouYwE2LidS_2X0cjSXJM44BG4OF4EsgoHFd-U1aKVw4FxV3z5YlKC6X1u6tYviSM_obWQilY26pk6Qd5wreFz1wyeaMGeEPoBNV7nIN5gp5dZLvUkYhYV8WqA5yPX7vjbzDUGoPyzW9GdH5cqPSsktqzULWv1WuiWi4OnT28s3797yFaBN901ho50uaMVhsJKxaGqOUmuVEGeAe_UuyGDMwGFyeaKRpESuOsMzwv0WOdQDAzrUkoNtnyRaLuiKlzxAC2QKfrIyGeDoDumroCoKAS8LgUnSFrVcbkTCT986RRfIZCgSZ1APvXo8MhSxYUBZSjCvNd3PZ8lU0-qVpwsseSJB6rUrtzYYCfZlW7Ia1HOHNIxP7IqGDLOrOcxIYJj-1Q9ROL3RN3JAVbqIg8MXHnZztTw9m5zjG2QVNLZJ6MFg6EoPmOJyAhJ1qsHggNF0AsGJQEphRQaMfCuDB4YzoAJYKRphT40337411maRzhUmOQyCRIL2YLff1N5GgrcKlRdnWdn8YkYxXYQZ20-8uNchaqjGrGQTFMAUnkJTFiAa3BWmRprO2j1hY6DEHW7iYhuOzVuwEGAkBn1cV-uH1piBy_O4_ZJDUrJPKOMim8SCM7b3GseaxcZCoyhBxgoP7NFUkdQpm450k7HIc0TcCm_8KqV_HvJqeoaBxNDjS1DtzBRkSE5MQfirOXg6B38Hr-KW7pAm0SB0iZwFGpE2K5ECqctZmOWFbekSOVmWXkyQ2Hosh5MGSYpWarKMfPYnOtodMBObBcAfdCBQ4ntkVKlPHt38CkSFSVxgGRLigMQ1N3Vh_dEWisJJhiZWDloZxdPbn__GVqoEnEjsGKzQyV_wIhbIlSLHBBBntIMJGdAXWxTYXSFz0yyJiGGZ5NBuyci4JqEARI_esphrMnFzje0kKFaBzmHIX4oNitf65mKYEgS046dZkhP2dYIhWQhgiQCqMP5AePMKeapeFd3_36Sb0a7ZuclHUrt7NgFNWLbIvLhsULncT5jhR9BZlx9_4tvpLOqh1-Rz6N0ccofP6eV3J2fasHmpkjSIQSiQMgLD-4c58FS4XKgWciFSUYfEJRLI5_AayQUP1pEhP82WPgy7o2HT8fsTeTyjwy2C1bbZUSI6CbIsyXJrpih25O49a4nQFASk48z-kQCnEzMC60QqnYNueQnSJbshgQirBsrZxB0It7_x151u9ZmpigBk2eEKHC08ljFd--dKFnNkI78JU9KHRQar0iUdix9DyuWCqJn2HSeBsR89FNcIPQocmcYHdFEU9NTnOXGyK7kK76a8ql7sSh47Dg64hdIQtDD63oifL2Twi8QiZxPQkDq-JmjfAP6KCxj_LPKusQeszb6C9NnlPhXv8gHWXjJh-cEUb9BGoUmixNMSX8IY4pvqeeJy-GFODm-vtJy9_IaoAHGl521swjGaFl4KnYydTE7Q48en52OKM8MEkSTQ48JVNqrHrGapZUgHyKUIhWQXQvF_fP7wHjBlPFNsXS7jZcy41eKTQWkLUScpYsgM9EXEazkBEgXdLRpz3DBda3xCpSAaQauV0rTiiYmfPyaOzTHUi9aUvgVcG37dvLiLHLOwnMybCs6wHW7SIMNimJOlrGiOwgks4bYLy2GwdS3gecPsPqQolncyqzvghgd5rs0zYHIjZ-gaVpxuo_lZBphECFGEg-KquXcnKp1kWwQ1c-Pja1VoMwwqJUoPtC-Jo9NYcbEkZSW0L9f0ofBmBbPwCjqYUK4FCTNySV03lOjH5LbmotPBlw_E9zRnfnjDhtm30U0uPdJ8mWLOHifyySCyYEYXUajH-sbsTdcFN13EvsOXYEq3SAQqtRmjlZYui8DmQrl53lecGGOIHQ87xeVU0eOxIgd8Ox9K7iUK8mS2bjbrNXKcmTIWOJYNFisSiE3d8YqvYwZFclYu_tt8mT6Mt8QcSRp9oeDYOqGJ3_CQQ1xj6d497WQ0kNUbK6-X1hrygonmQPVnW7UfYBVpOmT9YSJoGfEsrdNPaPZzoGrsfCJExlXxAl2LESw8jD8hOtI7YxWjN4Ft6S5rFSXXIaUtG-umY08qC5a5rLSwRGkakohJUly8FclIHyw2sY_RuusrB68WGrUep8Avhhx5huUCiIaeLElogmgQWV04prc1ziK5JlnZYDnWWmgMqNtNM3X-YhIcH5_3es_Pn51Np_7Fx09gJzHpOyKt9KrYUjrRxPTSBFbDAjmJcM9BAPT7kAOI2HewM_mSceTcd_TrC1ast5ucBYZ3aM5TKHlc-aJQqz3mIAOoC_wghBrrD0IAzfwdZ4LY5HC7lnXMUVr9gfgUxeeVVwixt2sxLMO0pDVBJUOmNF1AnvLlLczIlPctlJDbpMCbH3JDRr3-egO6AQdEey9rHELbJUUFMyUKJcuaIsAiEjCRxdAW7QfwCV9ZBlRFTGQ8vR9wpzxbiJDBfFuFX9esyIDDnLc_QjDvtuiey_pd_NBs4ot6N1HszZplFn49-LbMis5-X13burtYFxm0PipVaqZyW0fPuHmnwHNTLHjLIBI9ZpIs3P0CEJF6v4DyaZz9j43bB7OidvPA2jiwdVrNzgdaPLQT5QwPRiFbIiRRxmsJcj1M4B7zzfg6rwcjk3gPdUzzDum6eRQWvpUbFwZyq4S97UW5UCSiv3x497OaRMmU8nScSSMzGh3rFWQ3i0gGZkaccDuWOKsEQ2A073IvZhz6Y7O_VqKakcfbmLR4ZQYLGeeS2KKtZHR4v3pgjwa26nzPXXAck3uni9SAf51pgGVJK4AOYUWloiVH4U7kcVLDeBrAyrniHdaVBIcsG493-n7Ew2PiJ8qMjR-Pzh5vLnNwd4p_xwKDJUgZWdPoyl3VDR4gxXo4fMPkw1YvXukC_kFONhTu4mhThHUwxiPZkCZFf8Xf8coWmIrDTMMnSwoeJKkokjWdSloZrx7dL2codN-4jPNRrj7u3L_Hh22hk1IEOLoX44JH33_f_Z6_TUDcwq7Ryhp3Xz3Ry39yoiPc8ItcWl9Hv1m8Opt1HeVutnckOtf1JEDcoIPFQSwHvcKMAZFPFn0z_jG0ojm05aniLk3aHTtGadxT3K_UXqMlY2wfmNNwLZyBiGh2I0FEgNS4S2HiJIVmXgiWQpQs_eiuQb1-RG53mAqIuxQcHZ0Ug6IJOb5TLkOfo4yaZziZxsjPij-HB2s8QiSKKQqmbPPSNiWYdDRxVHboS2Upe9xlF0x3ZEc4GtNWXPWbqJUdq3eXH2v2sewlrL5z2blUqqSRqpVBH8EE9cGi6tvSttn3k3s7f8qvbnMNhQhbjacnYmmBQrhO-uq5vt0oBras2dbumIBj48Z2R0faeItbtrZtVQvcbUlIh_ExwM2cj_tHVixNrNIO3Ra0SQxIdo8jCXomqCffmEFxjWZHUq25Lq75c280W7Etw1wU6dUBD5W-CIiCFyx4P-B9-DLVjFNqA994c87lnhFfU0OmdBi3WdUzcnNKPcGcxpiuyfDF_jUeITWmrT_amjRFfGiLQk8--zm092DA4jWtMATZGeHvuHfxO-4ceqF2uDZ6-wqsUtofQGVp6_UfrHgVa0jy_ZKYgkLlR3V4uyFGOV4kvod7apLRYql5PjiBgaxMvswjm5o65I4cpj7EJgGEs0fKwI0yX5pULY6Ut2kcCKKMmCPlhVkAErRh9pgO4VuhIT-IAiyhjxUAj7w07ov48YfcRjYQcT_MsguyAO0yNl7z8oAv3dmFY2aNIP6UpFTpsyJkjOg7jfZxlKneHa0_UCkFqZkU8SbICVAGjJdPT3SgwGZFYHledTqbVajjXfxfJivazaFf7P_usD-j8dX_EcVXpRnm7zm7FmZTnqWdUHNfB-87ij4gyvuyRO54FWyBblKH-QaWpgtOQIjUTR-80NZdg6FAmV4bhUXpsMqmgLXW2sxLaZNOu8mOqOqpv6GS5S24eJMhwDZuivdCsPWC_m-GZoWnnnSTWfcpJf4T_zVtA1gZHN00685hfce8TW0kOM4Y4w56F3IJVD5ZkjuLIgt3o0ti6VPaGh1zkgS08QB3gIY9Wv6xcctp3waTpUBrALZ76h356ewF8S5ld5mW0_8FsBZRjNrlbzL2YdQScraYujrlISKUPhzkr9kB--t7R0lvyHap_UYXrPTJM-to8VZjwn0rUaGjxoQbU6NCWptq2upzU8WqFl2vutm6aTK5yDGYLLsnG9-eNr8t_E1t4e1p7WeM_4LfPaas-4Lt1iILFwuhWAyT4elXFCpxEnd5a5UM2-HD_wM"],"symbols":[]},{"file":"bin/flowmap","old":10,"new":10,"ctx":"Run from inside the repo you're mapping (or set FLOWMAP_ROOT).","lines":["   flowmap diagrams                      Mermaid at system / flow / step zoom","   flowmap atlas [--pr base..head=label] the interactive map, optionally with PR overlays","-  flowmap canvas [--change name=b..h]   the map as one left-to-right picture; a change painted on it","+  flowmap canvas [--change name=b..h]   the map as one left-to-right picture; a change painted on it; --link","   flowmap lens <base> [<head>] [--json] place a change on the map (verdict, flows, reach, blind spots)","   flowmap change <base> [<head>]        the change as chapters on the map: where, what, why, questions","-  flowmap viewer <dir>                  the hosted change viewer, rendering --link links in the browser","+  flowmap viewer <dir>                  the hosted viewer, rendering --link links in the browser","   flowmap callgraph impact <file:sym>   which entry points can reach a symbol","   flowmap callgraph check               is every entry point's handler a call-graph node?"],"symbols":[]},{"file":"flowmap/canvas.py","old":202,"new":204,"ctx":"def from_page(path):","lines":[" "," ","+def viewer_html():","+    \"\"\"The page with no data in it: it reads a link's fragment.\"\"\"","+    return locked(TEMPLATE.read_text()).replace(\"__CANVAS_NAME__\", \"flowmap\")","+","+"," def main():","     ap = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])"],"symbols":["flowmap/canvas.py:main","flowmap/canvas.py:viewer_html"]},{"file":"flowmap/canvas.py","old":208,"new":215,"ctx":"def main():","lines":["     ap.add_argument(\"--name\", help=\"map name (default: flowmap.toml's name, or the repo's)\")","     ap.add_argument(\"--out\", help=\"default: <out>/canvas.html\")","+    ap.add_argument(\"--link\", action=\"store_true\", help=\"also print a viewer link carrying the map\")","     args = ap.parse_args()","     changes = []"],"symbols":["flowmap/canvas.py:main"]},{"file":"flowmap/canvas.py","old":226,"new":234,"ctx":"def main():","lines":["         name = args.name or config.load().get(\"name\") or config.root().name.replace(\"-\", \" \").replace(\"_\", \" \").title()","     g = graph(atlas)","+    g[\"name\"] = name","     g[\"changes\"] = []","     for (cname, rng), ov in zip(changes, atlas.get(\"overlays\", [])):"],"symbols":["flowmap/canvas.py:main"]},{"file":"flowmap/canvas.py","old":241,"new":250,"ctx":"def main():","lines":["     out.write_text(html)","     print(f\"wrote {out} ({len(html) // 1024} KB: {len(g['flows'])} flows, {len(g['steps'])} steps, \"","-          f\"{len(g['files'])} files, {len(g['data'])} data, {len(g['screens'])} screens, {len(g['changes'])} changes)\")","+          f\"{len(g['files'])} files, {len(g['data'])} data, {len(g['screens'])} screens, {len(g['changes'])} changes)\",","+          file=sys.stderr if args.link else sys.stdout)  # with --link, stdout is just the link","+    if args.link:","+        url = link(g, viewer_url().rsplit(\"/\", 1)[0] + \"/canvas.html\")","+        if len(url) > BUDGET:","+            print(f\"warning: the link is {len(url) // 1000}K characters, too long for a PR body; \"","+                  f\"it still opens in a browser\", file=sys.stderr)","+        print(url)"," "," "],"symbols":["flowmap/canvas.py:main"]},{"file":"flowmap/canvas.template.html","old":3,"new":3,"ctx":"","lines":[" <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"," <title>__CANVAS_NAME__ \u00b7 flowmap canvas<\/title>","-<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">","+<!--fonts--><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">"," <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>","-<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap\">","+<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap\"><!--/fonts-->"," <style>"," /* One canvas, read left to right: screens, the flows and their steps, the code they run (a card"],"symbols":[]},{"file":"flowmap/canvas.template.html","old":193,"new":193,"ctx":"a.ext { color: var(--accent); }","lines":[" <\/main>"," ","-<script>","-const G = /*__CANVAS_DATA__*/null;","+<script type=\"module\">","+// The data is embedded by `flowmap canvas`, or, in the hosted viewer, carried in the link's fragment","+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server. The view's state","+// follows it in the fragment, so it survives a reload. Either way it goes nowhere else.","+const EMBEDDED = /*__CANVAS_DATA__*/null;","+const PAYLOAD = EMBEDDED ? null : /^#(v1\\.[\\w-]+)&?(.*)$/.exec(location.hash);","+// another link pasted into this tab changes only the fragment, which does not reload the page","+addEventListener(\"hashchange\", () => { if (location.hash.startsWith(\"#v1.\") && !EMBEDDED) location.reload(); });","+","+async function load() {","+  if (EMBEDDED) return EMBEDDED;","+  let why = \"Open a flowmap map from the link `flowmap canvas --link` prints. Its data stays in this tab.\";","+  if (PAYLOAD) {","+    try {","+      const b64 = PAYLOAD[1].slice(3).replace(/-/g, \"+\").replace(/_/g, \"/\");","+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));","+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(\"deflate-raw\"));","+      return JSON.parse(await new Response(stream).text());","+    } catch (e) { why = \"The link's data is cut off or damaged. Was the whole link copied?\"; }","+  }","+  const p = document.createElement(\"p\");","+  p.style.padding = \"24px\";","+  p.textContent = why;","+  document.body.replaceChildren(p);","+  return new Promise(() => {});  // nothing to draw","+}","+","+const G = await load();","+document.title = `${G.name} \u00b7 flowmap canvas`;","+document.querySelector(\"h1\").textContent = G.name;"," const $ = s => document.querySelector(s);"," function el(tag, attrs, ...kids) {"],"symbols":[]},{"file":"flowmap/canvas.template.html","old":610,"new":638,"ctx":"function panel() {","lines":["   if (!id && S.view !== \"map\") return filePanel(S.view, true);","   if (!id) {","-    P.append(el(\"h2\", {}, S.view === \"map\" ? \"__CANVAS_NAME__\" : FILES[S.view].label),","+    P.append(el(\"h2\", {}, S.view === \"map\" ? G.name : FILES[S.view].label),","       el(\"p\", { class: \"lead\" }, S.view === \"map\"","         ? `${FLOWS.length} flows, ${Object.keys(STEPS).length} steps, ${Object.keys(FILES).length} files of code, ${Object.keys(DATA).length} kinds of data.` + (G.commit ? ` Built at ${G.commit}.` : \"\")"],"symbols":[]},{"file":"flowmap/canvas.template.html","old":793,"new":821,"ctx":"function writeHash() {","lines":["   if (S.expanded.size && S.expanded.size < FLOWS.length) p.set(\"x\", [...S.expanded].map(f => f.slice(5)).join(\",\"));","   else if (S.expanded.size === FLOWS.length && total > 12) p.set(\"x\", \"all\");","-  history.replaceState(null, \"\", \"#\" + p.toString());","+  history.replaceState(null, \"\", \"#\" + (PAYLOAD ? PAYLOAD[1] + \"&\" : \"\") + p.toString());"," }"," function readHash() {","-  const p = new URLSearchParams(location.hash.slice(1));","+  const p = new URLSearchParams(PAYLOAD ? PAYLOAD[2] : location.hash.slice(1));","   if (p.has(\"c\")) S.change = Math.min(G.changes.length - 1, +p.get(\"c\"));","   if (p.has(\"x\")) S.expanded = new Set(p.get(\"x\") === \"all\" ? FLOWS.map(f => f.id) : p.get(\"x\").split(\",\").map(f => \"flow:\" + f).filter(f => flowOf[f]));"],"symbols":[]},{"file":"flowmap/change.py","old":342,"new":340,"ctx":"def lint_story(fx, story, chapters, known):","lines":[" "," ","-VIEWER = \"https://flowmap.testabl.ai/v1/change.html\"  # public; the data stays in the fragment","-","-"," def viewer_html():","-    \"\"\"The page with no data in it: it reads a link's fragment or a dropped file. No fonts or other","-    requests, and a CSP that forbids any, so a reader can see their data stays in the tab.\"\"\"","-    csp = (\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; \"","-           \"base-uri 'none'; form-action 'none'\")","-    return re.sub(r\"<!--fonts-->.*?<!--/fonts-->\", f'<meta http-equiv=\"Content-Security-Policy\" content=\"{csp}\">',","-                  TEMPLATE.read_text(), count=1, flags=re.S).replace(\"__TITLE__\", \"flowmap change\")","-","-","-def link(data, viewer):","-    \"\"\"The viewer URL with the data in its fragment: #v1.<base64url of raw-deflated JSON>.\"\"\"","-    z = zlib.compressobj(9, zlib.DEFLATED, -15)","-    packed = z.compress(json.dumps(data, separators=(\",\", \":\")).encode()) + z.flush()","-    return f\"{viewer}#v1.{base64.urlsafe_b64encode(packed).rstrip(b'=').decode()}\"","-","-","-BUDGET = 60000  # a PR body holds 65536 characters; leave room for the prose around the link","+    \"\"\"The page with no data in it: it reads a link's fragment or a dropped file.\"\"\"","+    return locked(TEMPLATE.read_text()).replace(\"__TITLE__\", \"flowmap change\")"," "," "],"symbols":["flowmap/change.py:link","flowmap/change.py:viewer_html"]},{"file":"flowmap/change.py","old":413,"new":394,"ctx":"def main():","lines":["           file=sys.stderr if a.link else sys.stdout)  # with --link, stdout is just the link","     if a.link:","-        viewer = os.environ.get(\"FLOWMAP_VIEWER\") or config.load().get(\"viewer\") or VIEWER","+        viewer = viewer_url()","         if data[\"lint\"]:","             sys.exit(\"no link: fix the story problems above first\")"],"symbols":["flowmap/change.py:main"]},{"file":"flowmap/viewer.py","old":1,"new":1,"ctx":"","lines":["-\"\"\"Build the hosted viewer: the change page with no data in it. It renders a `flowmap change --link`","-link, whose fragment carries the page, or a change page dropped onto it, all inside the browser.","+\"\"\"Build the hosted viewer: the change and canvas pages with no data in them. They render a","+`flowmap change --link` or `flowmap canvas --link` link, whose fragment carries the data, all inside","+the browser; the change page also takes a page dropped onto it."," ","     python tools/flowmap/viewer.py <dir>"," ","-Writes <dir>/change.html. Host it anywhere static (S3, Cloudflare Pages, a public Pages repo) and","-point `viewer` in flowmap.toml at its URL. The data never reaches the host: browsers do not send","-the fragment, and the page's CSP forbids it from making any request.","+Writes <dir>/change.html and <dir>/canvas.html. Host them anywhere static (S3, Cloudflare Pages, a","+public Pages repo) and point `viewer` in flowmap.toml at change.html's URL; canvas.html sits beside it.","+The data never reaches the host: browsers do not send the fragment, and each page's CSP forbids it","+from making any request."," \"\"\""," "," import argparse","+import base64","+import json","+import os","+import re"," import sys","+import zlib"," from pathlib import Path"," "," sys.path.insert(0, str(Path(__file__).parent))","-from change import viewer_html  # noqa: E402","+import config  # noqa: E402","+","+VIEWER = \"https://flowmap.testabl.ai/v1/change.html\"  # public; the data stays in the fragment","+BUDGET = 60000  # a PR body holds 65536 characters; leave room for the prose around the link","+","+","+def viewer_url():","+    return os.environ.get(\"FLOWMAP_VIEWER\") or config.load().get(\"viewer\") or VIEWER","+","+","+def locked(html):","+    \"\"\"A template as a page with no fonts or other requests, and a CSP that forbids any, so a reader","+    can see their data stays in the tab.\"\"\"","+    csp = (\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; \"","+           \"base-uri 'none'; form-action 'none'\")","+    return re.sub(r\"<!--fonts-->.*?<!--/fonts-->\", f'<meta http-equiv=\"Content-Security-Policy\" content=\"{csp}\">',","+                  html, count=1, flags=re.S)","+","+","+def link(data, viewer):","+    \"\"\"The viewer URL with the data in its fragment: #v1.<base64url of raw-deflated JSON>.\"\"\"","+    z = zlib.compressobj(9, zlib.DEFLATED, -15)","+    packed = z.compress(json.dumps(data, separators=(\",\", \":\")).encode()) + z.flush()","+    return f\"{viewer}#v1.{base64.urlsafe_b64encode(packed).rstrip(b'=').decode()}\""," "," "],"symbols":["flowmap/viewer.py:link","flowmap/viewer.py:locked","flowmap/viewer.py:viewer_url"]},{"file":"flowmap/viewer.py","old":21,"new":51,"ctx":"def main():","lines":["     ap.add_argument(\"dir\")","     a = ap.parse_args()","-    out = Path(a.dir) / \"change.html\"","-    out.parent.mkdir(parents=True, exist_ok=True)","-    out.write_text(viewer_html())","-    print(f\"wrote {out}\")","+    import canvas  # the pages import this module for its helpers","+    import change","+    for name, html in ((\"change.html\", change.viewer_html()), (\"canvas.html\", canvas.viewer_html())):","+        out = Path(a.dir) / name","+        out.parent.mkdir(parents=True, exist_ok=True)","+        out.write_text(html)","+        print(f\"wrote {out}\")"," "," "],"symbols":["flowmap/viewer.py:main"]}]},"story":{"title":"The map opens in the browser from a link, with nothing published, and the README starts with what flowmap is for","pr":"PR #18","url":"https://github.com/NelisVerhoef/Flowmap/pull/18","intent":"Make the README clean and concise, say what the repo is trying to achieve, and let a reader play with flowmap's own map directly, rendered on flowmap.testabl.ai the way change pages already are.","delta":"browse-the-map gains a way out of the repo: `flowmap canvas --link` prints a link carrying the whole map in its `#` fragment, and the hosted viewer gets a second data-free page, `canvas.html`, that draws it in the tab. review-a-change's viewer step now builds both pages. The change page, its --link, lens and the atlas behave as before, a canvas written to disk still carries its data and works without a link, and the flow map's own contents are untouched. The link helpers moved from change.py to viewer.py so the canvas can use them without importing lens; that move is the only reason pull-change-facts shows as touched. The README is rewritten around the goal, with screenshots and two live links. lens calls this blind: change.py and viewer.py have module-level constants, and the canvas template, bin/flowmap and plugin.json sit outside the analysed code, so read those in the diff.","no_longer":[{"was":"The hosted viewer only renders change pages, so opening a map means cloning the repo and opening the file","cite":"flowmap/canvas.py:main"},{"was":"`flowmap viewer <dir>` writes one page, change.html","cite":"flowmap/viewer.py:main","step":"review-a-change/build-viewer"},{"was":"The canvas's URL fragment holds only its view state","cite":"flowmap/canvas.template.html"}]},"chapters":[{"title":"`flowmap canvas --link` prints a link that opens the map in the browser","role":"core","kind":"new capability","symbols":["flowmap/canvas.py:main"],"files":["flowmap/canvas.template.html"],"before":"A canvas could only be opened from a checkout; GitHub shows committed HTML as source.","after":"`--link` still writes the page and also prints a viewer link with the map raw-deflated in the fragment, about 20K characters for flowmap's own map. Stdout carries only the link; past 60K characters a warning on stderr says it won't fit a PR body, and the link still prints. The template decodes the fragment when the page has no embedded data, with the view state following the data after `&`, and shows a plain message for a missing or damaged link. The map's name now comes from the data, because the viewer page is built without one.","claim":"A map can be shared as a link, and the data never reaches the server because browsers don't send the fragment.","why":"Anyone reading the README or a PR can now try the map without installing anything. Rather than GitHub Pages or a preview proxy, because publishing maps is what the fragment design exists to avoid (Pages was rejected for that reason), raw.githack shows a warning page first, and htmlpreview crashes the canvas during startup. The cost: the template's script became a module so it can await decompression, so every canvas page, not just linked ones, now runs through this loading code.","verified":[{"how":"test","what":"tests/test_canvas.py:test_link_carries_the_map_in_its_fragment_to_the_viewers_canvas_page"},{"how":"ran","what":"the built viewer over local HTTP with the CSP on: drew the map, selected a flow, unpainted a change, reloaded with the state kept, double-clicked a file, no console messages; a damaged link and no link each showed their message"},{"how":"ran","what":"the link on flowmap.testabl.ai in headless Chrome after the deploy: drew the whole map (3 flows, 11 steps), no console errors"},{"how":"ran","what":"a freshly built embedded canvas from disk in headless Chrome: loaded with no console errors"},{"how":"not checked","what":"Safari and Firefox, including their handling of a 20K fragment and DecompressionStream"}],"questions":[{"q":"`canvas.main` warns but still prints a link past 60K, where `change.fitted_link` trims the data and prints no link at all when it can't fit. Is printing the right call for a large map?","why":"Decides whether a big repo's map gets a link that opens in a browser but breaks a PR body.","kind":"ask"},{"q":"The change viewer also takes a dropped file; the canvas viewer only reads links. Should a map too big for a link be droppable too?","why":"Without it, a large map has no way onto the viewer when its link is too long to pass around.","kind":"ask"},{"q":"Does the map link in the README open and draw in Safari?","why":"It is the first thing many readers click, and it has only been run in Chrome.","kind":"check"}]},{"title":"The hosted viewer also serves an empty canvas page","role":"supporting","kind":"new page","symbols":["flowmap/canvas.py:viewer_html","flowmap/viewer.py:locked","flowmap/viewer.py:main","flowmap/change.py:viewer_html"],"before":"`flowmap viewer <dir>` wrote change.html only.","after":"It writes change.html and canvas.html. `locked` gives both the same treatment: fonts removed and a CSP of default-src 'none' that allows only inline script and style, so the page can't make a request. A canvas link points at canvas.html beside whichever change.html `viewer` names. It is deployed: the fjall build command needed no change and now produces both.","claim":"The canvas viewer has the same guarantee as the change viewer, that the data stays in the tab.","why":"Reusing one function means the two pages can't drift apart on the one property readers are asked to trust. A repo hosting its own viewer gets canvas.html the next time it rebuilds; until then its canvas links fail.","verified":[{"how":"test","what":"tests/test_canvas.py:test_viewer_page_holds_no_data_and_can_make_no_requests"},{"how":"ran","what":"fjall deploy flowmap: plan showed 0 resource changes and 2 stacks redeployed; /v1/canvas.html and /v1/change.html return 200 and match a local build byte for byte"},{"how":"ran","what":"this PR's own change link on flowmap.testabl.ai after the deploy: rendered with its title and overview, no console errors"}],"questions":[{"q":"The live viewer was deployed from this branch before merge. Deploying from main before this merges would remove canvas.html and break the README's map link. Merge first next time, or is that acceptable?","why":"Decides the order of merge and deploy for changes to the viewer.","kind":"ask"},{"q":"Should a repo's own `viewer` setting be able to name the canvas page separately, rather than assuming canvas.html sits beside change.html?","why":"A custom viewer at a different layout gets a canvas link that 404s.","kind":"ask"}]},{"title":"Link helpers move from the change page to the viewer module","role":"refactor","kind":"move, no behaviour change","symbols":["flowmap/viewer.py:link","flowmap/viewer.py:viewer_url","flowmap/change.py:link","flowmap/change.py:main"],"before":"`link`, the viewer URL lookup, the 60K link limit and the CSP lived in change.py, which imports lens.","after":"They live in viewer.py, whose only top-level flowmap import is config, and change.py imports them. `viewer_url` is extracted from `change.main`, not moved whole. `change --link` builds the same URL as before.","claim":"Behaviour-preserving, so `flowmap canvas --from` keeps working where no map or lens can load.","why":"canvas.py deliberately imports lens only when building from a map. Importing change.py for one helper would have broken that.","verified":[{"how":"test","what":"tests/test_change.py:LinkSizeTest"},{"how":"ran","what":"python3 -m unittest discover -s tests: 72 tests pass, 3 skipped"}],"questions":[{"q":"Does `viewer.py` importing `canvas` and `change` inside `main`, while they import it at the top, read as a cycle worth removing?","why":"It works because the imports are deferred; splitting the helpers into their own module would remove the question at the cost of a file.","kind":"ask"},{"q":"Does `flowmap change <base> <head> --link` on any existing story still print a link that opens?","why":"It settles that the move changed nothing, and this PR's own link is an instance of it.","kind":"check"}]},{"title":"The README says what flowmap is for, and readers can try it from there","role":"outside","kind":"docs","files":["README.md","bin/flowmap",".claude-plugin/plugin.json"],"before":"The README opened with what the tools do and ran 179 lines: install steps twice, a stack table that said `pattern` call graphs were Python only, and a quick-start loop that fails in zsh because `$r` doesn't split.","after":"It opens with the goal, keeping up with a system while agents write its code, then the map, the lens and the change page, two screenshots (`docs/images/`; binary, so the facts don't list them) and two live links, in 154 lines. Adapter and builder detail now points at the contracts in the code. The README's links are snapshots and need regenerating to stay current. The help text names --link, and the plugin version goes to 0.4.0 so installed plugins pick up the change, including the canvas from #17, which had no bump.","claim":"A new reader can tell what the repo is for and try it without installing anything.","why":"Rather than keep every detail, the README drops what the code already documents. Two details left the README: copying `skills/*` by hand without the plugin system, which is now written nowhere, and what `--link` prints for a page too big even when trimmed, which change.py and pr-lens still cover.","verified":[{"how":"ran","what":"the new quick-start's inventory and brief commands in a throwaway FastAPI repo with no flowmap.toml: found the endpoint and wrote the briefs; verify on this repo's runs: 0 bad citations"},{"how":"ran","what":"GitHub's Markdown renderer on both reference links: the 16K and 20K hrefs came back intact"},{"how":"not checked","what":"reconcile from the rewritten quick-start, and the plugin install commands"}],"questions":[{"q":"Is the opening paragraph the goal as you'd state it: understanding the system well enough to take part in its decisions, not just to verify changes?","why":"It is the one part of the README that is a judgement rather than a fact.","kind":"ask"},{"q":"`docs/flowmap/MAP.md` says it was built at `9f7d221`, which isn't a valid commit here, and the README now links to it. Regenerate it in a follow-up?","why":"Readers arrive at that page from the first screen of the README.","kind":"ask"}]}],"folded":["tests/test_canvas.py"],"lint":[]};
+const PAYLOAD = /^#v1\.([\w-]+)$/.exec(location.hash);
+// another link pasted into this tab changes only the fragment, which does not reload the page
+addEventListener("hashchange", () => { if (location.hash.startsWith("#v1.")) location.reload(); });
+
+async function inflate(b64) {
+  const bytes = Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+
+function fromFile(error) {
+  const box = document.createElement("section");
+  box.className = "drop";
+  box.innerHTML = `<h1>Open a flowmap change</h1>
+    <p>Drop a change page (<code>docs/flowmap/changes/&lt;name&gt;.html</code>) or its data as JSON here.
+    It is read in this tab and sent nowhere.</p>
+    <p><input type="file" accept=".html,.json"></p><p class="err" hidden></p>`;
+  const err = box.querySelector(".err");
+  if (error) { err.hidden = false; err.textContent = error; }
+  document.querySelector(".wrap").replaceChildren(box);
+  document.querySelector(".tray").hidden = true;
+  return new Promise((resolve) => {
+    const read = async (f) => {
+      try {
+        const text = await f.text();
+        const m = /const EMBEDDED = (\{.*?\});\n/s.exec(text) || /const DATA = (\{.*?\});\n/s.exec(text);
+        const data = JSON.parse(m ? m[1] : text);
+        if (!data.facts || !data.chapters) throw new Error("not flowmap change data");
+        resolve(data);
+      } catch (e) { err.hidden = false; err.textContent = `Could not read ${f.name}: ${e.message}`; }
+    };
+    box.querySelector("input").addEventListener("change", (e) => e.target.files[0] && read(e.target.files[0]));
+    addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("over"); });
+    addEventListener("dragleave", () => box.classList.remove("over"));
+    addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("over"); e.dataTransfer.files[0] && read(e.dataTransfer.files[0]); });
+  });
+}
+
+async function load() {
+  if (EMBEDDED) return EMBEDDED;
+  if (PAYLOAD) {
+    try { return await inflate(PAYLOAD[1]); }
+    catch (e) { return fromFile("The link's data is cut off or damaged. Was the whole link copied?"); }
+  }
+  return fromFile();
+}
+
+const WRAP = document.querySelector(".wrap").cloneNode(true);
+const DATA = await load();
+document.querySelector(".wrap").replaceWith(WRAP);
+document.querySelector(".tray").hidden = false;
+if (DATA.story.title) document.title = DATA.story.title;
+const F = DATA.facts, S = DATA.story;
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+};
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const md = (s) => esc(s || "").replace(/`([^`]+)`/g, "<code>$1</code>");
+const sym = (id) => id.split(":").pop();
+const file = (id) => id.split(":")[0].split("/").pop();
+const flowName = (id) => id.replace(/^new:/, "").replace(/-/g, " ");
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const ROLE = { core: "Core change", supporting: "Supporting change", refactor: "Refactor", outside: "Off the map",
+  unassigned: "Not in the story", "off-map": "Off the map" };
+
+const steps = new Map();
+F.map.forEach((f, fi) => f.steps.forEach((s, si) => steps.set(s.key, { ...s, flow: f.id, fi, si })));
+const symById = new Map(F.symbols.map(s => [s.id, s]));
+const byPlace = (a, b) => (steps.get(a).fi - steps.get(b).fi) || (steps.get(a).si - steps.get(b).si);
+
+// a reach move belongs to the part whose added (or dropped) call caused it; when no part owns the
+// cause (or the data predates causes), to every part on an entry point that moved
+const inIds = (ids, n) => ids.has(n) || ids.has(n + ".__init__");  // calls to a class are calls to its constructor
+const owned = new Set(DATA.chapters.flatMap(c => c.symbols || []));
+function movesFor(c, keys, which) {
+  const ids = new Set(c.symbols || []), myEps = new Set(keys.flatMap(k => steps.get(k).endpoints));
+  return Object.entries(F.reach[which]).map(([s, eps]) => {
+    const by = ((F.reach.cause || {})[which] || {})[s];
+    if (by && by.some(x => inIds(owned, x))) return [s, by.some(x => inIds(ids, x)) ? eps : []];
+    return [s, eps.filter(e => myEps.has(e))];
+  }).filter(([, eps]) => eps.length);
+}
+
+// chapter facts
+const chapters = DATA.chapters.map((c, i) => {
+  const syms = (c.symbols || []).map(id => symById.get(id)).filter(Boolean);
+  const keys = [...new Set(syms.flatMap(s => s.steps))].sort(byPlace);
+  const ids = new Set(c.symbols || []);
+  const callers = new Map();
+  syms.filter(s => s.status === "modified").forEach(s => s.callers.forEach(c => { if (!ids.has(c.id)) callers.set(c.id, c.edited); }));
+  const hunks = F.hunks.filter(h => h.symbols.some(x => ids.has(x)) || (c.files || []).includes(h.file));
+  const role = c.role || (c.kind === "outside" ? "outside" : c.kind === "unassigned" ? "unassigned" : c.kind === "off-map" ? "off-map" : i === 0 ? "core" : "supporting");
+  return { ...c, n: i + 1, syms, keys, role, callers, qs: questions(c, i + 1, syms, keys), hunks };
+});
+
+// the story's questions, then what the graph raises on its own
+function questions(c, n, syms, keys) {
+  const qs = [];
+  const moved = (which) => movesFor(c, keys, which);
+  moved("lost").forEach(([s, eps], i) => qs.push({ id: `c${n}l${i}`, kind: "graph", q: `${eps.join(", ")} no longer reaches ${sym(s)} (${file(s)}). Was dropping it intended?`, why: "Lost reach to existing code is how a removed check looks." }));
+  moved("gained").forEach(([s, eps], i) => qs.push({ id: `c${n}w${i}`, kind: "graph", q: `${eps.join(", ")} now reaches existing ${sym(s)} (${file(s)}). Is it safe to run there?`, why: "Existing code running under a new entry point." }));
+  (c.questions || []).forEach((q, i) => qs.push({ ...q, id: `c${n}q${i}` }));
+  syms.filter(s => s.contract).forEach((s, i) => {
+    const still = s.callers.filter(x => !x.edited).map(x => sym(x.id));
+    if (still.length) qs.push({ id: `c${n}g${i}`, kind: "graph", q: `${sym(s.id)} changed its arguments (${s.signature[0]} → ${s.signature[1]}) but ${still.length} caller(s) were not edited: ${still.join(", ")}. Are they still correct?`, why: "Signature changed, callers did not." });
+  });
+  const orphans = syms.filter(s => s.status === "new" && !s.steps.length).map(s => sym(s.id));
+  if (orphans.length) qs.push({ id: `c${n}o`, kind: "graph", why: "New code no flow reaches is either a map gap or dead.",
+    q: orphans.length === 1 ? `New ${orphans[0]} is not run by any flow on the map. Which step is it for?`
+      : `${orphans.length} new functions (${orphans.join(", ")}) are not run by any flow on the map. Which step are they for?` });
+  return qs;
+}
+const picked = new Set(chapters.flatMap(c => c.qs.filter(q => q.kind === "ask" || q.kind === "graph").map(q => q.id)));
+const minor = (c) => ["refactor", "outside", "unassigned"].includes(c.role);
+const where = (c) => c.keys.length
+  ? [...new Set(c.keys.map(k => flowName(steps.get(k).flow)))].join(", ") + ` · ${plural(c.keys.length, "step")}`
+  : (c.files || []).length ? "off the map · " + c.files.map(f => f.split("/").pop()).slice(0, 3).join(", ") + (c.files.length > 3 ? " …" : "")
+  : "off the map";
+
+// header: which change
+const range = el("div", { class: "range" });
+range.append(S.pr ? (S.url ? el("a", { href: S.url, text: S.pr }) : S.pr) : "", S.pr ? " · " : "",
+  el("span", { class: "mono", title: `${F.base}..${F.head}`, text: `${F.base_sha} → ${F.head_sha}` }),
+  S.pr ? " (branch head when rendered)" : "", ` · ${F.name}`);
+$("#top").append(range, el("h1", { text: S.title || `${F.base_sha}..${F.head_sha}` }));
+if ((DATA.lint || []).length) $("#top").append(el("div", { class: "lint" }, el("b", { text: "The story says things the facts don't back" }),
+  el("ul", {}, ...DATA.lint.map(l => el("li", { text: l.problem ?? l })))));
+if (!F.verdict) $("#top").append(el("p", { class: "note", text: "No verdict: an older flowmap rendered this page. Re-render it to see one." }));
+else {
+  const V = F.verdict, flowsOf = new Set(F.map.filter(f => f.steps.some(s => s.endpoints.some(e => V.spreads_to.includes(e)))).map(f => flowName(f.id)));
+  const spread = V.spreads_to.length ? `reaches ${plural(V.spreads_to.length, "existing entry point")}` + (flowsOf.size ? ` in ${[...flowsOf].join(", ")}` : "") : "";
+  const line = { contained: "no existing entry point runs changed code; only new code changed",
+    spreads: spread, blind: `${plural(V.blind.length, "thing")} the call graph can't see` + (spread ? `; what it can see ${spread}` : "") }[V.verdict];
+  const items = [...V.blind.map(b => "Can't see: " + b), ...(V.spreads_to.length ? ["Entry points that run changed code: " + V.spreads_to.map(e => "`" + e + "`").join(", ")] : [])];
+  $("#top").append(el("details", { class: "verdict " + V.verdict }, el("summary", {}, el("b", { text: V.verdict }), line),
+    items.length ? el("ul", {}, ...items.map(i => el("li", { html: md(i) }))) : null));
+}
+
+// overview: how the system moves, and only the numbers that are not zero
+const touchedFlows = new Set(F.symbols.flatMap(s => s.steps.map(k => k.split("/")[0])));
+const nNew = F.symbols.filter(s => s.status === "new").length, nMod = F.symbols.filter(s => s.status === "modified").length;
+const shape = [
+  [`${touchedFlows.size} of ${F.map.length}`, "flows run changed code"],
+  F.endpoints.added.length && [`+${F.endpoints.added.length}`, "entry points", F.endpoints.added.join(", ")],
+  F.endpoints.removed.length && [`−${F.endpoints.removed.length}`, "entry points", F.endpoints.removed.join(", ")],
+  nNew && [nNew, "new functions"], nMod && [nMod, "changed functions"],
+  Object.keys(F.reach.gained).length && [Object.keys(F.reach.gained).length, "existing functions newly reached", Object.keys(F.reach.gained).map(sym).join(", ")],
+  Object.keys(F.reach.lost).length && [Object.keys(F.reach.lost).length, "existing functions no longer reached", Object.keys(F.reach.lost).map(sym).join(", ")],
+  F.modules.added.length && [`+${F.modules.added.length}`, "module links", F.modules.added.map(([a, b]) => `${a.split("/").pop()} → ${b.split("/").pop()}`).join(", ")],
+  [F.tests.changed.length || "no", F.tests.changed.length === 1 ? "test changed" : "tests changed", F.tests.changed.join(", ")],
+].filter(Boolean);
+function overview(pane) {
+  pane.className = "pane";
+  pane.append(el("div", {}, el("div", { class: "ch-tags" }, el("span", { class: "tag", text: "Overview" })),
+    el("h2", { text: `What this change does, in ${plural(chapters.length, "part")}` })));
+  if (S.intent) pane.append(el("p", { class: "claim", html: md(S.intent) }));
+  if (S.delta) pane.append(el("p", { class: "delta", html: md(S.delta) }));
+  const was = noLonger();
+  if (was.length) pane.append(el("section", { style: "display:grid;gap:8px" }, el("h3", { class: "label", text: "No longer true" }),
+    el("ul", { class: "was" }, ...was.map(([t, cite]) => el("li", { html: `<s>${t}</s>` + (cite ? ` <small>${cite}</small>` : "") })))));
+  pane.append(el("p", { class: "kept", html: "<b>Still true.</b> " + stillTrue() }));
+  pane.append(el("ul", { class: "shape", "aria-label": "Shape of the change" },
+    ...shape.map(([v, k, t]) => el("li", { title: t || null }, el("b", { text: String(v) }), " " + k))));
+  const ref = (c) => el("button", { type: "button", class: "ref " + c.role, title: c.title, onclick: () => show(c.n) }, String(c.n));
+  const lanes = el("div", { class: "lanes" });
+  for (const f of F.map) {
+    const at = (k) => chapters.filter(c => c.keys.includes(k));
+    if (!f.steps.some(s => at(s.key).length)) continue;
+    lanes.append(el("section", { class: "lane" }, el("h3", { text: flowName(f.id) }), el("ol", {}, ...f.steps.map(s => {
+      const hits = at(s.key);
+      return el("li", { class: hits.length ? "touched " + hits[0].role : null }, el("span", { class: "dot", "aria-hidden": "true" }),
+        el("span", { text: s.name }), hits.length ? el("span", { class: "refs" }, ...hits.map(ref)) : null);
+    }))));
+  }
+  const off = chapters.filter(c => !c.keys.length);
+  if (off.length) lanes.append(el("section", { class: "lane" }, el("h3", { text: "Off the map" }),
+    el("div", { class: "refs", style: "display:grid;gap:6px" }, ...off.map(c => el("span", { style: "display:flex;gap:8px;align-items:baseline;font-size:13px" }, ref(c), c.title)))));
+  if (lanes.children.length) pane.append(el("section", { style: "display:grid;gap:10px" }, el("h3", { class: "label", text: "Where it lands" }),
+    el("p", { class: "note", text: "Each line is a user flow, its stops in order. A filled stop runs changed code; the numbers under it are the parts that change it." }), lanes));
+  if (!S.delta) pane.append(el("p", { class: "note", text: "No story for this change: each part below is grouped by the flow steps that run its code." }));
+}
+
+// what a reader of the old map believed that this change makes false: the story's lines (each
+// cites the diff), then what the facts show on their own
+function noLonger() {
+  const name = (k) => steps.has(k) ? steps.get(k).name : k;
+  return [
+    ...(S.no_longer || []).map(w => [md(w.was), md("`" + (w.cite || "") + "`") +
+      (w.step ? ` · the map's step “${esc(name(w.step))}” still says this: re-run the map loop` : "")]),
+    ...F.endpoints.removed.map(e => [md("`" + e + "` is an entry point"), "removed"]),
+    ...Object.entries(F.reach.lost).map(([s, eps]) => [md(`${eps.map(e => "`" + e + "`").join(", ")} can run \`${sym(s)}\``), esc(file(s))]),
+    ...F.modules.removed.map(([a, b]) => [md(`\`${a.split("/").pop()}\` calls into \`${b.split("/").pop()}\``), "no call left"]),
+    ...(F.anchors_lost || []).map(a => [md(`The map's step “${name(a.step)}” runs \`${sym(a.anchor)}\``), "gone from the code: re-run the map loop"]),
+  ];
+}
+// what the reader can keep, scoped to what the call graph can vouch for
+function stillTrue() {
+  const V = F.verdict, parts = [];
+  if (quiet.length) parts.push(`${quiet.join(", ")} ${quiet.length === 1 ? "is" : "are"} untouched`);
+  if (V && F.endpoints.total) parts.push(`${F.endpoints.total - V.spreads_to.length} of ${F.endpoints.total} entry points run no changed code`);
+  if (!Object.keys(F.reach.lost).length && !F.endpoints.removed.length) parts.push("no entry point lost reach to existing code");
+  if (!F.edges.removed.length) parts.push("no existing call was removed");
+  const scope = V && V.blind.length ? ` <small>(in code the call graph sees; it can't vouch for: ${V.blind.map(md).join("; ")})</small>`
+    : ` <small>(in code the call graph sees)</small>`;
+  return (parts.length ? parts.join("; ") : "nothing the graph can vouch for") + "." + scope;
+}
+
+// rail: the parts
+$("#toc-h").textContent = `The change in ${plural(chapters.length, "part")}`;
+$("#toc").append(el("li", { class: "ov" }, el("button", { type: "button", "data-ch": 0, onclick: () => show(0) },
+  el("span", { class: "n", text: "◎" }), el("span", { class: "t", text: "Overview" }), el("span", { class: "w", text: "what moves, and how much" }))));
+for (const c of chapters) {
+  $("#toc").append(el("li", { class: minor(c) ? "minor" : null }, el("button", { type: "button", class: c.role, "data-ch": c.n, onclick: () => show(c.n) },
+    el("span", { class: "n", text: String(c.n) }), el("span", { class: "t", text: c.title }), el("span", { class: "w", text: where(c) }))));
+}
+
+// rail: the map, touched flows only; a stop says which parts run there
+const quiet = [];
+for (const f of F.map) {
+  const at = (k) => chapters.filter(c => c.keys.includes(k));
+  if (!f.steps.some(s => at(s.key).length)) { quiet.push(flowName(f.id)); continue; }
+  const ol = el("ol", { class: "stops" });
+  for (const s of f.steps) {
+    const hits = at(s.key);
+    ol.append(el("li", {}, el(hits.length ? "button" : "div", {
+      class: "stop" + (hits.length ? " touched " + hits[0].role : ""), "data-key": s.key, type: hits.length ? "button" : null,
+      title: hits.length ? `${s.name}\nParts: ${hits.map(c => c.n).join(", ")}` : `${s.name}\nNot touched`,
+      onclick: hits.length ? () => { const i = hits.findIndex(c => c.n === current); show(hits[(i + 1) % hits.length].n); } : null },
+      el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "nm", text: s.name }))));
+  }
+  $("#map").append(el("section", { class: "flow" }, el("h3", { text: flowName(f.id) }), ol));
+}
+const off = chapters.filter(c => !c.keys.length);
+if (off.length) {
+  const ol = el("ol", { class: "stops" });
+  off.forEach(c => ol.append(el("li", {}, el("button", { type: "button", class: "stop touched " + c.role, "data-off": c.n, title: c.title, onclick: () => show(c.n) },
+    el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "nm", text: `${c.n} · ${c.title}` })))));
+  $("#map").append(el("section", { class: "flow" }, el("h3", { text: "Off the map" }), ol));
+}
+if (quiet.length) $("#map").append(el("p", { class: "quiet-flows", text: `Untouched: ${quiet.join(", ")}` }));
+if (DATA.folded.length) $("#folded").textContent = `Not shown: ${plural(DATA.folded.length, "generated or test file")} (${DATA.folded.map(p => p.split("/").pop()).join(", ")})`;
+if ((DATA.trimmed || []).length) $("#folded").textContent = `${$("#folded").textContent} Left out of this link to fit a PR body: ${DATA.trimmed.join(" and ")}; see the PR diff.`.trim();
+
+// a part's code as a call tree: the shape that existed, with the calls this change added (+) or
+// removed (−); a changed function in the part opens its own calls, everything else is a leaf, and
+// calls nothing changed collapse to a count
+const label = (n) => `${n.split(":")[0].replace(/(\/__init__)?\.\w+$/, "").split("/").pop()}.${sym(n)}`;  // graphs/__init__.py -> graphs
+function callTree(c) {
+  const ids = new Set(c.symbols || []);
+  const node = (id) => id.replace(/\.__init__$/, "");
+  const symOf = (n) => symById.get(n) || symById.get(n + ".__init__");
+  const edge = (list, a, b) => list.some(([x, y]) => x === a && y === b);
+  const kids = (n) => {
+    const out = [...F.edges.added.filter(([a]) => a === n).map(([, b]) => ["+", b]),
+      ...F.edges.removed.filter(([a]) => a === n).map(([, b]) => ["−", b]),
+      ...F.symbols.filter(t => node(t.id) !== n && t.callers.some(x => x.id === n) && !edge(F.edges.added, n, node(t.id)) &&
+        !edge(F.edges.removed, n, node(t.id))).map(t => ["", node(t.id)])];
+    const rest = (symOf(n) || {}).kept_calls - out.filter(([m]) => !m).length;
+    return [out, rest > 0 ? rest : 0];
+  };
+  const note = (n) => {
+    const s = symOf(n);
+    if (s) {
+      const o = chapters.find(x => x !== c && (x.symbols || []).includes(s.id));
+      return { new: "new", modified: "changed", deleted: "deleted" }[s.status] + (o ? ` → part ${o.n}` : "");
+    }
+    if (F.reach.gained[n]) return "existing, now runs from " + F.reach.gained[n].join(", ");
+    if (F.reach.lost[n]) return "existing, no longer runs from " + F.reach.lost[n].join(", ");
+    return "";
+  };
+  const lines = [], seen = new Set();
+  const walk = (n, mark, prefix, last, root) => {
+    lines.push([(root ? "" : prefix + (last ? "└─ " : "├─ ")) + (mark || " ") + " " + label(n), mark, note(n), n]);
+    if (seen.has(n) || !(root || inIds(ids, n))) return;
+    seen.add(n);
+    const [out, rest] = kids(n), sub = root ? "" : prefix + (last ? "   " : "│  ");
+    out.forEach(([m, b], i) => walk(b, m, sub, i === out.length - 1 && !rest, false));
+    if (rest) lines.push([sub + "└─   " + plural(rest, "call") + " unchanged", "", "", null]);
+  };
+  const roots = c.syms.filter(s => !s.callers.some(x => inIds(ids, x.id)));
+  for (const s of roots.length ? roots : c.syms.slice(0, 1)) {
+    if (seen.has(node(s.id))) continue;
+    const [k, path] = Object.entries(s.witness)[0] || [];
+    const hops = path ? path.slice(0, -1).map(label) : [];
+    if (k) lines.push([[steps.get(k).endpoints[0], ...(hops.length > 3 ? [hops[0], "…", ...hops.slice(-2)] : hops)].join(" › "), "from", "", null]);
+    walk(node(s.id), "", "", true, true);
+  }
+  if (!lines.length) return null;
+  const MAX = 18, shown = lines.length > MAX ? [...lines.slice(0, MAX - 1), [`… ${lines.length - MAX + 1} more lines`, "from", "", null]] : lines;
+  const blind = (c.files || []).filter(f => !["code", "test", "generated"].includes((F.files.find(x => x.path === f) || {}).kind));
+  const read = blind.filter(f => c.hunks.some(h => h.file === f)), unread = blind.filter(f => !read.includes(f));
+  if (read.length) shown.push([`?  ${read.join(", ")}: not in the call graph, read its code below`, "from", "", null]);
+  if (unread.length) shown.push([`?  ${unread.join(", ")}: not in the call graph, see the PR diff`, "from", "", null]);
+  return el("pre", { class: "tree" }, ...shown.map(([t, m, n, id]) => el("span", { class: { "+": "add", "−": "rem", from: "from" }[m] || "", title: id },
+    t, n ? el("i", { text: "   " + n }) : null)));
+}
+const fold = (title, sub, ...body) => el("details", {}, el("summary", {}, title, sub ? el("small", { text: sub }) : null), el("div", {}, ...body));
+
+// pane: one part at a time
+let current = 0;
+function show(n, focus = true) {
+  const c = chapters[n - 1];
+  current = n;
+  document.querySelectorAll("#toc button").forEach(b => b.setAttribute("aria-current", String(+b.dataset.ch === n)));
+  // the overview lights every touched stop in its own part's colour; a part lights only its own
+  document.querySelectorAll("#map .stop").forEach(s => s.classList.toggle("lit", c ? c.keys.includes(s.dataset.key) || +s.dataset.off === n : s.classList.contains("touched")));
+  $("#map").style.removeProperty("--sel");
+  if (c) $("#map").style.setProperty("--sel", `var(--${{ core: "core", supporting: "support", refactor: "refactor" }[c.role] || "outside"})`);
+  $("#rail-map").hidden = !c;
+  const pane = $("#pane");
+  pane.replaceChildren();
+  if (!c) overview(pane);
+  else part(pane, c);
+
+  const nav = el("div", { class: "step-nav" });
+  for (const [dir, label] of [[-1, "Previous"], [1, n ? "Next" : "Start"]]) {
+    const o = n + dir === 0 ? { n: 0, title: "Overview" } : chapters[n - 1 + dir];
+    if (o) nav.append(el("button", { type: "button", "data-dir": String(dir), onclick: () => show(o.n) }, el("small", { text: o.n ? `${label} · ${o.n} of ${chapters.length}` : label }), o.title));
+  }
+  pane.append(nav, el("p", { class: "keys", html: "<kbd>←</kbd> <kbd>→</kbd> or <kbd>j</kbd> <kbd>k</kbd> to move between parts" }));
+  if (focus) { pane.focus({ preventScroll: true }); if (pane.getBoundingClientRect().top < 0) pane.scrollIntoView({ block: "start" }); }
+}
+
+function part(pane, c) {
+  pane.className = "pane " + c.role;
+
+  pane.append(el("div", {},
+    el("div", { class: "ch-tags" }, el("span", { class: "num", text: `${c.n} of ${chapters.length}` }), el("span", { class: "tag", text: ROLE[c.role] || c.role }),
+      c.kind && c.kind !== c.role ? el("span", { class: "kind", text: c.kind }) : null),
+    el("h2", { html: md(c.title) })));
+  if (c.claim) pane.append(el("p", { class: "claim", html: md(c.claim) }));
+  pane.append(el("p", { class: "runs", html: c.keys.length
+    ? "Runs in " + F.map.filter(f => c.keys.some(k => steps.get(k).flow === f.id)).map(f => {
+        const mine = f.steps.filter(s => c.keys.includes(s.key));
+        return `<b title="${esc(mine.map(s => s.name).join("\n"))}">${esc(flowName(f.id))}</b> (${mine.length === 1 ? esc(mine[0].name) : `${mine.length} of ${f.steps.length} steps`})`;
+      }).join(" · ")
+    : "No flow on the map runs this." }));
+
+  if (c.before || c.after) pane.append(el("div", { class: "ba" },
+    el("div", {}, el("p", { class: "label", text: "Before" }), el("p", { html: md(c.before || "—") })),
+    el("div", { class: "after" }, el("p", { class: "label", text: "After" }), el("p", { html: md(c.after || "—") }))));
+  if ((c.verified || []).length) pane.append(el("p", { class: "verified", html: "<b>Verified:</b> " +
+    c.verified.map(v => `<span class="how${v.how === "not checked" ? " no" : ""}">${esc(v.how)}</span> ${md(v.what)}`).join(" · ") }));
+  const tree = callTree(c);
+  if (tree) pane.append(el("section", { style: "display:grid;gap:8px" }, el("h3", { class: "label", text: "Calls, before → after" }), tree,
+    el("p", { class: "note", text: "+ added, − removed by this change; the rest existed before. Built from the call graph, so dispatch it can't follow (dicts, templates) is missing." })));
+  if (c.why) pane.append(el("p", { class: "why", html: "<b>Why it matters.</b> " + md(c.why) }));
+  if (!c.before && !c.after && !c.why) pane.append(el("p", { class: "note", text: "No story for this part: the facts below are all flowmap knows. Add it to the story file to say what changes and why." }));
+
+  if (c.qs.length) {
+    const ol = el("ol", { class: "qs" });
+    for (const q of c.qs) {
+      const kind = { ask: "Ask the author", check: "Check yourself", graph: "From the graph" }[q.kind] || q.kind;
+      ol.append(el("li", { class: "q" },
+        el("input", { type: "checkbox", id: q.id, checked: picked.has(q.id) ? "" : null,
+          onchange: (e) => { e.target.checked ? picked.add(q.id) : picked.delete(q.id); renderNote(); } }),
+        el("label", { for: q.id }, el("span", { class: "qtext", html: `<span class="qkind ${esc(q.kind)}">${esc(kind)}</span>` + md(q.q) }),
+          q.why ? el("span", { class: "qwhy", html: md(q.why) }) : null)));
+    }
+    pane.append(el("section", { style: "display:grid;gap:10px" }, el("h3", { class: "label", text: "Questions, most decisive first" }), ol));
+  }
+
+  // evidence, on demand
+  const more = el("div", { class: "more" });
+  const rows = [
+    ...movesFor(c, c.keys, "lost").map(([s, eps]) => ["rem", "no longer", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
+    ...movesFor(c, c.keys, "gained").map(([s, eps]) => ["add", "now reaches", `${file(s)} · ${sym(s)} from ${eps.join(", ")}`]),
+    ...[...c.callers].sort((a, b) => a[1] - b[1]).map(([id, edited]) => [edited ? "yes" : "no", edited ? "caller, edited" : "caller, not edited", `${file(id)} · ${sym(id)}`]),
+  ];
+  if (rows.length) {
+    const notEdited = [...c.callers.values()].filter(e => !e).length;
+    more.append(fold("Callers and reach", notEdited ? `${notEdited} caller${notEdited === 1 ? "" : "s"} not edited` : "",
+      el("ul", { class: "rows" }, ...rows.map(([k, m, t]) => el("li", {}, el("span", { class: "mark " + k, text: m }), el("span", { text: t }))))));
+  }
+  if (c.hunks.length) {
+    const box = el("div", { style: "display:grid;gap:10px" });
+    const hunkEls = c.hunks.map(h => {
+      const pre = el("pre");
+      h.lines.forEach(l => pre.append(el("span", { class: l[0] === "+" ? "a" : l[0] === "-" ? "r" : "", text: l })));
+      const n = el("div", { class: "hunk" }, el("div", { class: "hh", text: `${h.file} @ ${h.new}${h.ctx ? " · " + h.ctx : ""}` }), pre);
+      n._syms = h.symbols; n._file = h.file;
+      return n;
+    });
+    // pick a symbol (or file) to see only its hunks
+    const keysOf = [...new Set([...c.syms.map(s => s.id), ...c.hunks.filter(h => !h.symbols.length).map(h => h.file)])];
+    const chips = el("div", { class: "chips" });
+    const filter = (key) => {
+      chips.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.k === key)));
+      hunkEls.forEach(n => { n.hidden = key != null && !(n._syms.includes(key) || (!n._syms.length && n._file === key)); });
+    };
+    if (keysOf.length > 1) keysOf.forEach(k => {
+      const s = symById.get(k);
+      chips.append(el("button", { type: "button", class: "chip", "data-k": k, "aria-pressed": "false", title: k,
+        onclick: (e) => filter(e.currentTarget.getAttribute("aria-pressed") === "true" ? null : k) },
+        s ? (c.syms.filter(o => sym(o.id) === sym(k)).length > 1 ? `${file(k)} · ${sym(k)}` : sym(k)) : k.split("/").pop(), s && s.status !== "modified" ? el("i", { text: s.status }) : null));
+    });
+    box.append(chips, ...hunkEls);
+    const files = [...new Set(c.hunks.map(h => h.file.split("/").pop()))];
+    more.append(fold("Code", `${plural(c.hunks.length, "hunk")} in ${files.slice(0, 4).join(", ")}${files.length > 4 ? ` and ${files.length - 4} more` : ""}`, box));
+  }
+  if (more.children.length) pane.append(more);
+}
+
+function renderNote() {
+  const lines = [];
+  for (const c of chapters) {
+    const qs = c.qs.filter(q => picked.has(q.id));
+    if (!qs.length) continue;
+    lines.push(`${c.n}. ${c.title}`);
+    qs.forEach(q => lines.push(`   - ${q.q}`));
+  }
+  $("#note").value = lines.join("\n");
+  $("#count").textContent = plural(picked.size, "question");
+}
+
+addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  const d = { ArrowRight: 1, j: 1, ArrowLeft: -1, k: -1 }[e.key];
+  if (d && current + d >= 0 && current + d <= chapters.length) { e.preventDefault(); show(current + d); }
+});
+$("#peek").addEventListener("click", (e) => {
+  const open = $("#note").hidden;
+  $("#note").hidden = !open;
+  e.target.setAttribute("aria-expanded", String(open));
+  e.target.textContent = open ? "Hide" : "Show";
+});
+$("#copy").addEventListener("click", async () => {
+  const t = $("#note");
+  try { await navigator.clipboard.writeText(t.value); $("#status").textContent = "Copied"; }
+  catch (e) { t.hidden = false; t.focus(); t.select(); $("#status").textContent = "Selected: press Ctrl+C or Cmd+C to copy"; }
+});
+renderNote();
+show(0, false);
+</script>
