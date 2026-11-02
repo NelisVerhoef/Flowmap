@@ -1,10 +1,14 @@
 """The canvas: the map as one left-to-right picture, built from the atlas's data."""
 
+import base64
 import json
+import os
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
+from unittest import mock
 
 from tests.helpers import REPO, flowmap
 
@@ -83,9 +87,27 @@ class Page(unittest.TestCase):
             self.assertIn("7 flows, 26 steps, 8 files", said)
             html = out.read_text()
             self.assertIn("<title>Full Stack FastAPI Template · flowmap canvas</title>", html)
-            data = json.loads(html.split("const G = ", 1)[1].split(";\n", 1)[0])
+            data = json.loads(html.split("const EMBEDDED = ", 1)[1].split(";\n", 1)[0])
             self.assertEqual(data["files"]["f:crud.py"]["depth"], 1)
             self.assertNotIn("__CANVAS", html)
+
+    def test_link_carries_the_map_in_its_fragment_to_the_viewers_canvas_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"FLOWMAP_VIEWER": "https://v.example/v1/change.html"}):
+                said = flowmap("canvas", "--from", str(BENCH), "--out", str(Path(tmp) / "canvas.html"), "--link")
+        url = said.strip()
+        self.assertTrue(url.startswith("https://v.example/v1/canvas.html#v1."), url[:60])
+        packed = base64.urlsafe_b64decode(url.split("#v1.", 1)[1] + "==")
+        data = json.loads(zlib.decompress(packed, -15))
+        self.assertEqual(data["name"], "Full Stack FastAPI Template")
+        self.assertEqual(data["files"]["f:crud.py"]["depth"], 1)
+
+    def test_viewer_page_holds_no_data_and_can_make_no_requests(self):
+        html = canvas.viewer_html()
+        self.assertIn("default-src 'none'", html)
+        self.assertNotIn("fonts.googleapis", html)
+        self.assertNotIn("__CANVAS_NAME__", html)
+        self.assertIn("/*__CANVAS_DATA__*/null", html)
 
 
 if __name__ == "__main__":

@@ -2,9 +2,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__CANVAS_NAME__ · flowmap canvas</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<!--fonts--><link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><!--/fonts-->
 <style>
 /* One canvas, read left to right: screens, the flows and their steps, the code they run (a card
    per file, placed by call depth), the data they write. A flow is a path on it; a change is paint
@@ -192,8 +192,36 @@ a.ext { color: var(--accent); }
   <aside id="panel"></aside>
 </main>
 
-<script>
-const G = /*__CANVAS_DATA__*/null;
+<script type="module">
+// The data is embedded by `flowmap canvas`, or, in the hosted viewer, carried in the link's fragment
+// (#v1.<base64url of raw-deflated JSON>), which browsers never send to the server. The view's state
+// follows it in the fragment, so it survives a reload. Either way it goes nowhere else.
+const EMBEDDED = /*__CANVAS_DATA__*/null;
+const PAYLOAD = EMBEDDED ? null : /^#(v1\.[\w-]+)&?(.*)$/.exec(location.hash);
+// another link pasted into this tab changes only the fragment, which does not reload the page
+addEventListener("hashchange", () => { if (location.hash.startsWith("#v1.") && !EMBEDDED) location.reload(); });
+
+async function load() {
+  if (EMBEDDED) return EMBEDDED;
+  let why = "Open a flowmap map from the link `flowmap canvas --link` prints. Its data stays in this tab.";
+  if (PAYLOAD) {
+    try {
+      const b64 = PAYLOAD[1].slice(3).replace(/-/g, "+").replace(/_/g, "/");
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return JSON.parse(await new Response(stream).text());
+    } catch (e) { why = "The link's data is cut off or damaged. Was the whole link copied?"; }
+  }
+  const p = document.createElement("p");
+  p.style.padding = "24px";
+  p.textContent = why;
+  document.body.replaceChildren(p);
+  return new Promise(() => {});  // nothing to draw
+}
+
+const G = await load();
+document.title = `${G.name} · flowmap canvas`;
+document.querySelector("h1").textContent = G.name;
 const $ = s => document.querySelector(s);
 function el(tag, attrs, ...kids) {
   const n = document.createElement(tag);
@@ -609,7 +637,7 @@ function panel() {
   const id = S.sel, c = change();
   if (!id && S.view !== "map") return filePanel(S.view, true);
   if (!id) {
-    P.append(el("h2", {}, S.view === "map" ? "__CANVAS_NAME__" : FILES[S.view].label),
+    P.append(el("h2", {}, S.view === "map" ? G.name : FILES[S.view].label),
       el("p", { class: "lead" }, S.view === "map"
         ? `${FLOWS.length} flows, ${Object.keys(STEPS).length} steps, ${Object.keys(FILES).length} files of code, ${Object.keys(DATA).length} kinds of data.` + (G.commit ? ` Built at ${G.commit}.` : "")
         : "Its functions, laid out by who calls whom. Callers on the left, what it calls on the right."));
@@ -792,10 +820,10 @@ function writeHash() {
   if (S.change >= 0) p.set("c", S.change); else if (G.changes.length) p.set("c", -1);
   if (S.expanded.size && S.expanded.size < FLOWS.length) p.set("x", [...S.expanded].map(f => f.slice(5)).join(","));
   else if (S.expanded.size === FLOWS.length && total > 12) p.set("x", "all");
-  history.replaceState(null, "", "#" + p.toString());
+  history.replaceState(null, "", "#" + (PAYLOAD ? PAYLOAD[1] + "&" : "") + p.toString());
 }
 function readHash() {
-  const p = new URLSearchParams(location.hash.slice(1));
+  const p = new URLSearchParams(PAYLOAD ? PAYLOAD[2] : location.hash.slice(1));
   if (p.has("c")) S.change = Math.min(G.changes.length - 1, +p.get("c"));
   if (p.has("x")) S.expanded = new Set(p.get("x") === "all" ? FLOWS.map(f => f.id) : p.get("x").split(",").map(f => "flow:" + f).filter(f => flowOf[f]));
   if (p.has("in") && FILES[p.get("in")]) S.view = p.get("in");
