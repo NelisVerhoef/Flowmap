@@ -1,0 +1,93 @@
+{
+ "title": "The map opens in the browser from a link, with nothing published, and the README starts with what flowmap is for",
+ "pr": "PR #18",
+ "url": "https://github.com/NelisVerhoef/Flowmap/pull/18",
+ "intent": "Make the README clean and concise, say what the repo is trying to achieve, and let a reader play with flowmap's own map directly, rendered on flowmap.testabl.ai the way change pages already are.",
+ "delta": "browse-the-map gains a way out of the repo: `flowmap canvas --link` prints a link carrying the whole map in its `#` fragment, and the hosted viewer gets a second data-free page, `canvas.html`, that draws it in the tab. review-a-change's viewer step now builds both pages. The change page, its --link, lens and the atlas behave as before, a canvas written to disk still carries its data and works without a link, and the flow map's own contents are untouched. The link helpers moved from change.py to viewer.py so the canvas can use them without importing lens; that move is the only reason pull-change-facts shows as touched. The README is rewritten around the goal, with screenshots and two live links. lens calls this blind: change.py and viewer.py have module-level constants, and the canvas template, bin/flowmap and plugin.json sit outside the analysed code, so read those in the diff.",
+ "no_longer": [
+  {"was": "The hosted viewer only renders change pages, so opening a map means cloning the repo and opening the file",
+   "cite": "flowmap/canvas.py:main"},
+  {"was": "`flowmap viewer <dir>` writes one page, change.html",
+   "cite": "flowmap/viewer.py:main",
+   "step": "review-a-change/build-viewer"},
+  {"was": "The canvas's URL fragment holds only its view state",
+   "cite": "flowmap/canvas.template.html"}
+ ],
+ "chapters": [
+  {
+   "title": "`flowmap canvas --link` prints a link that opens the map in the browser",
+   "role": "core", "kind": "new capability",
+   "symbols": ["flowmap/canvas.py:main"],
+   "files": ["flowmap/canvas.template.html"],
+   "before": "A canvas could only be opened from a checkout; GitHub shows committed HTML as source.",
+   "after": "`--link` still writes the page and also prints a viewer link with the map raw-deflated in the fragment, about 20K characters for flowmap's own map. Stdout carries only the link; past 60K characters a warning on stderr says it won't fit a PR body, and the link still prints. The template decodes the fragment when the page has no embedded data, with the view state following the data after `&`, and shows a plain message for a missing or damaged link. The map's name now comes from the data, because the viewer page is built without one.",
+   "claim": "A map can be shared as a link, and the data never reaches the server because browsers don't send the fragment.",
+   "why": "Anyone reading the README or a PR can now try the map without installing anything. Rather than GitHub Pages or a preview proxy, because publishing maps is what the fragment design exists to avoid (Pages was rejected for that reason), raw.githack shows a warning page first, and htmlpreview crashes the canvas during startup. The cost: the template's script became a module so it can await decompression, so every canvas page, not just linked ones, now runs through this loading code.",
+   "verified": [
+    {"how": "test", "what": "tests/test_canvas.py:test_link_carries_the_map_in_its_fragment_to_the_viewers_canvas_page"},
+    {"how": "ran", "what": "the built viewer over local HTTP with the CSP on: drew the map, selected a flow, unpainted a change, reloaded with the state kept, double-clicked a file, no console messages; a damaged link and no link each showed their message"},
+    {"how": "ran", "what": "the link on flowmap.testabl.ai in headless Chrome after the deploy: drew the whole map (3 flows, 11 steps), no console errors"},
+    {"how": "ran", "what": "a freshly built embedded canvas from disk in headless Chrome: loaded with no console errors"},
+    {"how": "not checked", "what": "Safari and Firefox, including their handling of a 20K fragment and DecompressionStream"}
+   ],
+   "questions": [
+    {"q": "`canvas.main` warns but still prints a link past 60K, where `change.fitted_link` trims the data and prints no link at all when it can't fit. Is printing the right call for a large map?", "why": "Decides whether a big repo's map gets a link that opens in a browser but breaks a PR body.", "kind": "ask"},
+    {"q": "The change viewer also takes a dropped file; the canvas viewer only reads links. Should a map too big for a link be droppable too?", "why": "Without it, a large map has no way onto the viewer when its link is too long to pass around.", "kind": "ask"},
+    {"q": "Does the map link in the README open and draw in Safari?", "why": "It is the first thing many readers click, and it has only been run in Chrome.", "kind": "check"}
+   ]
+  },
+  {
+   "title": "The hosted viewer also serves an empty canvas page",
+   "role": "supporting", "kind": "new page",
+   "symbols": ["flowmap/canvas.py:viewer_html", "flowmap/viewer.py:locked", "flowmap/viewer.py:main", "flowmap/change.py:viewer_html"],
+   "before": "`flowmap viewer <dir>` wrote change.html only.",
+   "after": "It writes change.html and canvas.html. `locked` gives both the same treatment: fonts removed and a CSP of default-src 'none' that allows only inline script and style, so the page can't make a request. A canvas link points at canvas.html beside whichever change.html `viewer` names. It is deployed: the fjall build command needed no change and now produces both.",
+   "claim": "The canvas viewer has the same guarantee as the change viewer, that the data stays in the tab.",
+   "why": "Reusing one function means the two pages can't drift apart on the one property readers are asked to trust. A repo hosting its own viewer gets canvas.html the next time it rebuilds; until then its canvas links fail.",
+   "verified": [
+    {"how": "test", "what": "tests/test_canvas.py:test_viewer_page_holds_no_data_and_can_make_no_requests"},
+    {"how": "ran", "what": "fjall deploy flowmap: plan showed 0 resource changes and 2 stacks redeployed; /v1/canvas.html and /v1/change.html return 200 and match a local build byte for byte"},
+    {"how": "ran", "what": "this PR's own change link on flowmap.testabl.ai after the deploy: rendered with its title and overview, no console errors"}
+   ],
+   "questions": [
+    {"q": "The live viewer was deployed from this branch before merge. Deploying from main before this merges would remove canvas.html and break the README's map link. Merge first next time, or is that acceptable?", "why": "Decides the order of merge and deploy for changes to the viewer.", "kind": "ask"},
+    {"q": "Should a repo's own `viewer` setting be able to name the canvas page separately, rather than assuming canvas.html sits beside change.html?", "why": "A custom viewer at a different layout gets a canvas link that 404s.", "kind": "ask"}
+   ]
+  },
+  {
+   "title": "Link helpers move from the change page to the viewer module",
+   "role": "refactor", "kind": "move, no behaviour change",
+   "symbols": ["flowmap/viewer.py:link", "flowmap/viewer.py:viewer_url", "flowmap/change.py:link", "flowmap/change.py:main"],
+   "before": "`link`, the viewer URL lookup, the 60K link limit and the CSP lived in change.py, which imports lens.",
+   "after": "They live in viewer.py, whose only top-level flowmap import is config, and change.py imports them. `viewer_url` is extracted from `change.main`, not moved whole. `change --link` builds the same URL as before.",
+   "claim": "Behaviour-preserving, so `flowmap canvas --from` keeps working where no map or lens can load.",
+   "why": "canvas.py deliberately imports lens only when building from a map. Importing change.py for one helper would have broken that.",
+   "verified": [
+    {"how": "test", "what": "tests/test_change.py:LinkSizeTest"},
+    {"how": "ran", "what": "python3 -m unittest discover -s tests: 72 tests pass, 3 skipped"}
+   ],
+   "questions": [
+    {"q": "Does `viewer.py` importing `canvas` and `change` inside `main`, while they import it at the top, read as a cycle worth removing?", "why": "It works because the imports are deferred; splitting the helpers into their own module would remove the question at the cost of a file.", "kind": "ask"},
+    {"q": "Does `flowmap change <base> <head> --link` on any existing story still print a link that opens?", "why": "It settles that the move changed nothing, and this PR's own link is an instance of it.", "kind": "check"}
+   ]
+  },
+  {
+   "title": "The README says what flowmap is for, and readers can try it from there",
+   "role": "outside", "kind": "docs",
+   "files": ["README.md", "bin/flowmap", ".claude-plugin/plugin.json"],
+   "before": "The README opened with what the tools do and ran 179 lines: install steps twice, a stack table that said `pattern` call graphs were Python only, and a quick-start loop that fails in zsh because `$r` doesn't split.",
+   "after": "It opens with the goal, keeping up with a system while agents write its code, then the map, the lens and the change page, two screenshots (`docs/images/`; binary, so the facts don't list them) and two live links, in 154 lines. Adapter and builder detail now points at the contracts in the code. The README's links are snapshots and need regenerating to stay current. The help text names --link, and the plugin version goes to 0.4.0 so installed plugins pick up the change, including the canvas from #17, which had no bump.",
+   "claim": "A new reader can tell what the repo is for and try it without installing anything.",
+   "why": "Rather than keep every detail, the README drops what the code already documents. Two details left the README: copying `skills/*` by hand without the plugin system, which is now written nowhere, and what `--link` prints for a page too big even when trimmed, which change.py and pr-lens still cover.",
+   "verified": [
+    {"how": "ran", "what": "the new quick-start's inventory and brief commands in a throwaway FastAPI repo with no flowmap.toml: found the endpoint and wrote the briefs; verify on this repo's runs: 0 bad citations"},
+    {"how": "ran", "what": "GitHub's Markdown renderer on both reference links: the 16K and 20K hrefs came back intact"},
+    {"how": "not checked", "what": "reconcile from the rewritten quick-start, and the plugin install commands"}
+   ],
+   "questions": [
+    {"q": "Is the opening paragraph the goal as you'd state it: understanding the system well enough to take part in its decisions, not just to verify changes?", "why": "It is the one part of the README that is a judgement rather than a fact.", "kind": "ask"},
+    {"q": "`docs/flowmap/MAP.md` says it was built at `9f7d221`, which isn't a valid commit here, and the README now links to it. Regenerate it in a follow-up?", "why": "Readers arrive at that page from the first screen of the README.", "kind": "ask"}
+   ]
+  }
+ ]
+}
